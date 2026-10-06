@@ -31,3 +31,5 @@ designreference.html
 bench/corpus/*
 !bench/corpus/manifest.jsonl
 .pi/
+bench/runs/
+bench/models/

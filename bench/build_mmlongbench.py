@@ -14,6 +14,7 @@ from typing import Any
 
 from pyarrow.parquet import ParquetFile
 from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 
 from bench.corpus_sources import source_for
 from bench.sets_common import (
@@ -44,7 +45,7 @@ def pdf_pages(doc_id: str) -> int | None:
         return None
     try:
         return len(PdfReader(path).pages)
-    except Exception as exc:
+    except (OSError, PyPdfError) as exc:
         print(f"  unreadable pdf {doc_id}: {type(exc).__name__}: {exc}")
         return None
 
@@ -196,7 +197,7 @@ def build() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]
 def main() -> None:
     corpus, queries, report = build()
     corpus_count, corpus_sha = write_jsonl(SETS / "corpus" / "pdf.jsonl", corpus)
-    query_count, query_sha = write_jsonl(SETS / "pdf.jsonl", queries)
+    _query_count, query_sha = write_jsonl(SETS / "pdf.jsonl", queries)
     report |= {"corpus_records": corpus_count, "corpus_sha256": corpus_sha, "queries_sha256": query_sha}
     (SETS / "reports" / "pdf.json").parent.mkdir(parents=True, exist_ok=True)
     (SETS / "reports" / "pdf.json").write_text(json.dumps(report, indent=1, sort_keys=True))

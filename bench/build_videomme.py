@@ -185,7 +185,7 @@ def _counts(queries: list[dict[str, Any]], field: str) -> dict[str, int]:
 def main() -> None:
     corpus, queries, report = build()
     corpus_count, corpus_sha = write_jsonl(SETS / "corpus" / "video.jsonl", corpus)
-    query_count, query_sha = write_jsonl(SETS / "video.jsonl", queries)
+    _query_count, query_sha = write_jsonl(SETS / "video.jsonl", queries)
     report |= {"corpus_records": corpus_count, "corpus_sha256": corpus_sha, "queries_sha256": query_sha}
     (SETS / "reports").mkdir(parents=True, exist_ok=True)
     (SETS / "reports" / "video.json").write_text(

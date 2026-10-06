@@ -1,0 +1,5 @@
+{
+  "arms": ["bm25_only", "dense_only", "graph_only", "no_rerank", "fusion_rerank"],
+  "no_live": false,
+  "no_scale": false
+}

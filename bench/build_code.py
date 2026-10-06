@@ -217,7 +217,7 @@ def build() -> tuple[list, list, dict]:
 def main() -> None:
     corpus, queries, report = build()
     corpus_count, corpus_sha = write_jsonl(SETS / "corpus" / "code.jsonl", corpus)
-    query_count, query_sha = write_jsonl(SETS / "code.jsonl", queries)
+    _query_count, query_sha = write_jsonl(SETS / "code.jsonl", queries)
     report |= {"corpus_records": corpus_count, "corpus_sha256": corpus_sha, "queries_sha256": query_sha}
     (SETS / "reports").mkdir(parents=True, exist_ok=True)
     (SETS / "reports" / "code.json").write_text(

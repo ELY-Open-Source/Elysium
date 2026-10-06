@@ -1,7 +1,7 @@
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-extraPaths = ["."]
+extraPaths = [".", "backend/src"]
 pythonVersion = "3.12"
 include = ["bench", "backend/src"]
 
@@ -10,7 +10,20 @@ python_executable = ".venv/bin/python"
 mypy_path = "."
 python_version = "3.12"
 files = ["bench", "backend/src"]
+# bench/corpus is downloaded third-party data (git clones), not our source.
+exclude = "bench/corpus/"
 
 [[tool.mypy.overrides]]
 module = "pyarrow.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "rapidocr_onnxruntime.*",
+    "cv2.*",
+    "rank_bm25",
+    "sentence_transformers.*",
+    "onnxruntime.*",
+    "fitz.*",
+]
 ignore_missing_imports = true

@@ -31,7 +31,7 @@ def http_get(url: str) -> tuple[bytes, dict[str, str]]:
     if urllib.parse.urlsplit(url).scheme != "https" or urllib.parse.urlsplit(url).netloc != "huggingface.co":
         raise SystemExit(f"refusing non-HF url: {url}")
     try:
-        resp = OPENER.open(urllib.request.Request(url, headers=UA), timeout=300)  # noqa: S310
+        resp = OPENER.open(urllib.request.Request(url, headers=UA), timeout=300)
     except urllib.error.HTTPError as exc:
         raise SystemExit(f"HTTP {exc.code} {url}") from exc
     except urllib.error.URLError as exc:
@@ -90,7 +90,7 @@ def download_to(url: str, dest: Path) -> tuple[int, str]:
     digest = hashlib.sha256()
     size = 0
     try:
-        resp = OPENER.open(urllib.request.Request(url, headers=UA), timeout=600)  # noqa: S310
+        resp = OPENER.open(urllib.request.Request(url, headers=UA), timeout=600)
     except urllib.error.HTTPError as exc:
         raise SystemExit(f"HTTP {exc.code} {url}") from exc
     except urllib.error.URLError as exc:
