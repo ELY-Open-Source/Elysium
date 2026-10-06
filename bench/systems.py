@@ -8,6 +8,7 @@ ranked by its best atom.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -19,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from bench.ingest_baseline import source_map
 from bench.sets_common import ROOT
 
 RUNS = ROOT / "runs" / "baseline"
@@ -46,19 +48,34 @@ class Atom:
 
 
 def load_atoms(db_path: Path) -> list[Atom]:
-    """Every atom in the merged database, in a stable order."""
+    """Every atom in the merged database, keyed by the benchmark's source id.
+
+    The product names a source by content hash (`11089_4f2a...`), while the frozen
+    sets name the same file by its corpus id. `sources.path` is the only column
+    that identifies the original file, so the two id spaces are joined through it.
+    """
     if not db_path.is_file():
         raise SystemExit(f"{db_path}: no merged baseline database, run python -m bench.ingest_baseline first")
-    connection = sqlite3.connect(db_path)
+    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
-        rows = connection.execute("SELECT atom_id, source_id, text FROM atoms ORDER BY atom_id").fetchall()
+        rows = connection.execute(
+            "SELECT a.atom_id, s.path, a.text FROM atoms AS a "
+            "JOIN sources AS s ON s.source_id = a.source_id ORDER BY a.atom_id"
+        ).fetchall()
     except sqlite3.OperationalError as error:
         raise SystemExit(f"{db_path}: cannot read the atoms table ({error})") from error
     finally:
         connection.close()
     if not rows:
         raise SystemExit(f"{db_path}: the atoms table is empty")
-    return [Atom(atom_id=str(atom_id), source_id=str(source_id), text=str(text or "")) for atom_id, source_id, text in rows]
+    mapping = source_map()
+    unknown = sorted({str(path) for _, path, _ in rows if str(path) not in mapping})
+    if unknown:
+        raise SystemExit(f"{db_path}: {len(unknown)} atom paths are not corpus files, first {unknown[:3]}")
+    return [
+        Atom(atom_id=str(atom_id), source_id=str(mapping[str(path)]), text=str(text or ""))
+        for atom_id, path, text in rows
+    ]
 
 
 def tokenize(text: str) -> list[str]:
@@ -83,11 +100,18 @@ class SparseIndex:
         return np.asarray(self._model.get_scores(tokens), dtype=np.float64)
 
 
+def _cache_key(model_dir: Path, atoms: Sequence[Atom]) -> str:
+    """A cache name that follows the atom set, so a scale-curve subset can never
+    be scored with the full corpus's vectors (or the other way round)."""
+    joined = "\n".join(atom.atom_id for atom in atoms)
+    return f"{model_dir.name}-{hashlib.sha256(joined.encode('utf-8')).hexdigest()[:16]}"
+
+
 class DenseIndex:
     """Brute-force cosine over cached sentence embeddings, one vector per atom."""
 
     def __init__(self, atoms: Sequence[Atom], model_dir: Path, batch_size: int = 256, cache_name: str = "") -> None:
-        self._cache_name = cache_name or model_dir.name
+        self._cache_name = cache_name or _cache_key(model_dir, atoms)
         self._vectors = self._load_or_build(atoms, model_dir, batch_size)
 
     def _vectors_path(self, model_dir: Path) -> Path:
@@ -98,8 +122,11 @@ class DenseIndex:
         order_path = INDEX_DIR / f"{self._cache_name}.atoms.json"
         atom_ids = [atom.atom_id for atom in atoms]
         if path.is_file() and order_path.is_file():
-            vectors = np.load(path)
-            cached_ids = json.loads(order_path.read_text(encoding="utf-8"))
+            try:
+                vectors = np.load(path)
+                cached_ids = json.loads(order_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as error:
+                raise SystemExit(f"{order_path}: cached dense index is unreadable ({error})") from error
             if cached_ids == atom_ids and vectors.shape == (len(atoms), DENSE_DIM):
                 return vectors
             if cached_ids != atom_ids:

@@ -24,6 +24,11 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
+from ely_eye.storage import (  # the product's own source-id rule
+    safe_source_id,
+    sha256_bytes,
+)
+
 from bench.sets_common import MODALITIES, SETS, read_jsonl, record_path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -310,6 +315,15 @@ def merge() -> dict:
                     copied_objects += 1
     connection.commit()
 
+    # A file processed in two attempts lands in two shards. The atoms table
+    # dedupes on atom_id; fts5 has no key and kept every copy (288,266 rows for
+    # 165,973 atoms), which would inflate the product's text search statistics.
+    connection.execute("DELETE FROM atom_fts")
+    connection.execute(
+        "INSERT INTO atom_fts (atom_id, source, text) SELECT atom_id, source, text FROM atoms"
+    )
+    connection.commit()
+
     counts = {}
     for table, statement in COUNT_STATEMENTS.items():
         counts[table] = connection.execute(statement).fetchone()[0]
@@ -325,7 +339,11 @@ def merge() -> dict:
     if unmapped:
         raise SystemExit(f"{main_db}: {len(unmapped)} sources are not named by the corpus index, first {unmapped[:3]}")
     product_paths = {path for path, _ in rows}
-    unaccounted = sorted(done - product_paths)
+    product_ids = {source_id for _, source_id in rows}
+    # The product names a source by content hash, so two byte-identical files
+    # collapse into one source row (500 duplicate LongMemEval sessions).
+    collapsed_input = sorted(path for path in done - product_paths if safe_source_id(Path(path), sha256_bytes(Path(path).read_bytes())) in product_ids)
+    unaccounted = sorted(done - product_paths - set(collapsed_input))
     if unaccounted:
         raise SystemExit(
             f"{main_db}: {len(unaccounted)} ingested files produced no product source, first {unaccounted[:3]}"
@@ -342,12 +360,23 @@ def merge() -> dict:
     counts["benchmark_sources_total"] = len(total)
     counts["benchmark_sources_covered"] = len(covered)
     counts["product_sources"] = len(collapsed)
+    counts["duplicate_content_files"] = len(collapsed_input)
     counts["shared_source_ids"] = sum(1 for ids in collapsed.values() if len(ids) > 1)
-    if counts["files_not_ingested"] == 0 and covered != total:
+    if counts["atom_fts"] != counts["atoms"]:
         raise SystemExit(
-            f"{main_db}: every file was attempted but {len(total - covered)} benchmark sources have no product "
-            f"source; {counts['files_failed']} files failed, first failures {sorted(failed)[:3]}"
+            f"{main_db}: atom_fts holds {counts['atom_fts']} rows for {counts['atoms']} atoms"
         )
+    counts["uncovered_sources"] = len(total - covered)
+    if counts["files_not_ingested"] == 0 and covered != total:
+        # Two honest reasons: byte-identical inputs collapse into one content-hashed
+        # source, and files the product cannot ingest at all. Anything else is a bug.
+        explained = counts["duplicate_content_files"] + counts["files_failed"]
+        if counts["uncovered_sources"] > explained:
+            raise SystemExit(
+                f"{main_db}: {counts['uncovered_sources']} benchmark sources have no product source but only "
+                f"{explained} are explained by {counts['duplicate_content_files']} duplicate-content files and "
+                f"{counts['files_failed']} failures"
+            )
     counts["objects_copied"] = copied_objects
     (RUNS / "path_to_source_id.json").write_text(json.dumps(mapping, indent=1, sort_keys=True), encoding="utf-8")
     (RUNS / "ingest_report.json").write_text(json.dumps(counts, indent=1, sort_keys=True), encoding="utf-8")

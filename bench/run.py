@@ -37,7 +37,7 @@ from bench.systems import (
 ROOT = SETS.parent
 REPORTS = ROOT / "reports"
 DB_HOME = ROOT / "runs" / "baseline"
-LIVE_QUERIES = 120
+LIVE_QUERIES = 40  # the product rebuilds BM25 per query, so a live pass costs minutes per query
 SCALE_SIZES = (500, 2_000, 10_000, 50_000)
 
 
@@ -134,11 +134,16 @@ def scale_curve(queries: Sequence[Query], atoms: Sequence[Atom], arms: Sequence[
     return rows
 
 
-def live_check(queries: Sequence[Query], fast_rankings: dict[str, list[str]], top_k: int = 10) -> dict[str, Any]:
+def live_check(
+    queries: Sequence[Query],
+    fast_rankings: dict[str, list[str]],
+    top_k: int = 10,
+    live_queries: int = LIVE_QUERIES,
+) -> dict[str, Any]:
     """Compare the unmodified RetrievalService with the fast BM25 path."""
     probe = [query for query in queries if query.answerable]
-    stride = max(1, len(probe) // LIVE_QUERIES)
-    chosen = probe[::stride][:LIVE_QUERIES]
+    stride = max(1, len(probe) // live_queries)
+    chosen = probe[::stride][:live_queries]
     if not chosen:
         raise SystemExit("live check needs answerable queries")
     rankings, timings = live_product_rankings(DB_HOME, [query.text for query in chosen], top_k)
@@ -219,9 +224,15 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             f"| {overall['hit_at_10']:.3f} ({overall['hit_at_10_wilson_lower']:.3f}) "
             f"| {latency['p50']:.3f} | {latency['p95']:.3f} |"
         )
-    lines += ["", "## recall@10 by modality", "", "| arm | " + " | ".join(MODALITIES) + " |", "|---|" + "---|" * len(MODALITIES)]
+    shown = [modality for modality in MODALITIES if any(modality in arm["by_modality"] for arm in report["arms"])]
+    if not shown:
+        raise SystemExit("no per-modality scores to write")
+    lines += ["", "## recall@10 by modality", "", "| arm | " + " | ".join(shown) + " |", "|---|" + "---|" * len(shown)]
     for arm in report["arms"]:
-        cells = [f"{arm['by_modality'][modality]['recall_at_10']:.3f}" for modality in MODALITIES]
+        cells = [
+            f"{arm['by_modality'][modality]['recall_at_10']:.3f}" if modality in arm["by_modality"] else "-"
+            for modality in shown
+        ]
         lines.append(f"| {arm['arm']} | " + " | ".join(cells) + " |")
     lines += ["", "## unanswerable queries (44.8% of the suite)", ""]
     for arm in report["arms"]:
@@ -282,10 +293,11 @@ def load_config(parser: argparse.ArgumentParser, args: argparse.Namespace, path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--arms", nargs="+", choices=ARMS, default=list(ARMS))
+    parser.add_argument("--arms", nargs="+", choices=ARMS, action="extend", default=None)
     parser.add_argument("--modality", action="append", choices=MODALITIES, default=None)
     parser.add_argument("--limit", type=int, default=None, help="score at most this many queries per modality")
     parser.add_argument("--no-live", action="store_true", help="skip the unmodified RetrievalService path")
+    parser.add_argument("--live-queries", type=int, default=LIVE_QUERIES)
     parser.add_argument("--no-scale", action="store_true", help="skip the latency/scale curve")
     parser.add_argument("--out", type=Path, default=REPORTS)
     parser.add_argument("--config", type=Path, help="JSON defaults for these flags (bench/configs/ablation.json)")
@@ -294,6 +306,9 @@ def main() -> int:
         load_config(parser, args, args.config)
 
     modalities = args.modality or list(MODALITIES)
+    # action="extend" appends to the default, so an explicit --arms would otherwise
+    # run every arm plus the requested ones.
+    arms_requested: list[str] = list(args.arms or ARMS)
     queries = load_queries(modalities)
     if args.limit:
         capped: list[Query] = []
@@ -312,7 +327,7 @@ def main() -> int:
     }
     arms: list[dict[str, Any]] = []
     fast_rankings: dict[str, list[str]] = {}
-    for arm in args.arms:
+    for arm in arms_requested:
         print(f"== {arm}", flush=True)
         runner = ArmRunner(arm, atoms, MODELS)
         scores = []
@@ -344,9 +359,9 @@ def main() -> int:
         )
     report["arms"] = arms
     if not args.no_live:
-        report["live_product"] = live_check(queries, fast_rankings)
+        report["live_product"] = live_check(queries, fast_rankings, live_queries=args.live_queries)
     if not args.no_scale:
-        report["scale"] = scale_curve(queries, atoms, [arm for arm in args.arms if arm in ("bm25_only", "dense_only")])
+        report["scale"] = scale_curve(queries, atoms, [arm for arm in arms_requested if arm in ("bm25_only", "dense_only")])
 
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "baseline.json").write_text(json.dumps(report, indent=1, sort_keys=True), encoding="utf-8")

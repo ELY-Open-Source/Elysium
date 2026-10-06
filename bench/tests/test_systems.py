@@ -27,6 +27,11 @@ ATOMS = [
     Atom(atom_id="a3", source_id="src_red", text="the key hangs on the red door"),
 ]
 
+# The product names a source by content hash; the benchmark names the same file by
+# its corpus id (the source_id above). load_atoms joins the two through sources.path.
+PRODUCT_SOURCES = {"prod_red_9f3a": "/fixture/red.png", "prod_blue_1c77": "/fixture/blue.png"}
+ATOM_PRODUCT_IDS = ["prod_red_9f3a", "prod_blue_1c77", "prod_red_9f3a"]
+
 
 def test_tokenize_keeps_cjk_and_words() -> None:
     assert tokenize("钥匙 Key") == ["钥匙", "key"]
@@ -91,28 +96,48 @@ def test_local_model_dir_flattens_the_namespace() -> None:
 
 
 def make_database(path: Path) -> None:
-    """Create the product's atoms table and put three rows in it."""
+    """Create the product's atoms and sources tables and put three rows in them."""
     connection = sqlite3.connect(path)
     connection.execute(
         "CREATE TABLE atoms (atom_id text PRIMARY KEY, source_id text, modality text, source text, time text,"
         " text text, image_ref text, embedding_refs_json text, layout_json text, relations_json text,"
         " trust_json text, token_equivalent integer, metadata_json text)"
     )
-    for atom in ATOMS:
-        connection.execute("INSERT INTO atoms (atom_id, source_id, text) VALUES (?, ?, ?)", (atom.atom_id, atom.source_id, atom.text))
+    connection.execute("CREATE TABLE sources (source_id text PRIMARY KEY, path text)")
+    for atom, product_id in zip(ATOMS, ATOM_PRODUCT_IDS, strict=True):
+        connection.execute("INSERT INTO atoms (atom_id, source_id, text) VALUES (?, ?, ?)", (atom.atom_id, product_id, atom.text))
+    for source_id, file_path in PRODUCT_SOURCES.items():
+        connection.execute("INSERT INTO sources (source_id, path) VALUES (?, ?)", (source_id, file_path))
     connection.commit()
     connection.close()
 
 
-def test_load_atoms_returns_every_row_in_a_stable_order(tmp_path: Path) -> None:
+def fake_source_map() -> dict[str, str]:
+    """Stand in for the frozen corpus index: file path to the corpus id the gold uses."""
+    return {PRODUCT_SOURCES[pid]: atom.source_id for atom, pid in zip(ATOMS, ATOM_PRODUCT_IDS, strict=True)}
+
+
+def test_load_atoms_returns_every_row_in_a_stable_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bench.systems.source_map", fake_source_map)
     db = tmp_path / "ely_eye.sqlite"
     make_database(db)
     loaded = load_atoms(db)
     assert [atom.atom_id for atom in loaded] == ["a1", "a2", "a3"]
+    # The database stores the product's content-hash id; the caller gets the corpus id
+    # the gold annotations use.
+    assert [atom.source_id for atom in loaded] == ["src_red", "src_blue", "src_red"]
     assert loaded[2].text == "the key hangs on the red door"
 
 
-def test_load_atoms_fails_fast_on_a_missing_or_unusable_database(tmp_path: Path) -> None:
+def test_load_atoms_refuses_an_atom_it_cannot_trace_to_a_corpus_file(tmp_path: Path) -> None:
+    db = tmp_path / "ely_eye.sqlite"
+    make_database(db)
+    with pytest.raises(SystemExit, match="atom paths are not corpus files"):
+        load_atoms(db)
+
+
+def test_load_atoms_fails_fast_on_a_missing_or_unusable_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bench.systems.source_map", fake_source_map)
     with pytest.raises(SystemExit, match="no merged baseline database"):
         load_atoms(tmp_path / "absent.sqlite")
     no_table = tmp_path / "no_table.sqlite"

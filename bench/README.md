@@ -50,6 +50,18 @@ Treat that command as the check of record for import health; treat pyright's *ty
 (it has caught real defects here: an `AtomRunner` typo, missing `strict=True` on `zip`,
 `dict[str, object]` over-narrowing) as separate and worth fixing.
 
+The pi-lens mypy cascade also replays **stale** findings after a fix: it attributes another
+file's lines to whichever file was edited last (e.g. `bench/fetch_models.py:107: "object" has
+no attribute "encode"`, where line 107 of that file is a `Path` call and the quoted text is
+from `bench/systems.py`). The check of record is a fresh-cache run, which has passed on every
+current file:
+
+```bash
+rm -rf /tmp/mypycache && .venv/bin/python -m mypy --cache-dir /tmp/mypycache bench/   # Success: no issues found
+.venv/bin/python -m ruff check bench/                                                  # All checks passed
+.venv/bin/python -m pytest bench/tests -q                                              # all green
+```
+
 ## corpus facts that constrain the numbers
 
 - 50,789 sources / 5,308 queries (2,928 answerable, 2,380 unanswerable), all third-party.
