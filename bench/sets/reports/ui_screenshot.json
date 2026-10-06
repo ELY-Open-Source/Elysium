@@ -1,0 +1,24 @@
+{
+ "annotations": 1272,
+ "corpus_records": 730,
+ "corpus_sha256": "5bb110728ba5726f918139743612fcb0ca1a5e91cca2d396aaf4d3b022336570",
+ "datasets": [
+  "OS-Copilot/ScreenSpot-v2"
+ ],
+ "holders": [
+  "android",
+  "forum",
+  "gitlab",
+  "ios",
+  "macos",
+  "shop",
+  "tool",
+  "windows"
+ ],
+ "queries": 640,
+ "queries_answerable": 320,
+ "queries_cross_holder_unanswerable": 320,
+ "queries_sha256": "2269dd623e67cd851fb3f6b24a4556a8462a37db98e12ad79577c5830167c7c5",
+ "revision": "5efbb1f1b5463a575f2eb7bc30fe29e49c15f93c",
+ "screenshots": 730
+}

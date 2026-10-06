@@ -1,0 +1,16 @@
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["."]
+pythonVersion = "3.12"
+include = ["bench", "backend/src"]
+
+[tool.mypy]
+python_executable = ".venv/bin/python"
+mypy_path = "."
+python_version = "3.12"
+files = ["bench", "backend/src"]
+
+[[tool.mypy.overrides]]
+module = "pyarrow.*"
+ignore_missing_imports = true

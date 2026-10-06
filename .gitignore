@@ -27,3 +27,7 @@ CLAUDE.md
 designreference.html
 # Local landing site — deployed to Cloudflare, not part of this repo
 /ely-eye-web/
+
+bench/corpus/*
+!bench/corpus/manifest.jsonl
+.pi/

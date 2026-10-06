@@ -1,0 +1,74 @@
+{
+ "corpus_records": 20643,
+ "corpus_sha256": "4c34a3fbeddbe050431a5e8881d3a2ea56adf6af3448912e700a6f5e919eb76d",
+ "datasets": [
+  "openbmb/VisRAG-Ret-Test-ArxivQA",
+  "openbmb/VisRAG-Ret-Test-ChartQA",
+  "openbmb/VisRAG-Ret-Test-InfoVQA",
+  "openbmb/VisRAG-Ret-Test-MP-DocVQA",
+  "openbmb/VisRAG-Ret-Test-PlotQA",
+  "openbmb/VisRAG-Ret-Test-SlideVQA"
+ ],
+ "holders": [
+  "arxivqa",
+  "chartqa",
+  "infovqa",
+  "mp-docvqa",
+  "plotqa",
+  "slidevqa"
+ ],
+ "queries": 480,
+ "queries_answerable": 240,
+ "queries_cross_holder_unanswerable": 240,
+ "queries_sha256": "1c74488375c7ec9f3182964d51a5e506273bfd5cf3d126725c3cc431a8333128",
+ "subsets": {
+  "arxivqa": {
+   "corpus_images": 8066,
+   "dataset": "openbmb/VisRAG-Ret-Test-ArxivQA",
+   "queries_annotated": 816,
+   "queries_dropped_missing_gold_image": 0,
+   "queries_usable": 816,
+   "revision": "00a31fc1e899b5f81d7760eca4907b1a1005865b"
+  },
+  "chartqa": {
+   "corpus_images": 500,
+   "dataset": "openbmb/VisRAG-Ret-Test-ChartQA",
+   "queries_annotated": 63,
+   "queries_dropped_missing_gold_image": 0,
+   "queries_usable": 63,
+   "revision": "31f5ceb5d60b02e065bff394cb582f5bbb01a9b6"
+  },
+  "infovqa": {
+   "corpus_images": 459,
+   "dataset": "openbmb/VisRAG-Ret-Test-InfoVQA",
+   "queries_annotated": 718,
+   "queries_dropped_missing_gold_image": 0,
+   "queries_usable": 718,
+   "revision": "04ee2db1d0a05304899453a3b03baef5e18991a3"
+  },
+  "mp-docvqa": {
+   "corpus_images": 741,
+   "dataset": "openbmb/VisRAG-Ret-Test-MP-DocVQA",
+   "queries_annotated": 591,
+   "queries_dropped_missing_gold_image": 0,
+   "queries_usable": 591,
+   "revision": "3ebd091c458cf04161f78cd7b12ea101f83e2529"
+  },
+  "plotqa": {
+   "corpus_images": 9593,
+   "dataset": "openbmb/VisRAG-Ret-Test-PlotQA",
+   "queries_annotated": 863,
+   "queries_dropped_missing_gold_image": 0,
+   "queries_usable": 863,
+   "revision": "ef953ef8ab6d78ac112dd4cde6acdb2c2692039a"
+  },
+  "slidevqa": {
+   "corpus_images": 1284,
+   "dataset": "openbmb/VisRAG-Ret-Test-SlideVQA",
+   "queries_annotated": 556,
+   "queries_dropped_missing_gold_image": 0,
+   "queries_usable": 556,
+   "revision": "6b5f81a3f6953095934c26c5d420dfd039184d69"
+  }
+ }
+}

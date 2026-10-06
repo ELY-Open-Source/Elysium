@@ -1,0 +1,28 @@
+{
+ "annotated_videos": 900,
+ "by_duration": {
+  "long": 34,
+  "medium": 76,
+  "short": 105
+ },
+ "corpus_records": 129,
+ "corpus_sha256": "6965a1e0541922fcb5f7bf943f6e67681bf3a2681bd1f196968621e870dc61c2",
+ "datasets": [
+  "lmms-eval/Video-MME"
+ ],
+ "holders": [
+  "Artistic-Performance",
+  "Film-Television",
+  "Knowledge",
+  "Life-Record",
+  "Multilingual",
+  "Sports-Competition"
+ ],
+ "queries": 430,
+ "queries_answerable": 215,
+ "queries_cross_holder_unanswerable": 215,
+ "queries_sha256": "4973231d9f16d214b14923d79a34b85c3d2b423624dea752b1ee91ba09ff778c",
+ "questions_for_held_videos": 387,
+ "revision": "ead1408f75b618502df9a1d8e0950166bf0a2a0b",
+ "videos_on_disk": 129
+}

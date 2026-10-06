@@ -1,0 +1,38 @@
+{
+ "annotation_rows": 1091,
+ "corpus_records": 123,
+ "corpus_sha256": "68f20f0b5b203b73aa08adbb4e61a512d5c9d55f60d10ea229bbdfc3322cf713",
+ "datasets": [
+  "yubo2333/MMLongBench-Doc"
+ ],
+ "documents_annotated": 135,
+ "documents_dropped": [
+  "2023.acl-long.386.pdf",
+  "2307.09288v2.pdf",
+  "2312.09390v1.pdf",
+  "NYU_graduate.pdf",
+  "PI_2018.11.19_algorithms_FINAL.pdf",
+  "PS_2018.01.09_STEM_FINAL.pdf",
+  "bigdatatrends-120723191058-phpapp02_95.pdf",
+  "edb88a99670417f64a6b719646aed326.pdf",
+  "f1f5242528411b262be447e61e2eb10f.pdf",
+  "mi_phone.pdf",
+  "san-francisco-11-contents.pdf",
+  "stereo_headset.pdf"
+ ],
+ "documents_usable": 123,
+ "holders": [
+  "Academic-paper",
+  "Administration-Industry-file",
+  "Brochure",
+  "Financial-report",
+  "Guidebook",
+  "Research-report-Introduction",
+  "Tutorial-Workshop"
+ ],
+ "queries": 984,
+ "queries_dropped_no_evidence_page": 9,
+ "queries_sha256": "0cec488e660bf1bfa7ccfc72dbae8b7e3005f0b6a0255028e502296d4ecd4536",
+ "revision": "2ff6aa9237fc777b6627dc57a486e9225ac5fb86",
+ "unanswerable": 218
+}
