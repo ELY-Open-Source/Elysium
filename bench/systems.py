@@ -286,6 +286,97 @@ class ArmRunner:
         return float(np.percentile(np.asarray(self.timings), fraction * 100))
 
 
+# Which measured signals each arm consumes; JointRunner times each signal once and
+# attributes it to every arm that uses it.
+ARM_COMPONENTS: dict[str, tuple[str, ...]] = {
+    "bm25_only": ("sparse",),
+    "dense_only": ("dense",),
+    "graph_only": ("graph",),
+    "no_rerank": ("sparse", "dense", "graph", "fuse"),
+    "fusion_rerank": ("sparse", "dense", "graph", "fuse"),
+}
+
+
+class JointRunner:
+    """Every requested arm over one corpus, computing each signal once per query.
+
+    ArmRunner recomputes the sparse and dense signals per arm; over 166K atoms that is
+    hours of duplicated work. This pass computes each signal once and derives every
+    arm's ranking from it, so a ranking matches ArmRunner's exactly while latency is
+    attributed to the components that arm actually uses.
+    """
+
+    def __init__(self, arms: Sequence[str], atoms: Sequence[Atom], models: Path) -> None:
+        for arm in arms:
+            if arm not in ARMS:
+                raise SystemExit(f"{arm}: unknown arm, expected one of {ARMS}")
+        if not arms:
+            raise SystemExit("JointRunner needs at least one arm")
+        self.arms = [arm for arm in ARMS if arm in arms]
+        self.atoms = atoms
+        self.models = models
+        self.timings: dict[str, list[float]] = {arm: [] for arm in self.arms}
+        self._sparse: SparseIndex | None = None
+        self._dense: DenseIndex | None = None
+        self._reranker: Reranker | None = None
+        if any(arm in ("bm25_only", "no_rerank", "fusion_rerank") for arm in self.arms):
+            self._sparse = SparseIndex(atoms)
+        if any(arm in ("dense_only", "no_rerank", "fusion_rerank") for arm in self.arms):
+            self._dense = DenseIndex(atoms, local_model_dir(models, DENSE_MODEL))
+        if "fusion_rerank" in self.arms:
+            self._reranker = Reranker(local_model_dir(models, RERANK_MODEL))
+
+    def rank_all(self, query: str, top_k: int = 10) -> dict[str, tuple[list[str], float]]:
+        """Rank one query with every arm; returns {arm: (source_ids, seconds)}."""
+        signals: dict[str, np.ndarray] = {}
+        seconds: dict[str, float] = {}
+        started = time.perf_counter()
+        signals["graph"] = np.zeros(len(self.atoms), dtype=np.float64)
+        seconds["graph"] = time.perf_counter() - started
+        if self._sparse is not None:
+            started = time.perf_counter()
+            signals["sparse"] = self._sparse.scores(query)
+            seconds["sparse"] = time.perf_counter() - started
+        if self._dense is not None:
+            started = time.perf_counter()
+            signals["dense"] = self._dense.scores(query, local_model_dir(self.models, DENSE_MODEL))
+            seconds["dense"] = time.perf_counter() - started
+        if any(arm in ("no_rerank", "fusion_rerank") for arm in self.arms):
+            started = time.perf_counter()
+            signals["fuse"] = fuse(
+                signals.get("sparse", np.zeros(len(self.atoms))),
+                signals.get("dense", np.zeros(len(self.atoms))),
+                signals["graph"],
+            )
+            seconds["fuse"] = time.perf_counter() - started
+        ranked: dict[str, tuple[list[str], float]] = {}
+        for arm in self.arms:
+            started = time.perf_counter()
+            order = self._order(arm, query, signals, top_k)
+            total = sum(seconds[name] for name in ARM_COMPONENTS[arm]) + (time.perf_counter() - started)
+            self.timings[arm].append(total)
+            ranked[arm] = (order, total)
+        return ranked
+
+    def _order(self, arm: str, query: str, signals: dict[str, np.ndarray], top_k: int) -> list[str]:
+        if arm == "graph_only":
+            return top_sources(signals["graph"], self.atoms, top_k)
+        if arm == "bm25_only":
+            return top_sources(signals["sparse"], self.atoms, top_k)
+        if arm == "dense_only":
+            return top_sources(signals["dense"], self.atoms, top_k)
+        fused = signals["fuse"]
+        if arm == "no_rerank":
+            return top_sources(fused, self.atoms, top_k)
+        candidates = top_sources(fused, self.atoms, RERANK_CANDIDATES)
+        by_source = _best_atom_text(self.atoms, candidates)
+        if self._reranker is None:
+            raise SystemExit(f"{arm}: the reranker model is missing, run python -m bench.fetch_models")
+        rerank_scores = self._reranker.scores(query, [text for _, text in by_source])
+        order = sorted(zip(candidates, rerank_scores, strict=True), key=lambda item: (-item[1], item[0]))
+        return [source_id for source_id, _ in order[:top_k]]
+
+
 def _best_atom_text(atoms: Sequence[Atom], source_ids: Sequence[str]) -> list[tuple[str, str]]:
     longest: dict[str, str] = {}
     for atom in atoms:

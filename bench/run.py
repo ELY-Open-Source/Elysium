@@ -10,6 +10,7 @@ Run: python -m bench.run [--arms bm25_only] [--limit 200] [--no-live] [--out ben
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -20,6 +21,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from bench.metrics import aggregate, chance_recall_at_k, score_query
 from bench.sets_common import MODALITIES, SETS, read_jsonl, sha256_file
 from bench.systems import (
@@ -29,6 +32,7 @@ from bench.systems import (
     RERANK_MODEL,
     ArmRunner,
     Atom,
+    JointRunner,
     arm_needs,
     live_product_rankings,
     load_atoms,
@@ -38,6 +42,7 @@ ROOT = SETS.parent
 REPORTS = ROOT / "reports"
 DB_HOME = ROOT / "runs" / "baseline"
 LIVE_QUERIES = 40  # the product rebuilds BM25 per query, so a live pass costs minutes per query
+PROGRESS_EVERY = 250  # an arm takes tens of minutes over 5,308 queries; silence looks like a hang
 SCALE_SIZES = (500, 2_000, 10_000, 50_000)
 
 
@@ -291,6 +296,66 @@ def load_config(parser: argparse.ArgumentParser, args: argparse.Namespace, path:
         raise SystemExit(f"{path}: unknown arm(s) {unknown}, expected one of {list(ARMS)}")
 
 
+def latency(times: Sequence[float]) -> dict[str, float]:
+    """Latency summary for one arm's per-query wall times."""
+    values = np.asarray(times, dtype=np.float64)
+    if values.size == 0:
+        raise SystemExit("no latency samples recorded for this arm")
+    return {
+        "queries": int(values.size),
+        "mean": float(values.mean()),
+        "p50": float(np.percentile(values, 50)),
+        "p95": float(np.percentile(values, 95)),
+        "max": float(values.max()),
+    }
+
+
+def rss_gib() -> float:
+    """Resident memory of this process; a nine-hour run needs to show its growth."""
+    try:
+        for line in Path("/proc/self/status").read_text(encoding="utf-8").splitlines():
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) / 1024 / 1024
+    except OSError:
+        return 0.0
+    return 0.0
+
+
+def fingerprint(arms: Sequence[str], queries: Sequence[Query], atoms: Sequence[Atom]) -> str:
+    """Identity of a rankings cache: the arms, the query set, and the corpus behind them."""
+    corpus = hashlib.sha256("\n".join(atom.atom_id for atom in atoms).encode("utf-8")).hexdigest()[:16]
+    payload = "\n".join(
+        [",".join(arms), ",".join(query.query_id for query in queries), str(len(atoms)), corpus]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def load_rankings(path: Path, mark: str) -> dict[str, dict[str, Any]]:
+    """Read a resumable rankings cache; a header mismatch is an error, not a silent restart."""
+    if not path.exists():
+        return {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise SystemExit(f"{path}: cannot read the rankings cache ({error})") from error
+    rows: dict[str, dict[str, Any]] = {}
+    for index, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise SystemExit(f"{path}:{index}: not JSON ({error})") from error
+        if index == 1:
+            if row.get("fingerprint") != mark:
+                raise SystemExit(
+                    f"{path}: cached rankings belong to a different run, delete the file to start fresh"
+                )
+            continue
+        rows[str(row["query_id"])] = dict(row["arms"])
+    return rows
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--arms", nargs="+", choices=ARMS, action="extend", default=None)
@@ -325,14 +390,42 @@ def main() -> int:
         "meta": meta(corpus_sources, queries, args.limit),
         "chance": chance_row(queries, corpus_sources),
     }
+    # One pass over the queries: each signal is computed once and every arm is derived
+    # from it, and each query is checkpointed so a kill costs one query, not an arm.
+    mark = fingerprint(arms_requested, queries, atoms)
+    rankings_path = DB_HOME / "rankings.jsonl"
+    done = load_rankings(rankings_path, mark)
+    joint = JointRunner(arms_requested, atoms, MODELS)
+    resumed = 0
+    with rankings_path.open("a", encoding="utf-8") as cache:
+        if not done:
+            cache.write(f"{json.dumps({'fingerprint': mark})}\n")
+        for index, query in enumerate(queries, start=1):
+            if query.query_id in done:
+                resumed += 1
+                continue
+            per_arm = joint.rank_all(query.text)
+            done[query.query_id] = {
+                arm: {"ranked": order, "seconds": seconds} for arm, (order, seconds) in per_arm.items()
+            }
+            cache.write(f"{json.dumps({'query_id': query.query_id, 'arms': done[query.query_id]})}\n")
+            if index % PROGRESS_EVERY == 0:
+                cache.flush()
+                print(f"   {index}/{len(queries)} queries, rss {rss_gib():.1f} GiB", flush=True)
+    if resumed:
+        print(f"   resumed {resumed} queries from {rankings_path}", flush=True)
+
     arms: list[dict[str, Any]] = []
     fast_rankings: dict[str, list[str]] = {}
-    for arm in arms_requested:
-        print(f"== {arm}", flush=True)
-        runner = ArmRunner(arm, atoms, MODELS)
+    for arm in [arm for arm in ARMS if arm in arms_requested]:
         scores = []
+        times: list[float] = []
         for query in queries:
-            ranked = runner.rank(query.text)
+            record = done.get(query.query_id)
+            if record is None or arm not in record:
+                raise SystemExit(f"{rankings_path}: no cached ranking for {query.query_id} arm {arm}")
+            times.append(float(record[arm]["seconds"]))
+            ranked = [str(source_id) for source_id in record[arm]["ranked"]]
             scores.append(score_query(query.query_id, ranked, set(query.gold), holder=query.holder, holder_of=holders))
             if arm == "bm25_only":
                 fast_rankings[query.query_id] = ranked
@@ -341,16 +434,10 @@ def main() -> int:
             modality: aggregate([s for s, q in zip(scores, queries, strict=True) if q.modality == modality])
             for modality in sorted({q.modality for q in queries})
         }
-        summary["latency_seconds"] = {
-            "queries": len(runner.timings),
-            "mean": sum(runner.timings) / len(runner.timings),
-            "p50": runner.percentile(0.50),
-            "p95": runner.percentile(0.95),
-            "max": max(runner.timings),
-        }
+        summary["latency_seconds"] = latency(times)
         arms.append(summary)
         print(
-            f"   recall@10 {summary['overall']['recall_at_10']:.3f} "
+            f"== {arm} recall@10 {summary['overall']['recall_at_10']:.3f} "
             f"hit@10 {summary['overall']['hit_at_10']:.3f} "
             f"(95% lower {summary['overall']['hit_at_10_wilson_lower']:.3f}) "
             f"abstain {summary['overall']['abstention_rate_unanswerable']:.0%} "
@@ -358,6 +445,8 @@ def main() -> int:
             flush=True,
         )
     report["arms"] = arms
+    # A crash in the live or scale phase should not cost every finished arm.
+    (DB_HOME / "partial_report.json").write_text(json.dumps(report, indent=1, sort_keys=True), encoding="utf-8")
     if not args.no_live:
         report["live_product"] = live_check(queries, fast_rankings, live_queries=args.live_queries)
     if not args.no_scale:
