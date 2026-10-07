@@ -24,8 +24,9 @@ from .ingestion import IngestionService
 from .memory import MemoryService
 from .profiles import runtime_profile_report
 from .research_modules import ResearchModuleService
+from .retrieval import RetrievalService
 from .runtime import QwenRuntime
-from .schemas import MemoryOrigin, TimePrecision, TrainingAdapterKind
+from .schemas import MemoryOrigin, SearchFilters, TimePrecision, TrainingAdapterKind
 from .training import TrainingService
 
 app = typer.Typer(no_args_is_help=True)
@@ -77,6 +78,36 @@ def _moment(value: str, option: str) -> datetime | None:
         return datetime.fromisoformat(value)
     except ValueError as error:
         raise ValueError(f"{option} {value!r} is not an ISO timestamp: {error}") from error
+
+
+@app.command()
+def search(
+    query: str,
+    top_k: int = typer.Option(0, "--top-k", help="hits to return; 0 uses the configured default"),
+    holder: str = typer.Option("", "--holder", help="only this holder's memories may answer"),
+    scenario: str = typer.Option("", "--scenario"),
+    source_id: str = typer.Option("", "--source-id"),
+    since: str = typer.Option("", "--since", help="event time at or after, ISO with offset"),
+    until: str = typer.Option("", "--until"),
+    min_trust: float = typer.Option(-1.0, "--min-trust", help="drop memories whose trust falls below this"),
+    cursor: str = typer.Option("", "--cursor", help="next_cursor from the previous page"),
+) -> None:
+    """Rank the memories that may answer, and say so when none may."""
+    settings = get_settings()
+    result = RetrievalService(settings).search(
+        query,
+        top_k or None,
+        filters=SearchFilters(
+            holder=holder or None,
+            scenario=scenario or None,
+            source_id=source_id or None,
+            since=_moment(since, "--since"),
+            until=_moment(until, "--until"),
+            min_trust=None if min_trust < 0 else min_trust,
+        ),
+        cursor=cursor or None,
+    )
+    typer.echo(result.model_dump_json(indent=2))
 
 
 @app.command()
@@ -289,7 +320,7 @@ def build_visual_training_data(
     prd_path: Path = Path("PRD.md"),
     output_path: Path | None = None,
     cartridge_id: str | None = None,
-    image_path: list[Path] | None = typer.Option(None, "--image-path"),
+    image_path: list[Path] | None = typer.Option(None, "--image-path"),  # noqa: B008  # typer reads option defaults itself
 ) -> None:
     path = TrainingService(get_settings()).build_visual_dataset(
         prd_path=prd_path,

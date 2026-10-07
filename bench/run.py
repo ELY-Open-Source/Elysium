@@ -252,7 +252,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         ),
         f"- models: dense `{report['meta']['models']['dense']}`, rerank `{report['meta']['models']['rerank']}`",
         (
-            f"- machine: {report['meta']['machine']['cpus']} cores, load average "
+            f"- machine: {report['meta']['machine']['cpus']} cores, "
+            f"{report['meta']['machine']['threads_per_query']} threads per query, load average "
             f"{report['meta']['machine']['load_average_1_5_15'][0]:.1f} when the report was written"
         ),
         "",

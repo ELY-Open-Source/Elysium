@@ -222,3 +222,22 @@ def test_atoms_as_of_walks_the_validity_timeline(tmp_path: Path) -> None:
     assert {atom.atom_id for atom in database.atoms_as_of(NOW - timedelta(days=2))} == {"closed"}
     assert database.atoms_as_of(NOW, holder="nobody") == []
     assert {atom.atom_id for atom in database.atoms_as_of(NOW, holder="wife")} == {"live"}
+
+
+def test_a_second_version_database_rebuilds_its_index_on_upgrade(tmp_path: Path) -> None:
+    """A second-version store indexed raw text, so 钥匙 could never match; the upgrade fixes the index."""
+    database = _database(tmp_path)
+    _seed_source(database)
+    database.upsert_atoms([_atom("key")])
+    with database.connect() as connection:
+        connection.execute("DELETE FROM atom_fts")
+        connection.execute(
+            "INSERT INTO atom_fts(atom_id, source, text) VALUES ('key', 'notes/key.txt', '钥匙放在玄关抽屉里')"
+        )
+        connection.execute("PRAGMA user_version = 2")
+    assert database.search_fts("钥匙", 5) == [], "the old index really could not answer this query"
+
+    upgraded = _database(tmp_path)
+    assert [atom_id for atom_id, _ in upgraded.search_fts("钥匙", 5)] == ["key"]
+    with upgraded.connect() as connection:
+        assert int(connection.execute("PRAGMA user_version").fetchone()[0]) == SCHEMA_VERSION

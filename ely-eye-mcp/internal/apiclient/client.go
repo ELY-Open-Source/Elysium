@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
 )
 
 const maxErrorBody = 4096
@@ -81,4 +83,52 @@ func serverReason(status int, data []byte) string {
 		return fmt.Sprintf("HTTP %d with no reason", status)
 	}
 	return trimmed
+}
+
+// SearchOptions is one ranked query. Empty optional fields are omitted, so the
+// server's own defaults decide rather than a zero value invented here.
+type SearchOptions struct {
+	Query    string
+	Modality string
+	Holder   string
+	Scenario string
+	Limit    int
+}
+
+// SearchResult carries the server's own verdict: "no_match" is a claim about the
+// corpus, an empty hit list is not.
+type SearchResult struct {
+	Status     string           `json:"status"`
+	Hits       []domain.AtomHit `json:"hits"`
+	NextCursor string           `json:"next_cursor"`
+}
+
+// Search asks the running server to rank. The ranking lives in one place, so an
+// MCP hit cannot disagree with an HTTP or CLI hit for the same query.
+func (c *Client) Search(ctx context.Context, options SearchOptions) (*SearchResult, error) {
+	if strings.TrimSpace(options.Query) == "" {
+		return nil, errors.New("query is required")
+	}
+	body := map[string]any{"query": options.Query}
+	if options.Limit > 0 {
+		body["top_k"] = options.Limit
+	}
+	filters := map[string]string{}
+	for key, value := range map[string]string{
+		"modality": options.Modality,
+		"holder":   options.Holder,
+		"scenario": options.Scenario,
+	} {
+		if value != "" {
+			filters[key] = value
+		}
+	}
+	if len(filters) > 0 {
+		body["filters"] = filters
+	}
+	var result SearchResult
+	if err := c.Post(ctx, "/api/search", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

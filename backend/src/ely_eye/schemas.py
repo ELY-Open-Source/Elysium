@@ -150,6 +150,44 @@ class RetrievalHit(BaseModel):
     graph_score: float = 0.0
     final_score: float
 
+
+class SearchFilters(BaseModel):
+    """Who may answer, in what setting, and how fresh the memory has to be.
+
+    A memory with no event time cannot satisfy since/until, so it drops out when a time bound is
+    asked for rather than passing as unknown.
+    """
+
+    holder: str | None = None
+    scenario: str | None = None
+    source_id: str | None = None
+    modality: Modality | None = None
+    since: datetime | None = None
+    until: datetime | None = None
+    min_trust: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _times_are_ordered(self) -> SearchFilters:
+        if self.since and self.until and self.since > self.until:
+            raise ValueError("search since must not be after until")
+        return self
+
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int | None = Field(default=None, gt=0)
+    filters: SearchFilters | None = None
+    cursor: str | None = None
+
+
+class SearchResult(BaseModel):
+    """An empty answer says why: no_match is a claim about the corpus, [] is not."""
+
+    query: str
+    status: Literal["hits", "no_match"]
+    hits: list[RetrievalHit]
+    next_cursor: str | None = None
+
 class ContextPlan(BaseModel):
     question: str
     profile: RuntimeProfile

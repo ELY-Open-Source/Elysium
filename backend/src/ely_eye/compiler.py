@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Iterable
+from collections.abc import Iterable
 
 from .cache_fabric import CacheFabric
 from .config import Settings, get_settings
 from .db import Database
 from .retrieval import RetrievalService
 from .schemas import CompiledContext, ContextPlan, Modality, RetrievalHit, RuntimeProfile
-
 
 PROFILE_TOKEN_BUDGETS = {
     RuntimeProfile.live_demo: 128_000,
@@ -34,9 +33,9 @@ class ContextCompiler:
                 return compiled
 
         plan = self.plan(question, profile)
-        hits = self.retrieval.search(plan.retrieval_query, plan.evidence_budget_atoms)
+        hits = self.retrieval.search(plan.retrieval_query, plan.evidence_budget_atoms).hits
         packed_text, token_total = self._pack_hits(hits, plan.token_budget, plan.retrieval_query)
-        trace_id = hashlib.sha256(f"{cache_key}:{token_total}".encode("utf-8")).hexdigest()[:16]
+        trace_id = hashlib.sha256(f"{cache_key}:{token_total}".encode()).hexdigest()[:16]
         compiled = CompiledContext(
             plan=plan,
             hits=hits,

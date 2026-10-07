@@ -38,6 +38,7 @@ from .ingestion import IngestionService
 from .memory import MemoryService
 from .profiles import runtime_profile_report
 from .research_modules import ResearchModuleService
+from .retrieval import RetrievalService
 from .runtime import QwenRuntime, RuntimeUnavailableError
 from .schemas import (
     AdapterManifest,
@@ -53,6 +54,8 @@ from .schemas import (
     RememberRequest,
     RuntimeProfile,
     RuntimeProfileReport,
+    SearchRequest,
+    SearchResult,
     SupersedeRequest,
     SystemStatus,
     UploadIngestRequest,
@@ -189,6 +192,15 @@ def create_app() -> FastAPI:
             verifier=report,
             runtime_backend=generation.backend,
         )
+
+    @app.post("/api/search", response_model=SearchResult)
+    def search(request: SearchRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> SearchResult:
+        try:
+            return RetrievalService(settings).search(
+                request.query, request.top_k, filters=request.filters, cursor=request.cursor
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/memory", response_model=EvidenceAtom)
     def remember(

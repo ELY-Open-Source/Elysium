@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
 	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/contextpack"
 	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,8 +22,10 @@ type GetCartridgeInput struct {
 }
 
 type SearchAtomsInput struct {
-	Query    string `json:"query" jsonschema:"search query for the Ely-Eye FTS atom index"`
+	Query    string `json:"query" jsonschema:"search query, matched by the server's own ranking"`
 	Modality string `json:"modality,omitempty" jsonschema:"optional exact modality filter such as text, code, image, pdf_page, pdf_region, video_frame, ui_screenshot"`
+	Holder   string `json:"holder,omitempty" jsonschema:"optional: only this holder's memories may answer"`
+	Scenario string `json:"scenario,omitempty" jsonschema:"optional: only this scenario, e.g. home or work"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"maximum number of atoms to return, capped at 100"`
 }
 
@@ -160,11 +163,17 @@ func (s *Server) getCartridgeTool(ctx context.Context, _ *mcp.CallToolRequest, i
 }
 
 func (s *Server) searchAtomsTool(ctx context.Context, _ *mcp.CallToolRequest, input SearchAtomsInput) (*mcp.CallToolResult, SearchAtomsOutput, error) {
-	hits, err := s.store.SearchAtoms(ctx, input.Query, input.Modality, input.Limit)
+	result, err := s.api.Search(ctx, apiclient.SearchOptions{
+		Query:    input.Query,
+		Modality: input.Modality,
+		Holder:   input.Holder,
+		Scenario: input.Scenario,
+		Limit:    input.Limit,
+	})
 	if err != nil {
 		return nil, SearchAtomsOutput{}, err
 	}
-	return nil, SearchAtomsOutput{Hits: contextpack.SummarizeHits(hits, 1200)}, nil
+	return nil, SearchAtomsOutput{Hits: contextpack.SummarizeHits(result.Hits, 1200)}, nil
 }
 
 func (s *Server) fetchAtomTool(ctx context.Context, _ *mcp.CallToolRequest, input FetchAtomInput) (*mcp.CallToolResult, FetchAtomOutput, error) {
@@ -179,11 +188,11 @@ func (s *Server) compileContextTool(ctx context.Context, _ *mcp.CallToolRequest,
 	if input.Question == "" {
 		return nil, CompileContextOutput{}, errors.New("question is required")
 	}
-	hits, err := s.store.SearchAtoms(ctx, input.Question, "", input.Limit)
+	hits, err := s.api.Search(ctx, apiclient.SearchOptions{Query: input.Question, Limit: input.Limit})
 	if err != nil {
 		return nil, CompileContextOutput{}, err
 	}
-	pack := contextpack.Build(input.Question, input.Profile, hits, input.TokenBudget)
+	pack := contextpack.Build(input.Question, input.Profile, hits.Hits, input.TokenBudget)
 	return nil, CompileContextOutput{Context: pack}, nil
 }
 

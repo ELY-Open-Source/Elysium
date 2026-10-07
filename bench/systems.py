@@ -30,6 +30,16 @@ INDEX_DIR = RUNS / "index"
 MODELS = ROOT / "models"
 DENSE_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 RERANK_MODEL = "BAAI/bge-reranker-base"
+THREADS_PER_QUERY = 4
+
+
+def _pin_threads() -> None:
+    """Fix the CPU budget per query before torch loads; a run that grabs all 32 cores measures the scheduler."""
+    for variable in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        os.environ.setdefault(variable, str(THREADS_PER_QUERY))
+
+
+_pin_threads()
 
 
 def machine_facts() -> dict[str, Any]:
@@ -38,6 +48,7 @@ def machine_facts() -> dict[str, Any]:
         "system": platform.system(),
         "release": platform.release(),
         "cpus": os.cpu_count(),
+        "threads_per_query": int(os.environ.get("OMP_NUM_THREADS", THREADS_PER_QUERY)),
         "load_average_1_5_15": [round(value, 2) for value in os.getloadavg()],
     }
 
@@ -432,7 +443,7 @@ def live_product_rankings(
     timings: list[float] = []
     for query in queries:
         started = time.perf_counter()
-        hits = service.search(query, top_k=top_k)
+        hits = service.search(query, top_k=top_k).hits
         timings.append(time.perf_counter() - started)
         # The product ranks atoms; collapse to sources by first (best) hit so the arms stay comparable.
         sources: list[str] = []

@@ -98,6 +98,13 @@ if not hits or hits[0]["atom"]["atom_id"] != atom_id:
 if hits[0]["atom"].get("scenario") != "home":
     raise SystemExit(f"FAIL: the search hit lost the scenario: {hits[0]['atom']}")
 
+chinese = tool("remember", {"text": "我们的钥匙放在玄关抽屉里", "scenario": "home"})["atom"]
+short = tool("search_atoms", {"query": "钥匙"})["hits"]
+if not any(hit["atom"]["atom_id"] == chinese["atom_id"] for hit in short):
+    raise SystemExit(f"FAIL: a two-character Chinese query missed the memory written in Chinese: {short}")
+if tool("search_atoms", {"query": "keys", "scenario": "travel"})["hits"]:
+    raise SystemExit("FAIL: the scenario filter let another scenario answer")
+
 replacement = "keys are on the coffee table"
 newer = tool("supersede_memory", {"atom_id": atom_id, "text": replacement})["atom"]
 if newer["supersedes"] != [atom_id]:

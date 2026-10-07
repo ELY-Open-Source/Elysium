@@ -1,35 +1,27 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .config import Settings, get_settings
 from .migrations import apply as apply_migrations
-from .schemas import EvidenceAtom, MemoryOrigin, SourceRecord, TimePrecision, utc_now
+from .row_codec import atom_params, from_json, row_to_atom, row_to_source, to_json
+from .schemas import EvidenceAtom, SourceRecord, utc_now
+from .text_index import fts_query, index_text
 
 
-def _json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str)
+@dataclass(frozen=True)
+class FtsPage:
+    """One page of BM25 hits plus whether the corpus holds more: the cursor is an offset, and a
+    ranking this small re-reads rather than keeps a server-side position."""
 
-
-def _loads(value: str | None, default: Any) -> Any:
-    if value is None or value == "":
-        return default
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError as error:
-        raise ValueError(f"stored JSON is unreadable: {error}") from error
-
-
-def _datetime(value: str | None) -> datetime | None:
-    if value is None or value == "":
-        return None
-    return datetime.fromisoformat(value)
+    rows: list[tuple[str, float]]
+    has_more: bool
 
 
 class Database:
@@ -80,7 +72,7 @@ class Database:
                         source.sha256,
                         source.size_bytes,
                         source.created_at.isoformat(),
-                        _json(source.metadata),
+                        to_json(source.metadata),
                     )
                     for source in sources
                 ],
@@ -123,42 +115,13 @@ class Database:
                     visibility_json=excluded.visibility_json,
                     retention_until=excluded.retention_until
                 """,
-                [self._atom_params(atom) for atom in atoms],
+                [atom_params(atom) for atom in atoms],
             )
             connection.executemany("DELETE FROM atom_fts WHERE atom_id = ?", [(atom.atom_id,) for atom in atoms])
             connection.executemany(
                 "INSERT INTO atom_fts(atom_id, source, text) VALUES (?, ?, ?)",
-                [(atom.atom_id, atom.source, atom.text) for atom in atoms],
+                [(atom.atom_id, index_text(atom.source), index_text(atom.text)) for atom in atoms],
             )
-
-    def _atom_params(self, atom: EvidenceAtom) -> tuple[Any, ...]:
-        return (
-            atom.atom_id,
-            atom.source_id,
-            atom.modality.value,
-            atom.source,
-            atom.ingested_at.isoformat(),
-            atom.text,
-            atom.image_ref,
-            _json(atom.embedding_refs),
-            _json(atom.layout.model_dump() if atom.layout else None),
-            _json(atom.relations),
-            _json(atom.trust.model_dump()),
-            atom.token_equivalent,
-            _json(atom.metadata),
-            atom.holder_id,
-            atom.origin.value,
-            atom.scenario,
-            atom.event_time.isoformat() if atom.event_time else None,
-            atom.event_time_end.isoformat() if atom.event_time_end else None,
-            atom.event_time_precision.value,
-            atom.event_time_source,
-            atom.valid_from.isoformat() if atom.valid_from else None,
-            atom.valid_to.isoformat() if atom.valid_to else None,
-            _json(atom.supersedes),
-            _json(atom.visibility.model_dump()),
-            atom.retention_until.isoformat() if atom.retention_until else None,
-        )
 
     def list_atoms(self, limit: int | None = None) -> list[EvidenceAtom]:
         with self.connect() as connection:
@@ -168,7 +131,7 @@ class Database:
                 rows = connection.execute(
                     "SELECT * FROM atoms ORDER BY ingested_at DESC LIMIT ?", (limit,)
                 ).fetchall()
-        return [self._row_to_atom(row) for row in rows]
+        return [row_to_atom(row) for row in rows]
 
     def atoms_as_of(self, moment: datetime, holder: str | None = None) -> list[EvidenceAtom]:
         """Memories that were open at `moment`, the question a parameterless view cannot ask.
@@ -195,31 +158,89 @@ class Database:
                     "ORDER BY ingested_at DESC",
                     (holder, stamp, stamp),
                 ).fetchall()
-        return [self._row_to_atom(row) for row in rows]
+        return [row_to_atom(row) for row in rows]
 
     def get_atoms(self, atom_ids: list[str]) -> list[EvidenceAtom]:
         if not atom_ids:
             return []
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (_json(atom_ids),)
+                "SELECT * FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(atom_ids),)
             ).fetchall()
-        by_id = {row["atom_id"]: self._row_to_atom(row) for row in rows}
+        by_id = {row["atom_id"]: row_to_atom(row) for row in rows}
         return [by_id[atom_id] for atom_id in atom_ids if atom_id in by_id]
 
     def search_fts(self, query: str, limit: int) -> list[tuple[str, float]]:
+        """Best BM25 matches over the whole corpus, no filters: the ranking the product needs most days."""
+        return self.search_atoms(query, limit=limit).rows
+
+    def search_atoms(
+        self,
+        query: str,
+        *,
+        limit: int,
+        offset: int = 0,
+        holder: str | None = None,
+        scenario: str | None = None,
+        source_id: str | None = None,
+        modality: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        min_trust: float | None = None,
+    ) -> FtsPage:
+        """BM25 over the FTS index joined to memories that are open right now.
+
+        Every filter is a `? IS NULL OR` predicate in one literal statement: the ranking never
+        depends on string-built SQL, and the planner sees one shape. A memory with no event time
+        cannot answer a time filter, so it drops out when one is asked for.
+        """
         with self.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT atom_id, bm25(atom_fts) AS score
-                FROM atom_fts
+                SELECT f.atom_id, bm25(atom_fts) AS score
+                FROM atom_fts AS f
+                JOIN v_atoms_current AS a ON a.atom_id = f.atom_id
                 WHERE atom_fts MATCH ?
+                  AND (? IS NULL OR a.holder_id = ?)
+                  AND (? IS NULL OR a.scenario = ?)
+                  AND (? IS NULL OR a.source_id = ?)
+                  AND (? IS NULL OR a.modality = ?)
+                  AND (? IS NULL OR (a.event_time IS NOT NULL AND a.event_time >= ?))
+                  AND (? IS NULL OR (a.event_time IS NOT NULL AND a.event_time <= ?))
+                  AND (? IS NULL OR (
+                        a.trust_json IS NOT NULL
+                        AND min(
+                            json_extract(a.trust_json, '$.parser'),
+                            json_extract(a.trust_json, '$.ocr'),
+                            json_extract(a.trust_json, '$.model')
+                        ) >= ?
+                  ))
                 ORDER BY score
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """,
-                (query, limit),
+                (
+                    fts_query(query),
+                    holder,
+                    holder,
+                    scenario,
+                    scenario,
+                    source_id,
+                    source_id,
+                    modality,
+                    modality,
+                    None if since is None else since.isoformat(),
+                    None if since is None else since.isoformat(),
+                    None if until is None else until.isoformat(),
+                    None if until is None else until.isoformat(),
+                    min_trust,
+                    min_trust,
+                    limit + 1,
+                    offset,
+                ),
             ).fetchall()
-        return [(row["atom_id"], float(-row["score"])) for row in rows]
+        matched = [(str(row["atom_id"]), -float(row["score"])) for row in rows[:limit]]
+        return FtsPage(rows=matched, has_more=len(rows) > limit)
+
 
     def source_id_of_atom(self, atom_id: str) -> str | None:
         with self.connect() as connection:
@@ -231,7 +252,7 @@ class Database:
             rows = connection.execute(
                 "SELECT * FROM atoms WHERE source_id = ? ORDER BY atom_id", (source_id,)
             ).fetchall()
-        return [self._row_to_atom(row) for row in rows]
+        return [row_to_atom(row) for row in rows]
 
     def close_atoms(self, atom_ids: list[str], closed_at: datetime) -> int:
         """Stop treating these memories as current; the rows stay for time travel."""
@@ -241,7 +262,7 @@ class Database:
             cursor = connection.execute(
                 "UPDATE atoms SET valid_to = ? "
                 "WHERE valid_to IS NULL AND atom_id IN (SELECT value FROM json_each(?))",
-                (closed_at.isoformat(), _json(atom_ids)),
+                (closed_at.isoformat(), to_json(atom_ids)),
             )
         return int(cursor.rowcount)
 
@@ -250,10 +271,10 @@ class Database:
             return 0
         with self.connect() as connection:
             connection.execute(
-                "DELETE FROM atom_fts WHERE atom_id IN (SELECT value FROM json_each(?))", (_json(atom_ids),)
+                "DELETE FROM atom_fts WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(atom_ids),)
             )
             cursor = connection.execute(
-                "DELETE FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (_json(atom_ids),)
+                "DELETE FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(atom_ids),)
             )
         return int(cursor.rowcount)
 
@@ -265,7 +286,7 @@ class Database:
                 "DELETE FROM evidence_edges "
                 "WHERE from_atom_id IN (SELECT value FROM json_each(?)) "
                 "OR to_atom_id IN (SELECT value FROM json_each(?))",
-                (_json(atom_ids), _json(atom_ids)),
+                (to_json(atom_ids), to_json(atom_ids)),
             )
         return int(cursor.rowcount)
 
@@ -277,7 +298,7 @@ class Database:
             connection.execute(
                 "INSERT INTO cache_events(ts, layer, cache_key, event, bytes_estimate, metadata_json) "
                 "VALUES (?, 'memory', ?, 'invalidated', 0, ?)",
-                (utc_now().isoformat(), reason, _json({"entries_cleared": cleared})),
+                (utc_now().isoformat(), reason, to_json({"entries_cleared": cleared})),
             )
         return cleared
 
@@ -307,7 +328,7 @@ class Database:
                 "SELECT source_id, path, kind, mime, sha256, size_bytes, created_at, metadata_json "
                 "FROM sources ORDER BY created_at DESC"
             ).fetchall()
-        return [self._row_to_source(row) for row in rows]
+        return [row_to_source(row) for row in rows]
 
     def cartridge_count(self) -> int:
         with self.connect() as connection:
@@ -376,7 +397,7 @@ class Database:
                     cache_key,
                     event,
                     bytes_estimate,
-                    _json(metadata or {}),
+                    to_json(metadata or {}),
                 ),
             )
 
@@ -395,7 +416,7 @@ class Database:
                         str(edge["to_atom_id"]),
                         str(edge["relation"]),
                         float(edge["confidence"]),
-                        _json(edge.get("metadata") or {}),
+                        to_json(edge.get("metadata") or {}),
                     )
                     for edge in edges
                 ],
@@ -420,7 +441,7 @@ class Database:
                 "to_atom_id": row["to_atom_id"],
                 "relation": row["relation"],
                 "confidence": float(row["confidence"]),
-                "metadata": _loads(row["metadata_json"], {}),
+                "metadata": from_json(row["metadata_json"], {}),
             }
             for row in rows
         ]
@@ -440,47 +461,3 @@ class Database:
                 GROUP BY layer
                 """
             ).fetchall()
-
-    def _row_to_atom(self, row: sqlite3.Row) -> EvidenceAtom:
-        from .schemas import LayoutBox, Modality, TrustScores, Visibility
-
-        layout_data = _loads(row["layout_json"], None)
-        return EvidenceAtom(
-            atom_id=row["atom_id"],
-            modality=Modality(row["modality"]),
-            source_id=row["source_id"],
-            source=row["source"],
-            ingested_at=datetime.fromisoformat(row["ingested_at"]),
-            text=row["text"],
-            image_ref=row["image_ref"],
-            embedding_refs=_loads(row["embedding_refs_json"], []),
-            layout=LayoutBox(**layout_data) if layout_data else None,
-            relations=_loads(row["relations_json"], []),
-            trust=TrustScores(**_loads(row["trust_json"], {"parser": 0.0})),
-            token_equivalent=int(row["token_equivalent"]),
-            metadata=_loads(row["metadata_json"], {}),
-            holder_id=row["holder_id"],
-            origin=MemoryOrigin(row["origin"]),
-            scenario=row["scenario"],
-            event_time=_datetime(row["event_time"]),
-            event_time_end=_datetime(row["event_time_end"]),
-            event_time_precision=TimePrecision(row["event_time_precision"]),
-            event_time_source=row["event_time_source"],
-            valid_from=_datetime(row["valid_from"]),
-            valid_to=_datetime(row["valid_to"]),
-            supersedes=_loads(row["supersedes_json"], []),
-            visibility=Visibility(**_loads(row["visibility_json"], {})),
-            retention_until=_datetime(row["retention_until"]),
-        )
-
-    def _row_to_source(self, row: sqlite3.Row) -> SourceRecord:
-        return SourceRecord(
-            source_id=row["source_id"],
-            path=row["path"],
-            kind=row["kind"],
-            mime=row["mime"],
-            sha256=row["sha256"],
-            size_bytes=int(row["size_bytes"]),
-            created_at=datetime.fromisoformat(row["created_at"]),
-            metadata=_loads(row["metadata_json"], {}),
-        )

@@ -2,6 +2,7 @@
   "venvPath": ".",
   "venv": ".venv",
   "extraPaths": [".", "backend/src"],
-  "include": ["bench", "backend/src"],
+  "include": ["bench", "backend/src", "backend/tests"],
+  "exclude": ["bench/corpus", "bench/models", "bench/runs", "node_modules", ".venv"],
   "pythonVersion": "3.12"
 }

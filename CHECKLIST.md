@@ -60,20 +60,22 @@
   - [x] p0-1.4 `PRAGMA user_version` 迁移框架 + 旧库可重放（`migrations.py`：v1 库原地 ALTER + RENAME COLUMN 升到 v2，行不丢；版本高于本构建则 SystemExit）
   - [x] p0-1.5 视图 `v_atoms_current` + 时间旅行查询——偏差记录：SQLite 视图不能带参数，所以 as-of 是 `db.atoms_as_of(moment, holder=None)`，谓词与视图一致但去掉 retention（retention 是保存策略，不是当时是否为真）
   - 验收：`pytest backend/tests/test_memory_schema.py` 绿（8 条，含 v1→v2 升级不丢行、时间旅行返回历史版本）；实际路径是 `backend/tests/`，不是 `tests/`
-- [ ] **p0-2** 写入路径
-  - [ ] p0-2.1 `remember` / `forget` / `supersede` 三写，Python 单一写者
-  - [ ] p0-2.2 MCP 工具面 + HTTP `POST /api/memory{,/forget,/supersede}` + CLI 三面同源
-  - [ ] p0-2.3 服务端盖 provenance：`ingested_at`、`holder_id`、`origin` 由服务端写，客户端不可传
-  - [ ] p0-2.4 `forget` 级联：派生 atom、卡带成员、向量、元信念
-  - 验收：`pytest tests/test_write_path.py tests/test_forget_cascade.py` 绿；端到端「记住→重启→召回」
+- [x] **p0-2** 写入路径
+  - [x] p0-2.1 `remember` / `forget` / `supersede` 三写，Python 单一写者（`memory.py:MemoryService`；同一 holder 同一句子是更新，两个 holder 各留一条）
+  - [x] p0-2.2 MCP 工具面 + HTTP `POST /api/memory{,/supersede,/forget}` + CLI 三面同源——偏差记录：Go 侧不碰 SQLite 写，三个工具经 HTTP 转给 Python 写者（`ELY_EYE_API`，默认 `http://127.0.0.1:8765`），写规则只有一份；顺带把 Go 读路径跟上 v2（`atoms.time`→`ingested_at`，读改走 `v_atoms_current`，fetch/search 现在带 holder/origin/scenario/event_time）
+  - [x] p0-2.3 服务端盖 provenance：`ingested_at`、`holder_id`、`origin` 由服务端写，客户端不可传（`RememberRequest` 里根本没有这三个字段；HTTP 测试里 POST `holder_id=attacker&origin=third_party` 仍落成 `wife`/`self`）
+  - [x] p0-2.4 `forget` 级联：删 atom 与 FTS 行、删证据边、清 cache_events（留一条 invalidated 轨迹）、删 dense 向量索引——偏差记录：卡带成员是**报告**而非重写，已引用 DNA 的导出卡带不该被偷偷改掉
+  - 验收：`pytest backend/tests/test_memory_write.py backend/tests/test_memory_api.py backend/tests/test_memory_cli.py` 绿（21 条）；端到端跨进程 `bash scripts/mcp_write_smoke.sh` → `PASS: remember, supersede, search and forget work through MCP`（Go MCP + Python API 两个进程读写同一 SQLite，supersede 后旧记忆不再可检，forget 后 fetch 报 not found）；偏差：checklist 写的 `tests/test_write_path.py` / `tests/test_forget_cascade.py` 路径不存在，实际在 `backend/tests/`
+  - 顺带修的根因：`import fitz` 把 deprecation 警告打到 **stdout**，污染所有 CLI 命令的 JSON 输出（改 `import pymupdf as fitz`）；`cli status` 原本 echo 一个 Python dict repr，改 `json_dump`
 - [ ] **p0-3** 检索改 SQL-only
-  - [ ] p0-3.1 用 `db.search_fts()` 取代 `list_atoms()`，`LIMIT top_k*10`
-  - [ ] p0-3.2 分词修复：CJK 分词 + camelCase/标识符切分 + 前缀
-  - [ ] p0-3.3 空命中返回显式 `no_match`，不返回裸空数组
-  - [ ] p0-3.4 过滤器：`since/until/source/scenario/holder/modality/trust` + 游标分页
-  - [ ] p0-3.5 RRF 取代 `0.55/0.35/0.10` 加权混合
-  - [ ] p0-3.6 MCP 与 HTTP 收敛到同一排序实现
-  - 验收：`MATCH "钥匙"` 命中「我们的钥匙放在玄关抽屉里」；`search atoms` 命中 `func SearchAtoms`；100k atom p50 <100ms；`pytest tests/test_retrieval_parity.py` 绿
+  - [x] p0-3.1 `retrieval.py` 不再 `list_atoms()`：一条 SQL 里 `LIMIT ? OFFSET ?`，候选窗口 `CANDIDATE_WINDOW = 10`（`db.search_atoms()` 返回 `FtsPage{rows, has_more}`）
+  - [x] p0-3.2 分词修复：`text_index.py` 一处归一化，索引侧与查询侧共用（NFKC + camelCase 切分 + CJK 逐字 + 前缀 `"token"*` + CJK 串按短语匹配）——偏差记录：schema 升到 v3，`_rebuild_fts()` 重建旧 `atom_fts`；旧行存的是原文，「钥匙」在旧索引里永远匹配不上
+  - [x] p0-3.3 空命中是 `SearchResult{status:"no_match"}`，HTTP 与 CLI 同形，不再是裸空数组
+  - [x] p0-3.4 七个过滤器（holder/scenario/source/modality/since/until/min_trust）+ base64 游标；`since > until` 报 "search since must not be after until"，游标坏了报 "search cursor is unreadable"
+  - [x] p0-3.5 RRF（`RRF_K = 60`）取代 `0.55/0.35/0.10`；顺手删掉无人调用的 `tokenize()` / `lexical_score()` / `_graph_score()`（graph 项恒为 0，因为证据边从不参与排序）
+  - [x] p0-3.6 Go 的 `search_atoms` / `compile_context` 改走 `POST /api/search`，删掉 Go 侧第二套分词器（`store.SearchAtoms` / `ftsQuery` / `tokenPattern`）——两面不可能再漂开，因为只剩一个排序实现
+  - [ ] p0-3.7 100k atom 下 p50 <100ms：`python -m bench.scale_check` → `bench/reports/SCALE.md`。基线是 p50 20.16s / 165,973 atoms（`bench/reports/BASELINE.md`）。**未测不写数**：机器负载 3.7–17.9 期间测出来的数不算数
+  - 验收：`pytest backend/tests/test_text_index.py backend/tests/test_search_api.py` 绿（18 条，真 FTS5 表 + TestClient）：「钥匙」命中「我们的钥匙放在玄关抽屉里」、`search atoms` 命中 `func SearchAtoms(ctx context.Context)`、`forg` 命中 forgotten、全角 `Ｓｅａｒｃｈ　Ａｔｏｍｓ` 命中、游标翻页无重复、supersede 后旧记忆不再应答；MCP 一致性由 `ely-eye-mcp/internal/mcpserver/search_tools_test.go`（3 条）+ `bash scripts/mcp_write_smoke.sh` PASS 证明；偏差：checklist 写的 `tests/test_retrieval_parity.py` 不存在，实际在 `backend/tests/` 与 Go 测试里
 - [ ] **p0-4** 卡带变成可挂载作用域
   - [ ] p0-4.1 `mount` / `unmount` / `switch` / `append` 四动词
   - [ ] p0-4.2 检索按已挂载卡带过滤（作用域，不再是全局）

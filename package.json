@@ -1,0 +1,8 @@
+{
+  "name": "ely-eye-tools",
+  "private": true,
+  "description": "Dev-only type and lint gates for the Python and TypeScript surfaces.",
+  "devDependencies": {
+    "pyright": "1.1.404"
+  }
+}

@@ -93,6 +93,7 @@ type Atom struct {
 type AtomHit struct {
 	Atom        Atom    `json:"atom"`
 	SparseScore float64 `json:"sparse_score"`
+	DenseScore  float64 `json:"dense_score"`
 	FinalScore  float64 `json:"final_score"`
 }
 

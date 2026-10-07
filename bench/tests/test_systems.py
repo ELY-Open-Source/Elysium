@@ -187,3 +187,18 @@ def test_the_dense_model_is_loaded_once_per_process(tmp_path: Path, monkeypatch:
             systems._sentence_model(tmp_path / "missing")
     finally:
         systems._MODELS.clear()
+
+
+def test_the_cpu_budget_is_pinned_and_reported() -> None:
+    """Latency measured with every core available measures the scheduler, so the budget is fixed and printed."""
+    import os
+
+    from bench import systems
+
+    budget = systems.machine_facts()["threads_per_query"]
+    pinned = {os.environ[name] for name in _THREAD_VARIABLES}
+    assert pinned == {str(budget)}
+    assert 1 <= budget <= 8
+
+
+_THREAD_VARIABLES = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS")

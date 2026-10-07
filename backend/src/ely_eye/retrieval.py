@@ -1,14 +1,23 @@
+"""Retrieval: SQLite FTS5 does the matching, RRF merges the signals that exist.
+
+The first version pulled every atom into Python and rebuilt a BM25 index per query, so search
+cost grew with the corpus instead of with the answer, and a Chinese query matched nothing
+because the tokenizer had no CJK rule. Both are fixed below the score line: the index and the
+query share `text_index`, and the ranking is a SQL query.
+"""
+
 from __future__ import annotations
 
-import re
+import base64
 from collections import defaultdict
-
-from rank_bm25 import BM25Okapi
 
 from .config import Settings, get_settings
 from .db import Database
 from .embeddings import EmbeddingService
-from .schemas import EvidenceAtom, RetrievalHit
+from .schemas import EvidenceAtom, RetrievalHit, SearchFilters, SearchResult
+
+RRF_K = 60
+CANDIDATE_WINDOW = 10
 
 
 class RetrievalService:
@@ -17,52 +26,47 @@ class RetrievalService:
         self.db = database or Database(self.settings)
         self.embeddings = EmbeddingService(self.settings, self.db)
 
-    def search(self, query: str, top_k: int | None = None) -> list[RetrievalHit]:
+    def search(
+        self,
+        query: str,
+        top_k: int | None = None,
+        *,
+        filters: SearchFilters | None = None,
+        cursor: str | None = None,
+    ) -> SearchResult:
+        """Answer one query against the memories that are open right now.
+
+        The candidate window is wider than the page so fusion has something to fuse; the cursor
+        advances one page at a time and re-reads the tail of the window it came from, which is
+        why no result is ever skipped between pages.
+        """
         limit = top_k or self.settings.retrieval_top_k
-        atoms = self.db.list_atoms()
-        if not atoms:
-            return []
-
-        sparse_scores = self._sparse_search(query, atoms, limit * 3)
-        dense_scores: dict[str, float] = {}
+        if limit <= 0:
+            raise ValueError(f"search needs a positive limit, got {limit}")
+        offset = decode_cursor(cursor)
+        page = self.db.search_atoms(
+            query,
+            limit=limit * CANDIDATE_WINDOW,
+            offset=offset,
+            **(filters or SearchFilters()).model_dump(exclude_none=True),
+        )
+        rankings: list[list[str]] = [[atom_id for atom_id, _ in page.rows]]
+        scores: dict[str, dict[str, float]] = defaultdict(dict)
+        for atom_id, bm25 in page.rows:
+            scores[atom_id]["sparse_score"] = bm25
         if self.embeddings.enabled():
-            dense_scores = self._dense_search(query, limit * 3)
-
-        all_ids = set(sparse_scores) | set(dense_scores)
-        atom_map = {atom.atom_id: atom for atom in atoms}
-        hits: list[RetrievalHit] = []
-        for atom_id in all_ids:
-            atom = atom_map.get(atom_id)
-            if atom is None:
-                continue
-            sparse_score = sparse_scores.get(atom_id, 0.0)
-            dense_score = dense_scores.get(atom_id, 0.0)
-            graph_score = self._graph_score(atom, query)
-            final_score = sparse_score * 0.55 + dense_score * 0.35 + graph_score * 0.10
-            hits.append(
-                RetrievalHit(
-                    atom=atom,
-                    sparse_score=sparse_score,
-                    dense_score=dense_score,
-                    graph_score=graph_score,
-                    final_score=final_score,
-                )
-            )
-        hits.sort(key=lambda hit: hit.final_score, reverse=True)
-        return hits[:limit]
-
-    def _sparse_search(self, query: str, atoms: list[EvidenceAtom], limit: int) -> dict[str, float]:
-        tokenized = [tokenize(atom.text + " " + atom.source) for atom in atoms]
-        bm25 = BM25Okapi(tokenized)
-        query_tokens = tokenize(query)
-        scores = bm25.get_scores(query_tokens)
-        lexical_scores = [lexical_score(query_tokens, tokens, atoms[index]) for index, tokens in enumerate(tokenized)]
-        combined = [max(float(scores[index]), lexical_scores[index]) for index in range(len(atoms))]
-        order = sorted(range(len(combined)), key=lambda index: combined[index], reverse=True)[:limit]
-        if not order:
-            return {}
-        max_score = max(float(combined[index]) for index in order) or 1.0
-        return {atoms[index].atom_id: float(combined[index]) / max_score for index in order if combined[index] > 0}
+            dense = self._dense_search(query, limit * CANDIDATE_WINDOW)
+            rankings.append(list(dense))
+            for atom_id, cosine in dense.items():
+                scores[atom_id]["dense_score"] = cosine
+        hits = self._rank(rankings, scores, limit)
+        more = page.has_more or len(rankings[0]) > limit
+        return SearchResult(
+            query=query,
+            status="hits" if hits else "no_match",
+            hits=hits,
+            next_cursor=encode_cursor(offset + limit) if hits and more else None,
+        )
 
     def _dense_search(self, query: str, limit: int) -> dict[str, float]:
         index = self.embeddings.load_index()
@@ -71,27 +75,38 @@ class RetrievalService:
         query_vector = self.embeddings.embed_query(query)
         return dict(index.search(query_vector, limit))
 
-    def _graph_score(self, atom: EvidenceAtom, query: str) -> float:
-        query_tokens = set(tokenize(query))
-        relation_tokens = set()
-        for relation in atom.relations:
-            relation_tokens.update(tokenize(relation))
-        if not query_tokens or not relation_tokens:
-            return 0.0
-        return len(query_tokens & relation_tokens) / len(query_tokens)
+    def _rank(self, rankings: list[list[str]], scores: dict[str, dict[str, float]], limit: int) -> list[RetrievalHit]:
+        """Reciprocal rank fusion: rank position is comparable across signals, raw scores are not.
 
+        The old blend multiplied BM25 by 0.55 and cosine by 0.35, which compared a term-frequency
+        count to a bounded cosine and let the larger number decide. graph_score stays 0.0 until
+        evidence edges are retrieved as their own ranking.
+        """
+        fused: dict[str, float] = {}
+        for ranking in rankings:
+            for position, atom_id in enumerate(ranking):
+                fused[atom_id] = fused.get(atom_id, 0.0) + 1.0 / (RRF_K + position + 1)
+        order = sorted(fused, key=lambda atom_id: (-fused[atom_id], atom_id))[:limit]
+        atoms = {atom.atom_id: atom for atom in self.db.get_atoms(order)}
+        hits: list[RetrievalHit] = []
+        for atom_id in order:
+            atom = atoms.get(atom_id)
+            if atom is None:
+                raise ValueError(f"search returned {atom_id} but the atom is not in the store")
+            signal = scores.get(atom_id, {})
+            hits.append(
+                RetrievalHit(
+                    atom=atom,
+                    sparse_score=signal.get("sparse_score", 0.0),
+                    dense_score=signal.get("dense_score", 0.0),
+                    final_score=fused[atom_id],
+                )
+            )
+        return hits
 
-def tokenize(text: str) -> list[str]:
-    return [token.lower() for token in re.findall(r"[\w\u4e00-\u9fff]+", text)]
-
-
-def lexical_score(query_tokens: list[str], document_tokens: list[str], atom: EvidenceAtom) -> float:
-    if not query_tokens or not document_tokens:
-        return 0.0
-    document_set = set(document_tokens)
-    overlap = sum(1 for token in query_tokens if token in document_set)
-    phrase_hits = sum(1 for token in query_tokens if token and token in atom.text.lower())
-    return (overlap + 0.25 * phrase_hits) / len(query_tokens)
+    def recall(self, query: str, top_k: int | None = None, *, filters: SearchFilters | None = None) -> list[EvidenceAtom]:
+        """The atoms a search would put in front of a model, no scoring attached."""
+        return [hit.atom for hit in self.search(query, top_k, filters=filters).hits]
 
 
 def group_hits_by_source(hits: list[RetrievalHit]) -> dict[str, list[RetrievalHit]]:
@@ -99,3 +114,19 @@ def group_hits_by_source(hits: list[RetrievalHit]) -> dict[str, list[RetrievalHi
     for hit in hits:
         grouped[hit.atom.source].append(hit)
     return dict(grouped)
+
+
+def encode_cursor(offset: int) -> str:
+    return base64.urlsafe_b64encode(str(offset).encode()).decode()
+
+
+def decode_cursor(cursor: str | None) -> int:
+    if cursor is None or cursor == "":
+        return 0
+    try:
+        offset = int(base64.urlsafe_b64decode(cursor.encode()).decode())
+    except (ValueError, UnicodeDecodeError) as error:
+        raise ValueError(f"search cursor is unreadable: {cursor!r}") from error
+    if offset < 0:
+        raise ValueError(f"search cursor is unreadable: {cursor!r}")
+    return offset

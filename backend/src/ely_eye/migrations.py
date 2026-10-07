@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 2
+from .text_index import index_text
+
+SCHEMA_VERSION = 3
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -85,12 +87,14 @@ _BASE_TABLES = """
         metadata_json TEXT NOT NULL
     );
 
-    CREATE VIRTUAL TABLE IF NOT EXISTS atom_fts USING fts5(
-        atom_id UNINDEXED,
-        source,
-        text,
-        tokenize = 'unicode61'
-    );
+CREATE VIRTUAL TABLE IF NOT EXISTS atom_fts USING fts5(
+atom_id UNINDEXED,
+source,
+text,
+tokenize = 'unicode61'
+);
+-- source and text hold text_index output, not the atom's own text: unicode61 sees one token
+-- per CJK character and per identifier fragment, which is what makes those queries match.
 """
 
 # A memory is usable now when nothing has closed it, it had begun by now, and its
@@ -178,6 +182,20 @@ def apply(connection: sqlite3.Connection) -> None:
             _upgrade_v1_to_v2(connection)
     else:
         _create_v2(connection)
+    if version < 3:
+        _rebuild_fts(connection)
 
     connection.executescript(VIEWS)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+
+def _rebuild_fts(connection: sqlite3.Connection) -> None:
+    """Re-index every atom through text_index: rows indexed before it existed hold raw text, and
+    FTS5 cannot match 钥匙 inside a token that is a whole Chinese sentence."""
+    connection.execute("DROP TABLE IF EXISTS atom_fts")
+    connection.executescript(_BASE_TABLES)
+    rows = connection.execute("SELECT atom_id, source, text FROM atoms ORDER BY atom_id").fetchall()
+    connection.executemany(
+        "INSERT INTO atom_fts(atom_id, source, text) VALUES (?, ?, ?)",
+        [(row[0], index_text(row[1]), index_text(row[2])) for row in rows],
+    )
