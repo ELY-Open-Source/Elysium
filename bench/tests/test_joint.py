@@ -158,6 +158,7 @@ def _report() -> dict:
             "corpus_sources": 10,
             "queries": 16,
             "answerable": 8,
+            "machine": {"system": "Linux", "release": "x", "cpus": 32, "load_average_1_5_15": [1.0, 2.0, 3.0]},
             "models": {"dense": "d", "rerank": "r"},
         },
         "chance": {"recall_at_1": 0.0, "recall_at_5": 0.0, "recall_at_10": 0.0},
@@ -191,6 +192,7 @@ def test_the_report_writer_survives_a_scale_note(tmp_path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     assert "| 500 | 900 | 0.001/0.002 |" in text
     assert "_latency only_" in text
+    assert "load average 1.0 on 32 cores" in text
     assert "## unanswerable queries (50.0% of the suite)" in text
 
 

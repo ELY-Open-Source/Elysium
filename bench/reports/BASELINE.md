@@ -1,6 +1,6 @@
 # BASELINE: what the product retrieves today
 
-- generated 2026-10-07T05:35:00+00:00 at commit a4953335e77f
+- generated 2026-10-07T15:33:42+00:00 at commit 29163632af74
 - corpus 50278 sources, 5308 queries (2928 answerable)
 - models: dense `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, rerank `BAAI/bge-reranker-base`
 
@@ -33,14 +33,20 @@
 
 ## the unmodified product path
 
-- RetrievalService.search: p50 15.54s, mean 16.68s, max 56.14s over 40 queries
+- RetrievalService.search: p50 20.16s, mean 20.67s, max 48.90s over 40 queries
 - top-10 overlap with the fast BM25 path: 0.0%, identical order 0.0%
+- its top-10 atoms cover only 7.6 distinct sources (min 1): the product ranks atoms and never diversifies, so ten slots fill with fragments of one document and the overlap with a source-level ranking is near zero
 
 ## latency vs corpus size
 
-| sources | atoms | bm25_only | dense_only |
-|---|---|---|---|---|
-| 50000 | 165695 | 0.804/1.576 | 1.446/2.538 |
+| sources | atoms | bm25_only p50/p95 s | dense_only p50/p95 s |
+|---|---|---|---|
+| 500 | 500 | 0.001/0.002 | 1.380/1.576 |
+| 2000 | 2000 | 0.008/0.016 | 1.398/2.595 |
+| 10000 | 10000 | 0.052/0.128 | 1.338/2.266 |
+| 50000 | 165695 | 0.809/2.274 | 1.496/2.464 |
+
+_latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless_
 
 ## reading
 

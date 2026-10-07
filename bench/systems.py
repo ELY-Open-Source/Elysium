@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import platform
 import re
 import sqlite3
 import time
@@ -28,6 +30,16 @@ INDEX_DIR = RUNS / "index"
 MODELS = ROOT / "models"
 DENSE_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 RERANK_MODEL = "BAAI/bge-reranker-base"
+
+
+def machine_facts() -> dict[str, Any]:
+    """Hardware plus the load at report time: latency numbers mean nothing without it."""
+    return {
+        "system": platform.system(),
+        "release": platform.release(),
+        "cpus": os.cpu_count(),
+        "load_average_1_5_15": [round(value, 2) for value in os.getloadavg()],
+    }
 
 
 def local_model_dir(models: Path, repo_id: str) -> Path:

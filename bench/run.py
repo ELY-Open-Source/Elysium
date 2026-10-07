@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import platform
 import subprocess
 from collections.abc import Sequence
@@ -36,6 +35,7 @@ from bench.systems import (
     arm_needs,
     live_product_rankings,
     load_atoms,
+    machine_facts,
 )
 
 ROOT = SETS.parent
@@ -213,7 +213,7 @@ def meta(corpus_sources: int, queries: Sequence[Query], limit: int | None = None
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "git_commit": git_commit(),
         "python": platform.python_version(),
-        "machine": {"system": platform.system(), "release": platform.release(), "cpus": os.cpu_count()},
+        "machine": machine_facts(),
         "corpus_manifest_sha256": manifest.get("corpus_manifest_sha256"),
         "sets": {name: sha256_file(SETS / f"{name}.jsonl") for name in MODALITIES},
         "queries": len(queries),
@@ -251,6 +251,10 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             f"({report['meta']['answerable']} answerable)"
         ),
         f"- models: dense `{report['meta']['models']['dense']}`, rerank `{report['meta']['models']['rerank']}`",
+        (
+            f"- machine: {report['meta']['machine']['cpus']} cores, load average "
+            f"{report['meta']['machine']['load_average_1_5_15'][0]:.1f} when the report was written"
+        ),
         "",
         "| arm | recall@1 | recall@5 | recall@10 | nDCG@10 | MRR | hit@10 (95% lower) | p50 s | p95 s |",
         "|---|---|---|---|---|---|---|---|---|",
@@ -321,6 +325,11 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         note = report["scale"][0].get("note")
         if note:
             lines += ["", f"_{note}_"]
+        load = report["meta"]["machine"]["load_average_1_5_15"][0]
+        lines.append(
+            f"\n_latency was measured at load average {load:.1f} on {report['meta']['machine']['cpus']} cores; "
+            "a busy machine inflates these figures, so read them as a ceiling_"
+        )
     lines += [
         "",
         "## reading",

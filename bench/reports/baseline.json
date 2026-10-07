@@ -564,9 +564,9 @@
    "min": 1
   },
   "identical_top10": 0.0,
-  "max": 63.2751505510023,
-  "mean": 21.701527132049886,
-  "p50": 21.831516211001144,
+  "max": 48.895113198996114,
+  "mean": 20.665571158625244,
+  "p50": 20.157494062004844,
   "queries": 40,
   "top10_overlap_with_bm25_only": 0.0,
   "top_k": 10
@@ -575,7 +575,7 @@
   "answerable": 2928,
   "corpus_manifest_sha256": "8fc1ed861c891d778853d41107630869f9eb267a669c5d1038e389de80114347",
   "corpus_sources": 50278,
-  "generated_at": "2026-10-07T14:38:12+00:00",
+  "generated_at": "2026-10-07T15:33:42+00:00",
   "git_commit": "29163632af7418758e79a79a748f68050ca1e0b6",
   "limit_per_modality": null,
   "machine": {
@@ -602,12 +602,12 @@
   {
    "atoms": 500,
    "bm25_only": {
-    "p50": 0.0007463944966730196,
-    "p95": 0.0026389723490865425
+    "p50": 0.0006466769991675392,
+    "p95": 0.00181096804953995
    },
    "dense_only": {
-    "p50": 2.053756675497425,
-    "p95": 3.7252893005985244
+    "p50": 1.3797472870028287,
+    "p95": 1.5762464397041183
    },
    "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
    "queries": 40,
@@ -616,12 +616,12 @@
   {
    "atoms": 2000,
    "bm25_only": {
-    "p50": 0.00923213200076134,
-    "p95": 0.023986968196186332
+    "p50": 0.008334371003002161,
+    "p95": 0.015740483100307734
    },
    "dense_only": {
-    "p50": 2.2580291965023207,
-    "p95": 4.0939969898456186
+    "p50": 1.3979396294998878,
+    "p95": 2.595364080850413
    },
    "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
    "queries": 40,
@@ -630,12 +630,12 @@
   {
    "atoms": 10000,
    "bm25_only": {
-    "p50": 0.11317921599766123,
-    "p95": 0.2961666731029253
+    "p50": 0.05245087000002968,
+    "p95": 0.12780161215196129
    },
    "dense_only": {
-    "p50": 2.269751224499487,
-    "p95": 3.6929099251963633
+    "p50": 1.3382894579990534,
+    "p95": 2.2659613330957646
    },
    "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
    "queries": 40,
@@ -644,12 +644,12 @@
   {
    "atoms": 165695,
    "bm25_only": {
-    "p50": 1.3151575949996186,
-    "p95": 3.7234880074014645
+    "p50": 0.8085095155001909,
+    "p95": 2.273631770645442
    },
    "dense_only": {
-    "p50": 2.3852021460043034,
-    "p95": 4.008884304698221
+    "p50": 1.4964509784986149,
+    "p95": 2.4635968941045574
    },
    "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
    "queries": 40,

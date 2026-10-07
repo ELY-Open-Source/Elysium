@@ -27,6 +27,7 @@ from bench.ingest_baseline import RUNS, database_path
 from bench.metrics import aggregate, score_query
 from bench.run import Query, git_commit, holder_index, load_queries
 from bench.sets_common import ROOT
+from bench.systems import machine_facts
 
 REPORTS = ROOT / "reports"
 TOP_K = 10
@@ -66,6 +67,10 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         "",
         f"- generated {meta['generated_at']} at commit {meta['git_commit'][:12]}",
         f"- {meta['queries']} queries ({meta['answerable']} answerable) against {meta['sources']} sources",
+        (
+            f"- machine: {meta['machine']['cpus']} cores, load average "
+            f"{meta['machine']['load_average_1_5_15'][0]:.1f} when the report was written"
+        ),
         (
             "- extraction is lexical for both stores; Mem0's real add() and Zep's graph builder call a "
             "generator model, which this round does not have"
@@ -139,6 +144,7 @@ def main() -> int:
             "sources": len(index),
             "top_k": TOP_K,
             "extraction": "lexical (see bench/counterpart.py); LLM extraction deferred with the generator",
+            "machine": machine_facts(),
         },
         "stores": [score_store(store, queries, holder_of) for store in stores],
     }
