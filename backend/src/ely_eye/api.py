@@ -24,7 +24,6 @@ from .compiler import ContextCompiler
 from .config import Settings, get_settings
 from .db import Database
 from .embeddings import EmbeddingService
-from .evals import HashHopEvaluator, PRDProofSuite
 from .evaluation_schemas import (
     BenchmarkPredictionReport,
     BenchmarkRegistryReport,
@@ -38,6 +37,7 @@ from .evidence_graph import EvidenceGraphService
 from .ingestion import IngestionService
 from .memory import MemoryService
 from .profiles import runtime_profile_report
+from .proofs import HashHopEvaluator, PRDProofSuite
 from .research_modules import ResearchModuleService
 from .retrieval import RetrievalService
 from .runtime import QwenRuntime, RuntimeUnavailableError

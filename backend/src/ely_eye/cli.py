@@ -20,10 +20,12 @@ from .cli_transactive import register as register_transactive_commands
 from .config import get_settings
 from .db import Database
 from .embeddings import EmbeddingService
-from .evals import HashHopEvaluator, PRDProofSuite
 from .ingestion import IngestionService
 from .memory import MemoryService
 from .profiles import runtime_profile_report
+from .proofs import HashHopEvaluator, PRDProofSuite
+from .proofs.contradictions import CORPUS_NAME, build_contradiction_scenarios, write_corpus
+from .proofs.table import render_table
 from .research_modules import ResearchModuleService
 from .retrieval import RetrievalService
 from .runtime import QwenRuntime
@@ -232,11 +234,19 @@ def proof_suite(cartridge_id: str | None = None) -> None:
 
 
 @app.command("latest-proof-suite")
-def latest_proof_suite() -> None:
+def latest_proof_suite(json_output: bool = typer.Option(False, "--json")) -> None:
+    """Print what the last proof suite claimed and what it actually proved."""
     report = PRDProofSuite(get_settings()).latest()
     if report is None:
+        raise typer.BadParameter(
+            "no proof suite has been recorded yet; run: ely-eye proof-suite --cartridge-id <id>"
+        )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+    else:
+        typer.echo(render_table(report))
+    if report.status == "failed":
         raise typer.Exit(code=1)
-    typer.echo(report.model_dump_json(indent=2))
 
 
 @app.command("runtime-generation-proof")
@@ -249,6 +259,14 @@ def runtime_generation_proof() -> None:
 def visual_contradiction_proof() -> None:
     check = PRDProofSuite(get_settings()).visual_contradiction_proof()
     typer.echo(check.model_dump_json(indent=2))
+
+
+@app.command("contradiction-corpus")
+def contradiction_corpus(data_dir: Path | None = None) -> None:
+    """Write the corpus the contradiction lens is graded on, so it can be read and replaced."""
+    settings = get_settings()
+    target = write_corpus((data_dir or settings.data_dir) / CORPUS_NAME)
+    typer.echo(json_dump({"corpus": str(target), "scenarios": len(build_contradiction_scenarios())}))
 
 
 @app.command("finalize-cartridge")

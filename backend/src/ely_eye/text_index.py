@@ -38,11 +38,19 @@ def fts_query(query: str) -> str:
     A CJK run becomes a quoted phrase so its characters stay adjacent: unphrased, a query for
     钥匙 would match text that mentions 钥 and 匙 worlds apart. Latin tokens get a prefix match,
     which is what lets `atom` reach `atoms`.
+
+    Latin tokens are OR-ed, not AND-ed. A question is longer than the sentence that answers it —
+    "Which PRD requirements prove long context memory, HashHop, and adapters?" shares only some of
+    its words with any single atom — and an AND over every word answers such a question with
+    nothing. bm25 then ranks the candidates by how many of those words each one carries, so the
+    broadened query does not mean a diluted answer.
     """
     terms = _bare(query).split()
     if not terms:
         raise ValueError(f"search needs at least one searchable word, got {query!r}")
-    return " ".join(_cjk_phrase(term) if _is_cjk(term) else f"{_quote(term)}*" for term in terms)
+    if len(terms) == 1:
+        return _cjk_phrase(terms[0]) if _is_cjk(terms[0]) else f"{_quote(terms[0])}*"
+    return " OR ".join(_cjk_phrase(term) if _is_cjk(term) else f"{_quote(term)}*" for term in terms)
 
 
 def _bare(text: str) -> str:

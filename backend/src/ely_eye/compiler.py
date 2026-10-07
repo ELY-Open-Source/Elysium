@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterable
 
-from .cache_fabric import CacheFabric
+from .cache_fabric import SEMANTIC_LAYER, CacheFabric
 from .config import Settings, get_settings
 from .db import Database
 from .retrieval import RetrievalService
@@ -27,11 +27,18 @@ class ContextCompiler:
     def compile(self, question: str, profile: RuntimeProfile) -> CompiledContext:
         cache_key = self.cache.semantic_key(question, profile.value)
         cached = self.cache.read_semantic_cache(cache_key)
-        if cached:
+        if cached is not None:
             compiled = CompiledContext.model_validate(cached)
             if compiled.hits:
+                self.cache.record_hit(SEMANTIC_LAYER, cache_key)
                 return compiled
-
+            # A cached context with no evidence in it is not an answer, so counting it as a hit
+            # would let an empty cache entry look like a warm cache.
+            self.cache.record_miss(
+                SEMANTIC_LAYER, cache_key, metadata={"reason": "cached context has no hits"}
+            )
+        else:
+            self.cache.record_miss(SEMANTIC_LAYER, cache_key)
         plan = self.plan(question, profile)
         hits = self.retrieval.search(plan.retrieval_query, plan.evidence_budget_atoms).hits
         packed_text, token_total = self._pack_hits(hits, plan.token_budget, plan.retrieval_query)

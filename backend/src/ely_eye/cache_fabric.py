@@ -9,6 +9,8 @@ from .config import Settings, get_settings
 from .db import Database
 from .schemas import CacheLayerStatus
 
+SEMANTIC_LAYER = "semantic"
+
 
 class CacheFabric:
     def __init__(self, settings: Settings | None = None, database: Database | None = None) -> None:
@@ -16,7 +18,7 @@ class CacheFabric:
         self.db = database or Database(self.settings)
 
     def semantic_key(self, question: str, profile: str) -> str:
-        return hashlib.sha256(f"compiler-v2\n{profile}\n{question}".encode("utf-8")).hexdigest()
+        return hashlib.sha256(f"compiler-v2\n{profile}\n{question}".encode()).hexdigest()
 
     def record_hit(self, layer: str, cache_key: str, bytes_estimate: int = 0, metadata: dict[str, Any] | None = None) -> None:
         self.db.log_cache_event(layer, cache_key, "hit", bytes_estimate, metadata)
@@ -29,15 +31,17 @@ class CacheFabric:
         path.parent.mkdir(parents=True, exist_ok=True)
         data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
         path.write_bytes(data)
-        self.db.log_cache_event("semantic", cache_key, "write", len(data), {"path": str(path)})
+        self.db.log_cache_event(SEMANTIC_LAYER, cache_key, "write", len(data), {"path": str(path)})
 
     def read_semantic_cache(self, cache_key: str) -> dict[str, Any] | None:
+        """Return the cached payload, or None. The caller traces the event: one compile, one event."""
         path = self.settings.cache_dir / "semantic" / f"{cache_key}.json"
         if not path.exists():
-            self.record_miss("semantic", cache_key)
             return None
-        self.record_hit("semantic", cache_key, path.stat().st_size)
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"{path}: the semantic cache entry is unreadable ({error})") from error
 
     def statuses(self) -> list[CacheLayerStatus]:
         rows = self.db.cache_layer_rows()

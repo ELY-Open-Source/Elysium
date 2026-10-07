@@ -410,10 +410,12 @@ def resolve_llama_server() -> str | None:
 
 
 def windows_path_to_wsl(path: Path) -> str:
+    """Map a Windows path to the WSL mount a WSL shell can cd into; a POSIX path is already correct."""
     resolved = path.resolve()
     drive = resolved.drive.rstrip(":").lower()
-    parts = resolved.parts[1:]
-    return "/mnt/" + drive + "/" + "/".join(parts)
+    if not drive:
+        return str(resolved)
+    return "/mnt/" + drive + "/" + "/".join(resolved.parts[1:])
 
 
 def wsl_quote(value: str) -> str:

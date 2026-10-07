@@ -1,0 +1,927 @@
+[
+  {
+    "name": "button-radius-token-drift",
+    "expect_drift": true,
+    "atoms": [
+      {
+        "atom_id": "home_btn_v4",
+        "modality": "ui_screenshot",
+        "source_id": "home_v4",
+        "source": "home_v4.figma",
+        "ingested_at": "2026-10-07T22:07:05.953200Z",
+        "text": "button.radius: 8px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "figma"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "checkout_btn_v4",
+        "modality": "ui_screenshot",
+        "source_id": "checkout_v4",
+        "source": "checkout_v4.figma",
+        "ingested_at": "2026-10-07T22:07:05.953230Z",
+        "text": "button.radius: 12px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "figma"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "primary-color-token-drift",
+    "expect_drift": true,
+    "atoms": [
+      {
+        "atom_id": "spec_color",
+        "modality": "pdf_page",
+        "source_id": "brand_spec",
+        "source": "brand_guide.pdf",
+        "ingested_at": "2026-10-07T22:07:05.953237Z",
+        "text": "primary.color: #2563eb",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "spec"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "impl_color",
+        "modality": "code",
+        "source_id": "theme_css",
+        "source": "src/theme.css",
+        "ingested_at": "2026-10-07T22:07:05.953241Z",
+        "text": "primary.color: #1d4ed8",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "css"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "heading-typography-drift",
+    "expect_drift": true,
+    "atoms": [
+      {
+        "atom_id": "home_heading",
+        "modality": "ui_screenshot",
+        "source_id": "home_shot",
+        "source": "home_v3.png",
+        "ingested_at": "2026-10-07T22:07:05.953245Z",
+        "text": "heading.font-size: 24px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "ui_screenshot"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "checkout_heading",
+        "modality": "ui_screenshot",
+        "source_id": "checkout_shot",
+        "source": "checkout_v3.png",
+        "ingested_at": "2026-10-07T22:07:05.953248Z",
+        "text": "heading.font-size: 28px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "ui_screenshot"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "card-spacing-layout-drift",
+    "expect_drift": true,
+    "atoms": [
+      {
+        "atom_id": "card_home",
+        "modality": "ui_screenshot",
+        "source_id": "card_home_shot",
+        "source": "home_v3.png",
+        "ingested_at": "2026-10-07T22:07:05.953252Z",
+        "text": "card.padding: 16px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "ui_screenshot"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "card_settings",
+        "modality": "ui_screenshot",
+        "source_id": "card_settings_shot",
+        "source": "settings_v3.png",
+        "ingested_at": "2026-10-07T22:07:05.953255Z",
+        "text": "card.padding: 24px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "ui_screenshot"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "cta-copy-drift",
+    "expect_drift": true,
+    "atoms": [
+      {
+        "atom_id": "cta_v1",
+        "modality": "ui_screenshot",
+        "source_id": "shot_v1",
+        "source": "cart_v1.png",
+        "ingested_at": "2026-10-07T22:07:05.953258Z",
+        "text": "cta.label: \"Checkout\"",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "ui_screenshot"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "cta_v4",
+        "modality": "ui_screenshot",
+        "source_id": "shot_v4",
+        "source": "cart_v4.png",
+        "ingested_at": "2026-10-07T22:07:05.953263Z",
+        "text": "cta.label: \"Pay now\"",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "ui_screenshot"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "banner-radius-temporal-drift",
+    "expect_drift": true,
+    "atoms": [
+      {
+        "atom_id": "banner_v1",
+        "modality": "ui_screenshot",
+        "source_id": "banner_spec_v1",
+        "source": "banner_v1.figma",
+        "ingested_at": "2026-10-07T22:07:05.953267Z",
+        "text": "banner.radius: 4px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "figma",
+          "version": "v1"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "banner_v4",
+        "modality": "ui_screenshot",
+        "source_id": "banner_spec_v4",
+        "source": "banner_v4.figma",
+        "ingested_at": "2026-10-07T22:07:05.953271Z",
+        "text": "banner.radius: 10px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "figma",
+          "version": "v4"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "toggle-accent-visual-code-drift",
+    "expect_drift": true,
+    "atoms": [
+      {
+        "atom_id": "toggle_design",
+        "modality": "ui_screenshot",
+        "source_id": "toggle_figma",
+        "source": "toggle.figma",
+        "ingested_at": "2026-10-07T22:07:05.953274Z",
+        "text": "toggle.color: #10b981",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "figma"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "toggle_code",
+        "modality": "code",
+        "source_id": "toggle_css",
+        "source": "src/toggle.css",
+        "ingested_at": "2026-10-07T22:07:05.953279Z",
+        "text": "toggle.color: #059669",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "css"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "consistent-button-radius",
+    "expect_drift": false,
+    "atoms": [
+      {
+        "atom_id": "ctrl_btn_spec",
+        "modality": "pdf_page",
+        "source_id": "ctrl_spec",
+        "source": "spec.pdf",
+        "ingested_at": "2026-10-07T22:07:05.953282Z",
+        "text": "button.radius: 8px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "spec"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "ctrl_btn_css",
+        "modality": "code",
+        "source_id": "ctrl_css",
+        "source": "src/tokens.css",
+        "ingested_at": "2026-10-07T22:07:05.953284Z",
+        "text": "button.radius = 8px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "css"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "distinct-components-not-a-conflict",
+    "expect_drift": false,
+    "atoms": [
+      {
+        "atom_id": "ctrl_button_radius",
+        "modality": "code",
+        "source_id": "ctrl_a",
+        "source": "a.css",
+        "ingested_at": "2026-10-07T22:07:05.953288Z",
+        "text": "button.radius: 8px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "css"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "ctrl_input_radius",
+        "modality": "code",
+        "source_id": "ctrl_b",
+        "source": "b.css",
+        "ingested_at": "2026-10-07T22:07:05.953293Z",
+        "text": "input.radius: 12px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 4,
+        "metadata": {
+          "source_kind": "css"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "single-source-multiple-rules",
+    "expect_drift": false,
+    "atoms": [
+      {
+        "atom_id": "ctrl_single_css",
+        "modality": "code",
+        "source_id": "ctrl_single",
+        "source": "src/base.css",
+        "ingested_at": "2026-10-07T22:07:05.953297Z",
+        "text": "header.padding: 8px; footer.padding: 24px; aside.padding: 16px",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 15,
+        "metadata": {
+          "source_kind": "css"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "consistent-primary-color",
+    "expect_drift": false,
+    "atoms": [
+      {
+        "atom_id": "ctrl_color_spec",
+        "modality": "pdf_page",
+        "source_id": "ctrl_color_a",
+        "source": "brand.pdf",
+        "ingested_at": "2026-10-07T22:07:05.953300Z",
+        "text": "primary.color: #2563eb",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "spec"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "ctrl_color_css",
+        "modality": "code",
+        "source_id": "ctrl_color_b",
+        "source": "theme.css",
+        "ingested_at": "2026-10-07T22:07:05.953302Z",
+        "text": "primary.color: #2563eb",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 5,
+        "metadata": {
+          "source_kind": "css"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  },
+  {
+    "name": "prose-without-design-facts",
+    "expect_drift": false,
+    "atoms": [
+      {
+        "atom_id": "ctrl_prose_a",
+        "modality": "text",
+        "source_id": "ctrl_prose_1",
+        "source": "notes_a.txt",
+        "ingested_at": "2026-10-07T22:07:05.953306Z",
+        "text": "The onboarding flow feels smooth and the colors look balanced.",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 15,
+        "metadata": {
+          "source_kind": "text"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      },
+      {
+        "atom_id": "ctrl_prose_b",
+        "modality": "text",
+        "source_id": "ctrl_prose_2",
+        "source": "notes_b.txt",
+        "ingested_at": "2026-10-07T22:07:05.953308Z",
+        "text": "Users reported the checkout button is easy to find.",
+        "image_ref": null,
+        "embedding_refs": [],
+        "layout": null,
+        "relations": [],
+        "trust": {
+          "parser": 0.95,
+          "ocr": 0.9,
+          "model": 0.85
+        },
+        "token_equivalent": 12,
+        "metadata": {
+          "source_kind": "text"
+        },
+        "holder_id": "",
+        "origin": "artifact",
+        "scenario": "",
+        "event_time": null,
+        "event_time_end": null,
+        "event_time_precision": "unknown",
+        "event_time_source": "",
+        "valid_from": null,
+        "valid_to": null,
+        "supersedes": [],
+        "visibility": {
+          "scope": "holder",
+          "holders": [],
+          "purpose": null
+        },
+        "retention_until": null
+      }
+    ]
+  }
+]

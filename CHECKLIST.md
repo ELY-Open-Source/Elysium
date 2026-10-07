@@ -105,12 +105,25 @@
     - 根因修复：`_answered()` 里 `readable = owner in (as_holder, LIBRARY)` 是 SQL 可见性子句之外的第二份、更严的规则，与 `visible_to=[husband]` 冲突（共享记忆被错误隐藏）→ 删掉这份重复判断，SQL 的 `as_holder` 可见性子句是唯一权威。
     - 偏差：Go 侧 `limit`/`max_hops` 零值曾当真实数字发出，被 API 以 `greater_than` 拒 → 未设置的可选字段一律省略，由服务端定默认值。
   - 验收：`pytest tests/test_transactive.py` 绿；钥匙测试场景通过
-- [ ] **p0-6** 证明套件去自证
-  - [ ] p0-6.1 删 arena 答案入墨（`evals.py:1408-1409` 连接线、`evals.py:1417-1426` 白圈）
-  - [ ] p0-6.2 删 best-of-N 重摇与达标即停
-  - [ ] p0-6.3 删自造矛盾场景（出题者≠判分者）
-  - [ ] p0-6.4 删缓存/证据图自触发式检查
-  - [ ] p0-6.5 模型相关检查标 `DEFERRED`，不进 pass
+- [x] **p0-6** 证明套件去自证
+  - [x] p0-6.1 删 arena 答案入墨（`evals.py:1408-1409` 连接线、`evals.py:1417-1426` 白圈）
+    - 偏差：入墨是唯一的可读信号——`render_visual_hash` 只画噪声、不画字，答案槽被青色线+白圈标出后，模型不需要检索也能答。所以删墨的同时把 id 印上瓦片（`proofs/arena.py:render_visual_hash` 白底黑字、每行 8 字符、字号 `tile_size//8`），否则删墨 = 删题。
+  - [x] p0-6.2 删 best-of-N 重摇与达标即停
+    - `collect_model_visual_proofs(evaluator, hops, token_equivalent, attempts)` 固定跑 `HASHHOP_ATTEMPTS = 8` 题；旧代码 `while len(proofs) < max_samples` 里一达标就 break（`evals.py:2365`），等于弱模型反复重摇到及格。
+  - [x] p0-6.3 删自造矛盾场景（出题者≠判分者）
+    - 偏差：自造场景没有删掉（删了就没得测），而是从代码搬进**数据**：`proofs/contradiction_scenarios.json`（12 场景，sha256 `5f93aba09cbfc32f…`），`corpus_path(settings.data_dir)` 优先读运维者放的第三方集，`ely-eye contradiction-corpus` 写默认集。检查项**永久 DEFERRED**，直到磁盘上不是自带的那份；reason 里写明「生产者用自家例题判分不算证据」。
+  - [x] p0-6.4 删缓存/证据图自触发式检查
+    - 缓存：旧检查只要 `any(layer.entries > 0)` 就算过（`evals.py:1252-1265`）。现在拿 store 里真实的一条 atom 拼一个带 nonce 的问题，编译两次，读 `cache_events` 的 miss→hit 计数；空 store 直接 failed（空上下文会让两次编译「一致」得毫无意义）。顺带修掉真实双计数：`read_semantic_cache` 与 `compiler.compile` 各记一次事件，现在读是纯读、编译恰好记一次（缓存命中带 hits 才记 hit，空缓存记 miss 并附 reason）。
+    - 仓库覆盖：旧检查 `indexed_file_count > 0` + 有调用图 + 有 git 历史就算过，不碰 store。现在必须 `sources > 0 && atoms > 0`，否则 failed 并说明「仓库上下文建了但没进 store」。
+    - 研究模块：旧检查断言八个模块各返回非空列表，而那些向量是 SHA256 派生的假向量——**不可能失败**。改为 `status="removed"`，artifact 记下为什么撤下、重新加回的条件。
+  - [x] p0-6.5 模型相关检查标 `DEFERRED`，不进 pass
+    - `ProofCheck.status` 加 `deferred`/`removed` + `reason` + `rerun`；`_deferred_without_model()` 在 `model_dir` 缺失时产出 deferred 并点名缺什么。聚合改成 `failed > deferred > passed`：只要还有没跑成的主张，整个套件就不说「通过」。每条 failed/deferred 都带 why 与可执行的 rerun 命令（`proofs/table.py` 渲染）。
+  - [x] p0-6.6 顺手还清的文件尺寸债
+    - `evals.py` 2427 行 → `proofs/` 包 15 个模块，最大 445 行（`checks_cartridge.py`），全部 ≤500 行；`suite.py` 218 行只剩「跑哪些检查、怎么定论」。`proofs/__main__.py` 删掉（它的 `latest_report()` 与 `PRDProofSuite.latest()` 是两份 glob 不同的重复实现），渲染移到 `proofs/table.py`，`latest-proof-suite` 成为唯一入口并在 failed 时 `exit 1`。
+  - 顺带修掉两个被证明测试逼出来的真 bug：
+    1. `text_index.fts_query` 把拉丁词用空格连起来 = FTS5 隐式 AND，长问题永远查不到短答案（实测「Which Ely-Eye PRD requirements prove long context memory, HashHop, and adapters?」→ 0 命中）。改成 OR + bm25 rank 排序。
+    2. `profiles.windows_path_to_wsl()` 对本来就是 POSIX 的路径也拼 `/mnt/` + 空 drive，产出 `/mnt//home/...`，六个 runtime profile 的探针全部 `probe_exit_code: 1`。
+  - 验收：`python -m pytest backend/tests/test_proofs.py -q` → 12 passed；`ELY_EYE_HOME=/tmp/p06home ely-eye proof-suite --cartridge-id p06_20cf30f7804d && ely-eye latest-proof-suite` → 15 行判决（5 failed / 3 passed / 6 deferred / 1 removed），每条带 why 与 rerun。
   - 验收：`python -m ely_eye.proofs --report` 逐条 PASS/DEFERRED/REMOVED + 理由
 
 ---

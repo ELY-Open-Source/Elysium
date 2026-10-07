@@ -24,6 +24,16 @@ def _hits(connection: sqlite3.Connection, query: str) -> list[str]:
     return [row[0] for row in connection.execute("SELECT original FROM fts WHERE fts MATCH ?", (fts_query(query),))]
 
 
+def _ranked(connection: sqlite3.Connection, query: str) -> list[str]:
+    """Matches in bm25 order: the answer that covers more of the question should come first."""
+    return [
+        row[0]
+        for row in connection.execute(
+            "SELECT original FROM fts WHERE fts MATCH ? ORDER BY rank", (fts_query(query),)
+        )
+    ]
+
+
 def test_index_text_splits_a_chinese_sentence_into_characters() -> None:
     assert index_text("我们的钥匙放在玄关抽屉里") == "我 们 的 钥 匙 放 在 玄 关 抽 屉 里"
 
@@ -40,7 +50,28 @@ def test_index_text_folds_full_width_letters_that_search_would_miss() -> None:
 
 def test_fts_query_phrases_cjk_and_prefixes_latin() -> None:
     assert fts_query("钥匙") == '"钥 匙"'
-    assert fts_query("search atoms") == '"search"* "atoms"*'
+    assert fts_query("search atoms") == '"search"* OR "atoms"*'
+
+
+def test_a_long_question_reaches_the_answer_that_covers_most_of_its_words() -> None:
+    """AND over every word answers a long question with nothing; bm25 picks the best candidate."""
+    connection = _fts(
+        [
+            "PRD requirements prove long context memory, HashHop proof, and adapter training.",
+            "The adapter was trained for 29 steps on 37 samples.",
+            "Unrelated notes about the weather.",
+        ]
+    )
+    question = "Which Ely-Eye PRD requirements prove long context memory, HashHop, and adapters?"
+    hits = [
+        row[0]
+        for row in connection.execute(
+            "SELECT original FROM fts WHERE fts MATCH ? ORDER BY rank", (fts_query(question),)
+        )
+    ]
+
+    assert hits[0].startswith("PRD requirements prove")
+    assert "Unrelated notes about the weather." not in hits
 
 
 def test_fts_query_refuses_a_query_with_nothing_to_match() -> None:
@@ -70,6 +101,10 @@ def test_a_prefix_reaches_the_word_it_grew_into() -> None:
     assert _hits(connection, "forg") == ["the atom was forgotten"]
 
 
-def test_a_mixed_query_needs_both_halves_in_the_same_memory() -> None:
+def test_a_mixed_query_ranks_the_memory_holding_both_halves_first() -> None:
+    """A query with a Chinese half and an English half must prefer the memory holding both."""
     connection = _fts(["钥匙放在 drawer 里", "钥匙在玄关", "the drawer is empty"])
-    assert _hits(connection, "钥匙 drawer") == ["钥匙放在 drawer 里"]
+    ranked = _ranked(connection, "钥匙 drawer")
+
+    assert ranked[0] == "钥匙放在 drawer 里"
+    assert set(ranked) == {"钥匙放在 drawer 里", "钥匙在玄关", "the drawer is empty"}

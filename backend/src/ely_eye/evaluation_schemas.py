@@ -105,16 +105,26 @@ class HashHopProof(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
 
 class ProofCheck(BaseModel):
+    """One claim, one verdict.
+
+    `deferred` means the check is written and runnable but needs something this machine does not
+    have (model weights, a second source). `removed` means the old check proved nothing and the
+    claim now waits for a check that can. Both carry a reason and the command that runs the check.
+    """
+
     name: str
     requirement: str
-    status: Literal["passed", "failed"]
+    status: Literal["passed", "failed", "deferred", "removed"]
     evidence: list[str]
     detail: str
+    reason: str = ""
+    rerun: str = ""
+
 
 class ProofSuiteReport(BaseModel):
     proof_id: str
     cartridge_id: str
-    status: Literal["passed", "failed"]
+    status: Literal["passed", "failed", "deferred"]
     created_at: datetime = Field(default_factory=utc_now)
     checks: list[ProofCheck]
     artifacts: dict[str, str]
