@@ -388,8 +388,15 @@ def _best_atom_text(atoms: Sequence[Atom], source_ids: Sequence[str]) -> list[tu
     return [(source_id, longest.get(source_id, "")) for source_id in source_ids]
 
 
-def live_product_rankings(db_home: Path, queries: Sequence[str], top_k: int = 10) -> tuple[list[list[str]], list[float]]:
-    """Rankings from the unmodified RetrievalService, with per-query wall time."""
+def live_product_rankings(
+    db_home: Path, queries: Sequence[str], top_k: int = 10
+) -> tuple[list[list[str]], list[int], list[float]]:
+    """Rankings from the unmodified RetrievalService, with per-query wall time.
+
+    The second list counts how many distinct sources the product's top-k atoms came
+    from: the product ranks atoms and never diversifies, so ten slots can be filled by
+    fragments of one document, and that is invisible once the hits are collapsed.
+    """
     from ely_eye.config import Settings
     from ely_eye.db import Database
     from ely_eye.retrieval import RetrievalService
@@ -397,6 +404,7 @@ def live_product_rankings(db_home: Path, queries: Sequence[str], top_k: int = 10
     settings = Settings(home=db_home)
     service = RetrievalService(settings=settings, database=Database(settings))
     rankings: list[list[str]] = []
+    distinct: list[int] = []
     timings: list[float] = []
     for query in queries:
         started = time.perf_counter()
@@ -408,5 +416,6 @@ def live_product_rankings(db_home: Path, queries: Sequence[str], top_k: int = 10
             source_id = hit.atom.source_id
             if source_id not in sources:
                 sources.append(source_id)
+        distinct.append(len({hit.atom.source_id for hit in hits}))
         rankings.append(sources[:top_k])
-    return rankings, timings
+    return rankings, distinct, timings

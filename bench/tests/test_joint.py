@@ -12,7 +12,15 @@ from pathlib import Path
 import pytest
 
 from bench import systems
-from bench.run import Query, fingerprint, latency, load_rankings
+from bench.run import (
+    Query,
+    fingerprint,
+    latency,
+    load_rankings,
+    scale_arm_names,
+    scale_probes,
+    write_markdown,
+)
 from bench.systems import ARMS, ArmRunner, Atom, JointRunner
 from bench.tests.test_systems import ATOMS
 
@@ -97,3 +105,96 @@ def test_latency_needs_samples() -> None:
 
 def test_every_arm_declares_the_signals_it_consumes() -> None:
     assert set(systems.ARM_COMPONENTS) == set(ARMS)
+
+
+def _probe_set(count: int) -> list[Query]:
+    return [
+        Query(
+            query_id=f"q{index}",
+            text="t",
+            modality="pdf",
+            gold=frozenset({f"s{index}"}),
+            holder="h",
+            answerable=index % 2 == 0,
+            as_of=None,
+        )
+        for index in range(count)
+    ]
+
+
+def test_scale_probes_ignore_gold_so_every_corpus_size_is_measured() -> None:
+    queries = _probe_set(100)
+    probes = scale_probes(queries, 10)
+    assert len(probes) == 10
+    assert all(query.answerable for query in probes)
+    assert probes == scale_probes(queries, 10), "the curve must be reproducible across runs"
+    assert {query.query_id for query in probes} <= {q.query_id for q in queries if q.answerable}
+    with pytest.raises(SystemExit, match="at least one probe"):
+        scale_probes(queries, 0)
+    with pytest.raises(SystemExit, match="needs answerable"):
+        scale_probes([], 10)
+
+
+def _overall() -> dict[str, float]:
+    return {
+        "recall_at_1": 0.3,
+        "recall_at_5": 0.4,
+        "recall_at_10": 0.5,
+        "ndcg_at_10": 0.42,
+        "mrr": 0.4,
+        "hit_at_10": 0.52,
+        "hit_at_10_wilson_lower": 0.45,
+        "abstention_rate_answerable": 0.0,
+        "abstention_rate_unanswerable": 0.0,
+        "wrong_holder_confidence_unanswerable": 0.2,
+    }
+
+
+def _report() -> dict:
+    return {
+        "meta": {
+            "generated_at": "2026-01-01T00:00:00+00:00",
+            "git_commit": "a" * 40,
+            "corpus_sources": 10,
+            "queries": 16,
+            "answerable": 8,
+            "models": {"dense": "d", "rerank": "r"},
+        },
+        "chance": {"recall_at_1": 0.0, "recall_at_5": 0.0, "recall_at_10": 0.0},
+        "arms": [
+            {
+                "arm": "bm25_only",
+                "overall": _overall(),
+                "by_modality": {"pdf": _overall()},
+                "latency_seconds": {"p50": 0.1, "p95": 0.2},
+            }
+        ],
+        "live_product": {
+            "queries": 2,
+            "top_k": 10,
+            "p50": 1.0,
+            "mean": 1.0,
+            "max": 1.0,
+            "top10_overlap_with_bm25_only": 0.0,
+            "identical_top10": 0.0,
+            "distinct_sources_in_top10": {"mean": 7.5, "min": 1, "max": 10},
+        },
+        "scale": [
+            {"sources": 500, "atoms": 900, "queries": 4, "note": "latency only", "bm25_only": {"p50": 0.001, "p95": 0.002}}
+        ],
+    }
+
+
+def test_the_report_writer_survives_a_scale_note(tmp_path: Path) -> None:
+    path = tmp_path / "BASELINE.md"
+    write_markdown(_report(), path)
+    text = path.read_text(encoding="utf-8")
+    assert "| 500 | 900 | 0.001/0.002 |" in text
+    assert "_latency only_" in text
+    assert "## unanswerable queries (50.0% of the suite)" in text
+
+
+def test_scale_arm_names_reads_only_latency_dicts() -> None:
+    assert scale_arm_names(_report()["scale"]) == ["bm25_only"]
+    with pytest.raises(SystemExit, match="no measured arm"):
+        scale_arm_names([{"sources": 500, "note": "latency only"}])

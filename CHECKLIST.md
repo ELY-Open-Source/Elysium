@@ -27,13 +27,13 @@
   - 验收：`python -m bench.validate_sets`（清单原名 dataset_check/manifest_check，实作合并为一个）报 `OK: 50789 sources, 2928 answerable queries, 2380 unanswerable` 退出 0；它同时校验 gold 存在性、gold holder==query holder、`observed_at <= as_of` 时间可达性、以及每个 set 文件的 SHA256 是否仍等于冻结的 manifest（重跑两次 SHA 相同由此保证）
 - [ ] **b-3** 检索 benchmark：五路消融 + 延迟规模
   - [x] b-3.1 指标实现：recall@k、MRR、nDCG@10，纯 Python，无模型（`bench/metrics.py` + `bench/tests/test_metrics.py` 11 条：Wilson 90/100→0.8257、10/10→0.7225、0/10→0.0 手算对齐；nDCG@10 `1.5/1.6309297535714574`；chance 公式经测试修正为 `min(1.0, k/N)`）
-  - [~] b-3.2 消融五路已写（`bench/systems.py`：`bm25_only / dense_only / graph_only / no_rerank / fusion_rerank`，融合权重照抄产品 `0.55/0.35/0.10`，`graph_only` 如实返回常量序因为产品从不填 `atom.relations`），14 条测试过；数字等全量 ingest
-  - [~] b-3.3 延迟规模曲线已写（`bench/run.py scale_curve`，p50/p95）；档位按语料实际取 `500 / 2_000 / 10_000 / 50_000` 个 source（清单原写 1k/10k/100k atom，语料冻结为 50,789 source，100k 档不存在）
+  - [x] b-3.2 消融五路已跑满 5,308 条（`bench/systems.py`：`bm25_only / dense_only / graph_only / no_rerank / fusion_rerank`，融合权重照抄产品 `0.55/0.35/0.10`，`graph_only` 如实返回常量序因为产品从不填 `atom.relations`）。recall@10：bm25 0.519、dense 0.424、graph 0.001、fusion 0.565、fusion+rerank 0.453 —— **加 reranker 反而掉 0.112**，graph 等于 chance，融合比任何单信号高 0.046
+  - [x] b-3.3 延迟规模曲线（`bench/run.py scale_curve`，p50/p95）；档位按语料实际取 `500 / 2_000 / 10_000 / 50_000` 个 source（清单原写 1k/10k/100k atom，语料冻结为 50,789 source，100k 档不存在）。首轮只有 50,000 一档出数：探针按 gold 是否在子集里筛，小前缀几乎不含 gold 就整档跳过 —— 已改为延迟不需要 gold（`scale_probes` + 测试），四档齐全
   - [ ] b-3.4 **BASELINE 报告**：在改动前的代码上跑，冻结提交
   - 验收：`python -m bench.run --config bench/configs/ablation.json` 出表（`--config` 已接，配置优先于默认、命令行仍可覆盖）；每格带 n 与 Wilson 95% 下界；`bench/reports/baseline_*.json` 入库
 - [ ] **b-4** 外部基线
   - [x] b-4.1 仓库内 Mem0/Zep 风格同构对照：扁平 store + holder 作用域 + 无失效（`bench/counterpart.py`：`split_items` 400 字切句、`(holder, sha256(text))` 去重＝Mem0、`supersede` 按 (holder, subject) 时间序关闭旧条目＝Zep；`visible(holder, as_of)` 只对 temporal store 生效）+ `bench/tests/test_counterpart.py` 11 条
-  - [~] b-4.2 同语料同硬件跑，出对照数字：`bench/run_external.py` 已跑通管道（shard 试跑：7,560 atom → 30,230 item，Zep 关闭 642 条），全量数字等 ingest
+  - [~] b-4.2 同语料同硬件跑，出对照数字：`bench/run_external.py` 全量在跑（165,973 atom → 403,859 条 memory item，Zep 式 `supersede` 关闭 27,072 条），数字待 `bench/reports/baseline_external.json`
   - [ ] b-4.3 附录：真 Mem0 跑法与参考值，标明其 `add()` 依赖 LLM 的不可比因素
   - 验收：`bench/reports/baseline_external_*.json`；对照基线与 ely-eye 同标注集同指标
 - [x] **b-5** 反自证审计（`bench/audit.py` + `bench/tests/test_audit.py` 9 条）

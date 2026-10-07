@@ -44,6 +44,7 @@ DB_HOME = ROOT / "runs" / "baseline"
 LIVE_QUERIES = 40  # the product rebuilds BM25 per query, so a live pass costs minutes per query
 PROGRESS_EVERY = 250  # an arm takes tens of minutes over 5,308 queries; silence looks like a hang
 SCALE_SIZES = (500, 2_000, 10_000, 50_000)
+SCALE_PROBES = 40
 
 
 @dataclass(frozen=True)
@@ -113,25 +114,42 @@ def chance_row(queries: Sequence[Query], corpus_sources: int) -> dict[str, float
     }
 
 
+def scale_probes(queries: Sequence[Query], count: int = SCALE_PROBES) -> list[Query]:
+    """Queries to time at every corpus size.
+
+    Latency does not need gold hits, and a truncated corpus keeps almost none of them,
+    so selecting probes by gold would silently drop the small sizes entirely.
+    """
+    if count <= 0:
+        raise SystemExit("the scale curve needs at least one probe query")
+    answerable = [query for query in queries if query.answerable]
+    if not answerable:
+        raise SystemExit("the scale curve needs answerable queries")
+    stride = max(1, len(answerable) // count)
+    return answerable[::stride][:count]
+
+
 def scale_curve(queries: Sequence[Query], atoms: Sequence[Atom], arms: Sequence[str]) -> list[dict[str, Any]]:
     """Latency of each arm as the corpus grows, measured on nested source prefixes."""
     sources = sorted({atom.source_id for atom in atoms})
     rows: list[dict[str, Any]] = []
-    sample = [query for query in queries if query.answerable][:40]
+    probes = scale_probes(queries)
     for size in SCALE_SIZES:
         keep = set(sources[:size])
         if not keep:
             raise SystemExit(f"scale size {size} kept no sources")
         subset = [atom for atom in atoms if atom.source_id in keep]
-        probe = [query for query in sample if query.gold & keep]
-        if not probe:
-            continue
-        row: dict[str, Any] = {"sources": len(keep), "atoms": len(subset), "queries": len(probe)}
+        row: dict[str, Any] = {
+            "sources": len(keep),
+            "atoms": len(subset),
+            "queries": len(probes),
+            "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
+        }
         for arm in arms:
             if not arm_needs(arm, MODELS):
                 continue
             runner = ArmRunner(arm, subset, MODELS)
-            for query in probe:
+            for query in probes:
                 runner.rank(query.text)
             row[arm] = {"p50": runner.percentile(0.50), "p95": runner.percentile(0.95)}
         rows.append(row)
@@ -151,7 +169,7 @@ def live_check(
     chosen = probe[::stride][:live_queries]
     if not chosen:
         raise SystemExit("live check needs answerable queries")
-    rankings, timings = live_product_rankings(DB_HOME, [query.text for query in chosen], top_k)
+    rankings, distinct, timings = live_product_rankings(DB_HOME, [query.text for query in chosen], top_k)
     overlaps = [
         len(set(fast_rankings[query.query_id]) & set(ranking)) / top_k
         for query, ranking in zip(chosen, rankings, strict=True)
@@ -161,11 +179,17 @@ def live_check(
         raise SystemExit("live check found no fast rankings to compare against")
     return {
         "queries": len(chosen),
+        "top_k": top_k,
         "p50": sorted(timings)[len(timings) // 2],
         "mean": sum(timings) / len(timings),
         "max": max(timings),
         "top10_overlap_with_bm25_only": sum(overlaps) / len(overlaps),
         "identical_top10": sum(1 for overlap in overlaps if overlap == 1.0) / len(overlaps),
+        "distinct_sources_in_top10": {
+            "mean": sum(distinct) / len(distinct),
+            "min": min(distinct),
+            "max": max(distinct),
+        },
     }
 
 
@@ -198,6 +222,22 @@ def meta(corpus_sources: int, queries: Sequence[Query], limit: int | None = None
         "corpus_sources": corpus_sources,
         "models": {"dense": DENSE_MODEL, "rerank": RERANK_MODEL},
     }
+
+
+def scale_arm_names(rows: Sequence[dict[str, Any]]) -> list[str]:
+    """Arms a scale row reports: only keys whose value is a latency dict, in order.
+
+    A scale row also carries strings (the note explaining what the row means), and
+    treating those as arms is how the report writer first crashed.
+    """
+    names: list[str] = []
+    for row in rows:
+        for name, value in row.items():
+            if isinstance(value, dict) and name not in names:
+                names.append(name)
+    if not names:
+        raise SystemExit("scale rows report no measured arm")
+    return names
 
 
 def write_markdown(report: dict[str, Any], path: Path) -> None:
@@ -239,7 +279,11 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             for modality in shown
         ]
         lines.append(f"| {arm['arm']} | " + " | ".join(cells) + " |")
-    lines += ["", "## unanswerable queries (44.8% of the suite)", ""]
+    total = report["meta"]["queries"]
+    if total <= 0:
+        raise SystemExit("the report records no queries")
+    share = 1 - report["meta"]["answerable"] / total
+    lines += ["", f"## unanswerable queries ({share:.1%} of the suite)", ""]
     for arm in report["arms"]:
         overall = arm["overall"]
         lines.append(
@@ -260,12 +304,23 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                 f"- top-10 overlap with the fast BM25 path: {live['top10_overlap_with_bm25_only']:.1%}, "
                 f"identical order {live['identical_top10']:.1%}"
             ),
+            (
+                f"- its top-{live['top_k']} atoms cover only "
+                f"{live['distinct_sources_in_top10']['mean']:.1f} distinct sources "
+                f"(min {live['distinct_sources_in_top10']['min']}): the product ranks atoms and never diversifies, "
+                "so ten slots fill with fragments of one document and the overlap with a source-level ranking is near zero"
+            ),
         ]
     if report.get("scale"):
-        lines += ["", "## latency vs corpus size", "", "| sources | atoms | " + " | ".join(a for a in report["scale"][0] if a not in ("sources", "atoms", "queries")) + " |", "|---" * (3 + len(report["scale"][0]) - 3) + "|"]
+        measured = scale_arm_names(report["scale"])
+        header = " | ".join(f"{arm} p50/p95 s" for arm in measured)
+        lines += ["", "## latency vs corpus size", "", f"| sources | atoms | {header} |", "|" + "---|" * (2 + len(measured))]
         for row in report["scale"]:
-            cells = [f"{row[arm]['p50']:.3f}/{row[arm]['p95']:.3f}" for arm in row if arm not in ("sources", "atoms", "queries")]
+            cells = [f"{row[arm]['p50']:.3f}/{row[arm]['p95']:.3f}" for arm in measured]
             lines.append(f"| {row['sources']} | {row['atoms']} | " + " | ".join(cells) + " |")
+        note = report["scale"][0].get("note")
+        if note:
+            lines += ["", f"_{note}_"]
     lines += [
         "",
         "## reading",
