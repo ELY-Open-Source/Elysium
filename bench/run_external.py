@@ -31,16 +31,29 @@ from bench.systems import machine_facts
 
 REPORTS = ROOT / "reports"
 TOP_K = 10
+HOLDER_SCOPE = "holder scope"
+WHOLE_CORPUS_SCOPE = "whole corpus"
+SCOPES = (HOLDER_SCOPE, WHOLE_CORPUS_SCOPE)
+PROGRESS_EVERY = 500
 
 
-def score_store(store: Counterpart, queries: list[Query], holder_of: dict[str, str]) -> dict[str, Any]:
-    """Rank every query against one counterpart store and aggregate the same metrics the arms use."""
+def score_store(store: Counterpart, queries: list[Query], holder_of: dict[str, str], scope: str) -> dict[str, Any]:
+    """Rank every query against one counterpart store and aggregate the same metrics the arms use.
+
+    scope "holder" answers only from the asking holder's memory; scope "whole corpus" hides the
+    holder boundary instead, which is the only difference from what the product's arms are shown.
+    Without both rows the gain from scoping cannot be told apart from the gain from ranking.
+    """
+    store.timings.clear()
     scores = []
-    for query in queries:
-        ranked = store.search(query.text, query.holder, query.as_of, TOP_K)
-        scores.append(score_query(query.query_id, ranked, set(query.gold), holder=query.holder, holder_of=holder_of))
+    for index, query in enumerate(queries, start=1):
+        holder = query.holder if scope == HOLDER_SCOPE else None
+        ranked = store.search(query.text, holder, query.as_of, TOP_K)
+        scores.append(score_query(query.query_id, ranked, set(query.gold), holder=holder, holder_of=holder_of))
+        if index % PROGRESS_EVERY == 0:
+            print(f"   {store.name} [{scope}] {index}/{len(queries)}", flush=True)
     summary: dict[str, Any] = {
-        "store": store.name,
+        "store": f"{store.name} [{scope}]",
         "items": len(store.items),
         "closed_items": sum(1 for item in store.items if item.valid_to is not None),
         "overall": aggregate(scores),
@@ -92,6 +105,13 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             f"| {latency['p50']:.3f} | {latency['p95']:.3f} |"
         )
     lines += ["", f"n per modality: {json.dumps(meta['queries_by_modality'], sort_keys=True)}", ""]
+    lines += [
+        "",
+        "`[holder scope]` answers only from the asking holder's memory; `[whole corpus]` searches every",
+        "holder's memory, which is what the product's arms are shown. The gap between the two rows is the",
+        "value of the holder boundary, not of a better ranker.",
+        "",
+    ]
     for store in report["stores"]:
         lines.append(f"## {store['store']} by modality")
         lines.append("")
@@ -99,7 +119,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         lines.append("| --- | --- | --- | --- | --- | --- |")
         for modality, row in sorted(store["by_modality"].items()):
             lines.append(
-                f"| {modality} | {row['answerable']} | {row['recall_at_10']:.3f} | {row['hit_at_10']:.3f} "
+                f"| {modality} | {row['n_answerable']} | {row['recall_at_10']:.3f} | {row['hit_at_10']:.3f} "
                 f"| {row['hit_at_10_wilson_lower']:.3f} | {row['mrr']:.3f} |"
             )
         lines.append("")
@@ -146,7 +166,7 @@ def main() -> int:
             "extraction": "lexical (see bench/counterpart.py); LLM extraction deferred with the generator",
             "machine": machine_facts(),
         },
-        "stores": [score_store(store, queries, holder_of) for store in stores],
+        "stores": [score_store(store, queries, holder_of, scope) for store in stores for scope in SCOPES],
     }
     REPORTS.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=1, sort_keys=True), encoding="utf-8")

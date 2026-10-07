@@ -292,7 +292,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         overall = arm["overall"]
         lines.append(
             f"- {arm['arm']}: abstains on {overall['abstention_rate_unanswerable']:.0%} of unanswerable queries, "
-            f"and puts a wrong-holder source on top for {overall['wrong_holder_confidence_unanswerable']:.0%} of them"
+            f"and its top hit comes from the query's own holder for {overall['top_hit_from_holder_unanswerable']:.0%} of them; "
+            "the rest are confident answers pulled out of somebody else's memory"
         )
     if "live_product" in report:
         live = report["live_product"]

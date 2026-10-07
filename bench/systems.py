@@ -168,13 +168,25 @@ class DenseIndex:
         return np.asarray(self._vectors @ vector[0], dtype=np.float64)
 
 
-def _sentence_model(model_dir: Path) -> Any:
-    """sentence-transformers ships no stubs, so the model is typed Any rather than a fake object."""
-    from sentence_transformers import SentenceTransformer
+_MODELS: dict[str, Any] = {}
 
-    if not model_dir.is_dir():
-        raise SystemExit(f"{model_dir}: model not downloaded, run python -m bench.fetch_models first")
-    return SentenceTransformer(str(model_dir), local_files_only=True)
+
+def _sentence_model(model_dir: Path) -> Any:
+    """Load a sentence-transformers model once per process.
+
+    The query path called this per query, and constructing the model from disk cost
+    more than the encode itself: dense arm p50 was 1.7s of which most was loading, and
+    the latency-vs-size curve came out flat because a constant dominated it.
+    sentence-transformers ships no stubs, so the model is typed Any rather than a fake object.
+    """
+    key = str(model_dir)
+    if key not in _MODELS:
+        from sentence_transformers import SentenceTransformer
+
+        if not model_dir.is_dir():
+            raise SystemExit(f"{model_dir}: model not downloaded, run python -m bench.fetch_models first")
+        _MODELS[key] = SentenceTransformer(key, local_files_only=True)
+    return _MODELS[key]
 
 
 def top_sources(scores: np.ndarray, atoms: Sequence[Atom], top_k: int) -> list[str]:

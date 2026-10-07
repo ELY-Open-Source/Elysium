@@ -146,7 +146,7 @@ def _overall() -> dict[str, float]:
         "hit_at_10_wilson_lower": 0.45,
         "abstention_rate_answerable": 0.0,
         "abstention_rate_unanswerable": 0.0,
-        "wrong_holder_confidence_unanswerable": 0.2,
+        "top_hit_from_holder_unanswerable": 0.2,
     }
 
 

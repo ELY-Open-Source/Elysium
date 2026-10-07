@@ -142,7 +142,7 @@ def aggregate(scores: Sequence[QueryScore]) -> dict[str, float | int]:
         "abstention_rate_unanswerable": (
             sum(1 for s in unanswerable if s.abstained) / len(unanswerable) if unanswerable else 0.0
         ),
-        "wrong_holder_confidence_unanswerable": (
+        "top_hit_from_holder_unanswerable": (
             sum(1 for s in holder_known if s.top_hit_from_holder) / len(holder_known)
             if holder_known
             else 0.0

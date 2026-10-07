@@ -241,6 +241,18 @@ def supersede(items: Sequence[MemoryItem]) -> int:
     return closed
 
 
+@dataclass(frozen=True)
+class _ItemArrays:
+    """Per-item columns, built once so a query never walks 400k Python objects."""
+
+    holder_ids: dict[str, int]
+    holders: np.ndarray
+    sources: list[str]
+    sources_of_item: np.ndarray
+    valid_from: np.ndarray
+    valid_to: np.ndarray
+
+
 @dataclass
 class Counterpart:
     """One counterpart store: the same items, the same embeddings, different memory semantics."""
@@ -252,9 +264,25 @@ class Counterpart:
     cache_name: str = "counterpart-items"
     timings: list[float] = field(default_factory=list)
     _index: DenseIndex | None = None
+    _arrays: _ItemArrays | None = None
 
     def __post_init__(self) -> None:
         """The store is cheap to build; embeddings are paid for on the first search."""
+
+    def _ensure_arrays(self) -> _ItemArrays:
+        if self._arrays is None:
+            holder_ids = {holder: code for code, holder in enumerate(sorted({item.holder for item in self.items}))}
+            ordered_sources = sorted({item.source_id for item in self.items})
+            source_ids = {source: code for code, source in enumerate(ordered_sources)}
+            self._arrays = _ItemArrays(
+                holder_ids=holder_ids,
+                holders=np.array([holder_ids[item.holder] for item in self.items], dtype=np.int32),
+                sources=list(ordered_sources),
+                sources_of_item=np.array([source_ids[item.source_id] for item in self.items], dtype=np.int32),
+                valid_from=np.array([item.valid_from for item in self.items], dtype="U64"),
+                valid_to=np.array([item.valid_to or "" for item in self.items], dtype="U64"),
+            )
+        return self._arrays
 
     def _ensure_index(self) -> DenseIndex:
         if self._index is None:
@@ -272,15 +300,14 @@ class Counterpart:
         a newer statement closed it, and hidden until it was observed. The flat store has no notion
         of as_of, which is exactly Mem0's behaviour and exactly what the comparison measures.
         """
-        mask = np.ones(len(self.items), dtype=bool)
-        for position, item in enumerate(self.items):
-            if holder is not None and item.holder != holder:
-                mask[position] = False
-                continue
-            if not self.temporal or as_of is None:
-                continue
-            if item.valid_from > as_of or (item.valid_to is not None and item.valid_to <= as_of):
-                mask[position] = False
+        arrays = self._ensure_arrays()
+        if holder is None:
+            mask = np.ones(len(self.items), dtype=bool)
+        else:
+            mask = arrays.holders == arrays.holder_ids.get(holder, -1)
+        if self.temporal and as_of is not None:
+            mask &= arrays.valid_from <= as_of
+            mask &= (arrays.valid_to == "") | (arrays.valid_to > as_of)
         return mask
 
     def search(self, query: str, holder: str | None, as_of: str | None, top_k: int = 10) -> list[str]:
@@ -288,16 +315,22 @@ class Counterpart:
         started = time.perf_counter()
         scores = self._ensure_index().scores(query, self.model_dir)
         mask = self.visible(holder, as_of)
-        best: dict[str, float] = {}
-        for position, item in enumerate(self.items):
-            if not mask[position]:
+        arrays = self._ensure_arrays()
+        masked = np.where(mask, scores, -np.inf)
+        ranked: list[str] = []
+        seen: set[int] = set()
+        for position in np.argsort(-masked, kind="stable"):
+            if not np.isfinite(masked[position]):
+                break
+            code = int(arrays.sources_of_item[position])
+            if code in seen:
                 continue
-            current = best.get(item.source_id)
-            if current is None or scores[position] > current:
-                best[item.source_id] = float(scores[position])
-        ranked = sorted(best.items(), key=lambda entry: (-entry[1], entry[0]))
+            seen.add(code)
+            ranked.append(arrays.sources[code])
+            if len(ranked) == top_k:
+                break
         self.timings.append(time.perf_counter() - started)
-        return [source_id for source_id, _ in ranked[:top_k]]
+        return ranked
 
     def percentile(self, fraction: float) -> float:
         if not self.timings:

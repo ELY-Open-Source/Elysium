@@ -162,3 +162,28 @@ def test_percentile_needs_timings_and_a_valid_fraction() -> None:
     with pytest.raises(SystemExit, match="percentile must be within"):
         runner.percentile(1.5)
     assert runner.percentile(0.5) >= 0.0
+
+
+def test_the_dense_model_is_loaded_once_per_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The query path used to rebuild the model for every query and measured that as retrieval latency."""
+    import sentence_transformers
+
+    from bench import systems
+
+    loaded: list[str] = []
+
+    class FakeModel:
+        def __init__(self, path: str, **_kwargs: object) -> None:
+            loaded.append(path)
+
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", FakeModel)
+    systems._MODELS.clear()
+    model_dir = tmp_path / "dense"
+    model_dir.mkdir()
+    try:
+        assert systems._sentence_model(model_dir) is systems._sentence_model(model_dir)
+        assert loaded == [str(model_dir)]
+        with pytest.raises(SystemExit, match="model not downloaded"):
+            systems._sentence_model(tmp_path / "missing")
+    finally:
+        systems._MODELS.clear()
