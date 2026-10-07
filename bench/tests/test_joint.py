@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -17,6 +18,7 @@ from bench.run import (
     fingerprint,
     latency,
     load_rankings,
+    remeasure_latency,
     scale_arm_names,
     scale_probes,
     write_markdown,
@@ -200,3 +202,12 @@ def test_scale_arm_names_reads_only_latency_dicts() -> None:
     assert scale_arm_names(_report()["scale"]) == ["bm25_only"]
     with pytest.raises(SystemExit, match="no measured arm"):
         scale_arm_names([{"sources": 500, "note": "latency only"}])
+
+
+def test_remeasure_latency_replaces_cached_seconds_with_a_warm_sample() -> None:
+    arms: list[dict[str, Any]] = [{"arm": "bm25_only", "latency_seconds": {"p50": 99.0}}]
+    remeasure_latency(arms, JointRunner(["bm25_only"], ATOMS, systems.MODELS), _probe_set(8), 4)
+    measured = arms[0]["latency_seconds"]
+    assert measured["p50"] < 99.0
+    assert measured["queries"] == 4
+    assert "warm models" in measured["note"]

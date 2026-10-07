@@ -264,6 +264,8 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"| chance (random ranking) | {chance['recall_at_1']:.3f} | {chance['recall_at_5']:.3f} "
         f"| {chance['recall_at_10']:.3f} | - | - | - | - | - |"
     )
+    if note := next((arm["latency_seconds"].get("note") for arm in report["arms"] if arm["latency_seconds"].get("note")), None):
+        lines += ["", f"_{note} (n={report['arms'][0]['latency_seconds']['queries']} queries)_"]
     for arm in report["arms"]:
         overall = arm["overall"]
         latency = arm["latency_seconds"]
@@ -361,7 +363,7 @@ def load_config(parser: argparse.ArgumentParser, args: argparse.Namespace, path:
         raise SystemExit(f"{path}: unknown arm(s) {unknown}, expected one of {list(ARMS)}")
 
 
-def latency(times: Sequence[float]) -> dict[str, float]:
+def latency(times: Sequence[float]) -> dict[str, Any]:
     """Latency summary for one arm's per-query wall times."""
     values = np.asarray(times, dtype=np.float64)
     if values.size == 0:
@@ -421,6 +423,30 @@ def load_rankings(path: Path, mark: str) -> dict[str, dict[str, Any]]:
     return rows
 
 
+def remeasure_latency(
+    arms: list[dict[str, Any]], joint: JointRunner, queries: Sequence[Query], count: int
+) -> None:
+    """Re-time a stride sample with warm models and replace each arm's latency section.
+
+    Cached per-query seconds are whatever the machine was doing at the time: a run sharing the
+    cores with another job, or a harness that paid model loading per query, reported that as
+    retrieval latency. Recall stays a full-pass number; only the timing column is re-measured
+    here, and the sample size is recorded so the two are never confused.
+    """
+    sample = scale_probes(queries, count)
+    times: dict[str, list[float]] = {arm["arm"]: [] for arm in arms}
+    for index, query in enumerate(sample, start=1):
+        for name, (_, seconds) in joint.rank_all(query.text).items():
+            if name in times:
+                times[name].append(seconds)
+        if index % PROGRESS_EVERY == 0:
+            print(f"   latency {index}/{len(sample)}, rss {rss_gib():.1f} GiB", flush=True)
+    for arm in arms:
+        measured: dict[str, Any] = latency(times[arm["arm"]])
+        measured["note"] = "re-timed on a stride sample with warm models; recall comes from the full pass"
+        arm["latency_seconds"] = measured
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--arms", nargs="+", choices=ARMS, action="extend", default=None)
@@ -429,6 +455,12 @@ def main() -> int:
     parser.add_argument("--no-live", action="store_true", help="skip the unmodified RetrievalService path")
     parser.add_argument("--live-queries", type=int, default=LIVE_QUERIES)
     parser.add_argument("--no-scale", action="store_true", help="skip the latency/scale curve")
+    parser.add_argument(
+        "--remeasure-latency",
+        type=int,
+        default=0,
+        help="re-time this many sampled queries with warm models instead of trusting cached per-query seconds",
+    )
     parser.add_argument("--out", type=Path, default=REPORTS)
     parser.add_argument("--config", type=Path, help="JSON defaults for these flags (bench/configs/ablation.json)")
     args = parser.parse_args()
@@ -510,6 +542,8 @@ def main() -> int:
             flush=True,
         )
     report["arms"] = arms
+    if args.remeasure_latency:
+        remeasure_latency(arms, joint, queries, args.remeasure_latency)
     # A crash in the live or scale phase should not cost every finished arm.
     (DB_HOME / "partial_report.json").write_text(json.dumps(report, indent=1, sort_keys=True), encoding="utf-8")
     if not args.no_live:
