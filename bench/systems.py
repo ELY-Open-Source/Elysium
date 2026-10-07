@@ -18,11 +18,14 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from bench.ingest_baseline import source_map
+
+if TYPE_CHECKING:
+    from ely_eye.db import Database
 from bench.sets_common import ROOT
 
 RUNS = ROOT / "runs" / "baseline"
@@ -423,34 +426,67 @@ def _best_atom_text(atoms: Sequence[Atom], source_ids: Sequence[str]) -> list[tu
     return [(source_id, longest.get(source_id, "")) for source_id in source_ids]
 
 
+def _corpus_ids(database: Database) -> dict[str, str]:
+    """Join the store's content-hash source ids to the ids the frozen sets call a source by.
+
+    Without this join the product's hits and the gold answers share no name, and a correct answer
+    scores zero — which is what an earlier report recorded as "0% overlap with the fast path".
+    """
+    mapping = source_map()
+    ids: dict[str, str] = {}
+    unknown: list[str] = []
+    for source in database.list_sources():
+        corpus_id = mapping.get(str(Path(source.path).resolve()))
+        if corpus_id is None:
+            unknown.append(source.source_id)
+        else:
+            ids[source.source_id] = corpus_id
+    if unknown:
+        raise SystemExit(f"{database.path}: {len(unknown)} store sources are not corpus files, first {unknown[:3]}")
+    return ids
+
+
 def live_product_rankings(
-    db_home: Path, queries: Sequence[str], top_k: int = 10
+    db_home: Path,
+    queries: Sequence[str],
+    top_k: int = 10,
+    as_holders: Sequence[str | None] | None = None,
 ) -> tuple[list[list[str]], list[int], list[float]]:
     """Rankings from the unmodified RetrievalService, with per-query wall time.
 
-    The second list counts how many distinct sources the product's top-k atoms came
-    from: the product ranks atoms and never diversifies, so ten slots can be filled by
-    fragments of one document, and that is invisible once the hits are collapsed.
+    Rankings carry the benchmark's source ids, so they are comparable with the arms and with gold.
+    `as_holders` asks each query as its own holder, which is how a transactive memory is used: the
+    asker does not know where the answer is, only who might.
+
+    The second list counts how many distinct sources the product's top-k atoms came from: the
+    product ranks atoms and never diversifies, so ten slots can be filled by fragments of one
+    document, and that is invisible once the hits are collapsed.
     """
     from ely_eye.config import Settings
     from ely_eye.db import Database
     from ely_eye.retrieval import RetrievalService
+    from ely_eye.schemas import SearchFilters
 
+    if as_holders is not None and len(as_holders) != len(queries):
+        raise SystemExit(f"{len(as_holders)} holders for {len(queries)} queries")
     settings = Settings(home=db_home)
-    service = RetrievalService(settings=settings, database=Database(settings))
+    database = Database(settings)
+    service = RetrievalService(settings=settings, database=database)
+    corpus_ids = _corpus_ids(database)
     rankings: list[list[str]] = []
     distinct: list[int] = []
     timings: list[float] = []
-    for query in queries:
+    for index, query in enumerate(queries):
+        holder = as_holders[index] if as_holders is not None else None
         started = time.perf_counter()
-        hits = service.search(query, top_k=top_k).hits
+        hits = service.search(query, top_k=top_k, filters=SearchFilters(as_holder=holder)).hits
         timings.append(time.perf_counter() - started)
         # The product ranks atoms; collapse to sources by first (best) hit so the arms stay comparable.
         sources: list[str] = []
         for hit in hits:
-            source_id = hit.atom.source_id
+            source_id = corpus_ids[hit.atom.source_id]
             if source_id not in sources:
                 sources.append(source_id)
-        distinct.append(len({hit.atom.source_id for hit in hits}))
+        distinct.append(len({corpus_ids[hit.atom.source_id] for hit in hits}))
         rankings.append(sources[:top_k])
     return rankings, distinct, timings

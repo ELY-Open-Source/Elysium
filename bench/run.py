@@ -41,7 +41,7 @@ from bench.systems import (
 ROOT = SETS.parent
 REPORTS = ROOT / "reports"
 DB_HOME = ROOT / "runs" / "baseline"
-LIVE_QUERIES = 40  # the product rebuilds BM25 per query, so a live pass costs minutes per query
+LIVE_QUERIES = 300  # the acceptance bar names n>=300; the SQL path answers in well under a second
 PROGRESS_EVERY = 250  # an arm takes tens of minutes over 5,308 queries; silence looks like a hang
 SCALE_SIZES = (500, 2_000, 10_000, 50_000)
 SCALE_PROBES = 40
@@ -163,13 +163,19 @@ def live_check(
     top_k: int = 10,
     live_queries: int = LIVE_QUERIES,
 ) -> dict[str, Any]:
-    """Compare the unmodified RetrievalService with the fast BM25 path."""
+    """Score the unmodified RetrievalService on its own, as its holder would ask it.
+
+    The arms measure retrieval configurations; the acceptance bar is about the product. A query is
+    asked as the holder the frozen set assigns it, because a transactive memory is used that way.
+    """
     probe = [query for query in queries if query.answerable]
     stride = max(1, len(probe) // live_queries)
     chosen = probe[::stride][:live_queries]
     if not chosen:
         raise SystemExit("live check needs answerable queries")
-    rankings, distinct, timings = live_product_rankings(DB_HOME, [query.text for query in chosen], top_k)
+    rankings, distinct, timings = live_product_rankings(
+        DB_HOME, [query.text for query in chosen], top_k, as_holders=[query.holder for query in chosen]
+    )
     overlaps = [
         len(set(fast_rankings[query.query_id]) & set(ranking)) / top_k
         for query, ranking in zip(chosen, rankings, strict=True)
@@ -177,20 +183,30 @@ def live_check(
     ]
     if not overlaps:
         raise SystemExit("live check found no fast rankings to compare against")
-    return {
-        "queries": len(chosen),
-        "top_k": top_k,
-        "p50": sorted(timings)[len(timings) // 2],
-        "mean": sum(timings) / len(timings),
-        "max": max(timings),
-        "top10_overlap_with_bm25_only": sum(overlaps) / len(overlaps),
-        "identical_top10": sum(1 for overlap in overlaps if overlap == 1.0) / len(overlaps),
-        "distinct_sources_in_top10": {
-            "mean": sum(distinct) / len(distinct),
-            "min": min(distinct),
-            "max": max(distinct),
-        },
-    }
+    scores = [
+        score_query(query.query_id, ranking, set(query.gold), query.holder)
+        for query, ranking in zip(chosen, rankings, strict=True)
+    ]
+    metrics: dict[str, Any] = dict(aggregate(scores))
+    ordered = sorted(timings)
+    metrics.update(
+        {
+            "queries": len(chosen),
+            "top_k": top_k,
+            "p50": ordered[len(ordered) // 2],
+            "p95": ordered[min(len(ordered) - 1, int(len(ordered) * 0.95))],
+            "mean": sum(ordered) / len(ordered),
+            "max": max(ordered),
+            "top10_overlap_with_bm25_only": sum(overlaps) / len(overlaps),
+            "identical_top10": sum(1 for overlap in overlaps if overlap == 1.0) / len(overlaps),
+            "distinct_sources_in_top10": {
+                "mean": sum(distinct) / len(distinct),
+                "min": min(distinct),
+                "max": max(distinct),
+            },
+        }
+    )
+    return metrics
 
 
 def git_commit() -> str:
@@ -203,7 +219,23 @@ def git_commit() -> str:
     return commit
 
 
-def meta(corpus_sources: int, queries: Sequence[Query], limit: int | None = None) -> dict[str, Any]:
+def store_schema_version(store: Path) -> int:
+    """The schema the measured store actually carries, read from the file."""
+    import sqlite3
+
+    if not store.exists():
+        raise SystemExit(f"{store}: the measured store is missing")
+    connection = sqlite3.connect(f"file:{store}?mode=ro", uri=True)
+    try:
+        row = connection.execute("PRAGMA user_version").fetchone()
+    finally:
+        connection.close()
+    return int(row[0])
+
+
+def meta(
+    corpus_sources: int, queries: Sequence[Query], limit: int | None = None, store: Path | None = None
+) -> dict[str, Any]:
     manifest_path = SETS / "manifest.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -220,6 +252,7 @@ def meta(corpus_sources: int, queries: Sequence[Query], limit: int | None = None
         "answerable": sum(1 for query in queries if query.answerable),
         "limit_per_modality": limit,
         "corpus_sources": corpus_sources,
+        "store_schema_version_at_start": None if store is None else store_schema_version(store),
         "models": {"dense": DENSE_MODEL, "rerank": RERANK_MODEL},
     }
 
@@ -240,12 +273,14 @@ def scale_arm_names(rows: Sequence[dict[str, Any]]) -> list[str]:
     return names
 
 
-def write_markdown(report: dict[str, Any], path: Path) -> None:
+def write_markdown(report: dict[str, Any], path: Path, name: str = "BASELINE") -> None:
     """Human-readable twin of the JSON report."""
+    schema = report["meta"].get("store_schema_version_at_start")
     lines = [
-        "# BASELINE: what the product retrieves today",
+        f"# {name}: what the product retrieves at this build",
         "",
         f"- generated {report['meta']['generated_at']} at commit {report['meta']['git_commit'][:12]}",
+        ("" if schema is None else f"- measured store schema: v{schema}"),
         (
             f"- corpus {report['meta']['corpus_sources']} sources, {report['meta']['queries']} queries "
             f"({report['meta']['answerable']} answerable)"
@@ -302,21 +337,26 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         live = report["live_product"]
         lines += [
             "",
-            "## the unmodified product path",
+            "## the product path, asked as its holder",
             "",
             (
-                f"- RetrievalService.search: p50 {live['p50']:.2f}s, mean {live['mean']:.2f}s, max {live['max']:.2f}s "
-                f"over {live['queries']} queries"
+                f"- RetrievalService.search as the query's own holder: recall@10 {live['recall_at_10']:.3f}, "
+                f"MRR {live['mrr']:.3f}, hit@10 {live['hit_at_10']:.3f} (95% lower {live['hit_at_10_wilson_lower']:.3f}) "
+                f"over n={live['queries']} answerable queries"
+            ),
+            (
+                f"- latency p50 {live['p50']:.3f}s, p95 {live['p95']:.3f}s, mean {live['mean']:.3f}s, "
+                f"max {live['max']:.3f}s"
             ),
             (
                 f"- top-10 overlap with the fast BM25 path: {live['top10_overlap_with_bm25_only']:.1%}, "
                 f"identical order {live['identical_top10']:.1%}"
             ),
             (
-                f"- its top-{live['top_k']} atoms cover only "
-                f"{live['distinct_sources_in_top10']['mean']:.1f} distinct sources "
+                f"- its top-{live['top_k']} atoms cover "
+                f"{live['distinct_sources_in_top10']['mean']:.1f} distinct sources on average "
                 f"(min {live['distinct_sources_in_top10']['min']}): the product ranks atoms and never diversifies, "
-                "so ten slots fill with fragments of one document and the overlap with a source-level ranking is near zero"
+                "so ten slots can fill with fragments of one document"
             ),
         ]
     if report.get("scale"):
@@ -463,6 +503,11 @@ def main() -> int:
         help="re-time this many sampled queries with warm models instead of trusting cached per-query seconds",
     )
     parser.add_argument("--out", type=Path, default=REPORTS)
+    parser.add_argument(
+        "--name",
+        default="BASELINE",
+        help="report name: writes NAME.md and name.json (BASELINE stays the frozen pre-P0 snapshot)",
+    )
     parser.add_argument("--config", type=Path, help="JSON defaults for these flags (bench/configs/ablation.json)")
     args = parser.parse_args()
     if args.config:
@@ -485,7 +530,7 @@ def main() -> int:
     print(f"{len(queries)} queries, {len(atoms)} atoms, {corpus_sources} sources", flush=True)
 
     report: dict[str, Any] = {
-        "meta": meta(corpus_sources, queries, args.limit),
+        "meta": meta(corpus_sources, queries, args.limit, store=DB_HOME / "data" / "ely_eye.sqlite"),
         "chance": chance_row(queries, corpus_sources),
     }
     # One pass over the queries: each signal is computed once and every arm is derived
@@ -553,9 +598,10 @@ def main() -> int:
         report["scale"] = scale_curve(queries, atoms, [arm for arm in arms_requested if arm in ("bm25_only", "dense_only")])
 
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "baseline.json").write_text(json.dumps(report, indent=1, sort_keys=True), encoding="utf-8")
-    write_markdown(report, args.out / "BASELINE.md")
-    print(f"== wrote {args.out / 'baseline.json'} and {args.out / 'BASELINE.md'}", flush=True)
+    stem = args.name.lower()
+    (args.out / f"{stem}.json").write_text(json.dumps(report, indent=1, sort_keys=True), encoding="utf-8")
+    write_markdown(report, args.out / f"{args.name}.md", name=args.name)
+    print(f"== wrote {args.out / (stem + '.json')} and {args.out / (args.name + '.md')}", flush=True)
     return 0
 
 

@@ -181,7 +181,12 @@ def _report() -> dict:
         "live_product": {
             "queries": 2,
             "top_k": 10,
+            "recall_at_10": 0.87,
+            "mrr": 0.74,
+            "hit_at_10": 0.87,
+            "hit_at_10_wilson_lower": 0.82,
             "p50": 1.0,
+            "p95": 1.0,
             "mean": 1.0,
             "max": 1.0,
             "top10_overlap_with_bm25_only": 0.0,
@@ -202,6 +207,7 @@ def test_the_report_writer_survives_a_scale_note(tmp_path: Path) -> None:
     assert "_latency only_" in text
     assert "load average 1.0 on 32 cores" in text
     assert "## unanswerable queries (50.0% of the suite)" in text
+    assert "recall@10 0.870" in text
 
 
 def test_scale_arm_names_reads_only_latency_dicts() -> None:
