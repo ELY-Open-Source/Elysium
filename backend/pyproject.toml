@@ -51,3 +51,7 @@ where = ["src"]
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.lint]
+# Typer requires an option default to be a typer.Option call, which is what B008 forbids.
+ignore = ["B008"]
+

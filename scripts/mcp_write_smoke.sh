@@ -25,8 +25,10 @@ printf '{"metadata": {}, "weight_map": {"model-00001.safetensors": "0"}}' > "$mo
 export ELY_EYE_MODEL_DIR="$model_dir"
 
 api=""
+wife_api=""
 cleanup() {
   if [ -n "$api" ]; then kill "$api" 2>/dev/null || true; fi
+  if [ -n "$wife_api" ]; then kill "$wife_api" 2>/dev/null || true; fi
   rm -rf "$home"
 }
 trap cleanup EXIT
@@ -47,6 +49,27 @@ fi
 
 (cd "$root/ely-eye-mcp" && go build -o "$home/ely-eye-mcp" ./cmd/ely-eye-mcp)
 
+# A second principal on the same SQLite file. The server, not the client, decides who a memory
+# belongs to, so the only way to write as the wife is to ask a server whose principal is the wife.
+wife_port=$((port + 1))
+ELY_EYE_DEFAULT_HOLDER=wife "$python_bin" -m ely_eye.cli serve --port "$wife_port" >"$home/wife-api.log" 2>&1 &
+wife_api=$!
+ready=0
+for _ in $(seq 1 80); do
+  if curl -sf "http://127.0.0.1:${wife_port}/api/status" >/dev/null 2>&1; then ready=1; break; fi
+  sleep 0.5
+done
+if [ "$ready" -ne 1 ]; then
+  echo "FAIL: the wife's Ely-Eye API did not start"
+  cat "$home/wife-api.log"
+  exit 1
+fi
+secret="护照在书房第二个抽屉里"
+curl -sf -X POST "http://127.0.0.1:${wife_port}/api/memory" -H 'content-type: application/json' \
+  -d "{\"text\":\"${secret}\",\"scenario\":\"home\"}" >/dev/null
+curl -sf -X POST "http://127.0.0.1:${wife_port}/api/holders/wife" -H 'content-type: application/json' \
+  -d '{"name":"小美","kind":"person","knows_about":["护照"],"contact":{"channel":"signal","address":"+86-555"}}' >/dev/null
+
 printf 'the pantry keeps flour\n' > "$home/pantry.txt"
 uploaded="$(curl -sf -X POST "http://127.0.0.1:${port}/api/ingest/upload?cartridge_name=home" \
   -F "files=@${home}/pantry.txt;type=text/plain")"
@@ -56,7 +79,7 @@ if [ -z "$cartridge_id" ] || [ "$cartridge_id" = "None" ]; then
   exit 1
 fi
 
-"$python_bin" - "$home/ely-eye-mcp" "$cartridge_id" "$model_dir" <<'PY'
+"$python_bin" - "$home/ely-eye-mcp" "$cartridge_id" "$model_dir" "$secret" <<'PY'
 import json
 import pathlib
 import subprocess
@@ -65,6 +88,7 @@ import sys
 binary = sys.argv[1]
 cartridge_id = sys.argv[2]
 model_dir = pathlib.Path(sys.argv[3])
+secret = sys.argv[4]
 proc = subprocess.Popen(
     [binary, "server"],
     stdin=subprocess.PIPE,
@@ -108,7 +132,8 @@ send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
 names = [item["name"] for item in call(2, "tools/list", {})["tools"]]
 for required in ("remember", "supersede_memory", "forget_memory", "mounted_cartridges",
-                 "mount_cartridge", "switch_cartridge", "unmount_cartridge", "append_to_cartridge"):
+                 "mount_cartridge", "switch_cartridge", "unmount_cartridge", "append_to_cartridge",
+                 "who_knows", "ask", "list_holders"):
     if required not in names:
         raise SystemExit(f"FAIL: {required} is not registered; tools are {names}")
 
@@ -182,5 +207,38 @@ refused = call(3, "tools/call", {"name": "mount_cartridge", "arguments": {"cartr
 if not refused.get("isError") or "rope" not in refused["content"][0]["text"]:
     raise SystemExit(f"FAIL: a cartridge built for RoPE factor 4.0 mounted on a factor 2.0 machine: {refused}")
 
-print("PASS: remember, supersede, search, forget and cartridge mounting work through MCP")
+# The transactive proof. The asker is this machine's principal; the wife's memory is private to
+# her, so the directory may say she knows without showing what she knows.
+holders = tool("list_holders", {})["holders"]
+if not any(item["holder_id"] == "wife" for item in holders):
+    raise SystemExit(f"FAIL: the registry does not list the wife: {holders}")
+
+directory = tool("who_knows", {"query": "护照", "as_holder": "local"})["report"]
+if directory["status"] != "found" or not directory["hits"]:
+    raise SystemExit(f"FAIL: the directory found nobody who knows: {directory}")
+top = directory["hits"][0]
+if top["holder_id"] != "wife" or top["contact"].get("channel") != "signal":
+    raise SystemExit(f"FAIL: the directory did not name the wife and how to reach her: {top}")
+if not any("declared topics" in line for line in top["basis"]):
+    raise SystemExit(f"FAIL: her declared topic did not raise the confidence: {top['basis']}")
+
+referred = tool("ask", {"question": "护照在哪里", "as_holder": "local", "include_text": True})["answer"]
+if referred["status"] != "referred" or referred["answered_by"] != "wife":
+    raise SystemExit(f"FAIL: the question was not referred to the wife: {referred}")
+if referred.get("answer"):
+    raise SystemExit(f"FAIL: a private memory leaked into the referral: {referred['answer']}")
+if secret in json.dumps(referred, ensure_ascii=False):
+    raise SystemExit(f"FAIL: the referral carried the private text: {referred}")
+if "wife" not in referred["asked"]:
+    raise SystemExit(f"FAIL: the referral never asked the wife: {referred}")
+
+mine = tool("ask", {"question": "pantry flour", "as_holder": "local", "include_text": True})["answer"]
+if mine["status"] != "answered" or not mine["atom_ids"]:
+    raise SystemExit(f"FAIL: the asker's own memory did not answer: {mine}")
+
+nobody = tool("ask", {"question": "潜水镜", "as_holder": "local"})["answer"]
+if nobody["status"] != "no_holder_knows" or nobody.get("answer"):
+    raise SystemExit(f"FAIL: nobody knowing was reported as an answer: {nobody}")
+
+print("PASS: remember, supersede, search, forget, cartridge mounting and the transactive referral work through MCP")
 PY

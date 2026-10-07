@@ -16,6 +16,7 @@ from .benchmarks import (
 )
 from .cartridge import CartridgeService
 from .cartridge_assets import CartridgeAssetService
+from .cli_transactive import register as register_transactive_commands
 from .config import get_settings
 from .db import Database
 from .embeddings import EmbeddingService
@@ -36,6 +37,9 @@ def json_dump(value: object) -> str:
     import json
 
     return json.dumps(value, ensure_ascii=False, indent=2)
+
+
+register_transactive_commands(app, lambda: get_settings())
 
 
 @app.command()
@@ -202,7 +206,7 @@ def unmount(cartridge_id: str) -> None:
 @app.command()
 def append(
     cartridge_id: str,
-    atom_id: list[str] = typer.Option(..., "--atom-id"),  # noqa: B008  # typer reads option defaults itself
+    atom_id: list[str] = typer.Option(..., "--atom-id"),
 ) -> None:
     """Add memories to an existing cartridge; the bundle and its DNA follow."""
     service = CartridgeService(get_settings())
@@ -352,7 +356,7 @@ def build_visual_training_data(
     prd_path: Path = Path("PRD.md"),
     output_path: Path | None = None,
     cartridge_id: str | None = None,
-    image_path: list[Path] | None = typer.Option(None, "--image-path"),  # noqa: B008  # typer reads option defaults itself
+    image_path: list[Path] | None = typer.Option(None, "--image-path"),
 ) -> None:
     path = TrainingService(get_settings()).build_visual_dataset(
         prd_path=prd_path,

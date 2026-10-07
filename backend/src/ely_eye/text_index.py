@@ -42,7 +42,7 @@ def fts_query(query: str) -> str:
     terms = _bare(query).split()
     if not terms:
         raise ValueError(f"search needs at least one searchable word, got {query!r}")
-    return " ".join(_phrase(term) if _is_cjk(term) else f"{_quote(term)}*" for term in terms)
+    return " ".join(_cjk_phrase(term) if _is_cjk(term) else f"{_quote(term)}*" for term in terms)
 
 
 def _bare(text: str) -> str:
@@ -57,6 +57,18 @@ def _is_cjk(term: str) -> bool:
 
 def _phrase(run: str) -> str:
     return '"' + " ".join(run) + '"'
+
+
+def _cjk_phrase(run: str) -> str:
+    """A CJK run stays adjacent, and a long question also reaches the pairs inside it.
+
+    The whole run as one phrase is the precise reading, and it is what a two-character word
+    needs. A question is usually longer than the sentence that answers it: 钥匙在哪里 will not
+    appear inside 我们的钥匙放在玄关抽屉里. Offering every adjacent pair as an alternative keeps
+    adjacency — 钥 and 匙 still have to touch — without demanding equal length.
+    """
+    phrases = list(dict.fromkeys([_phrase(run)] + [_phrase(run[start : start + 2]) for start in range(len(run) - 1)]))
+    return phrases[0] if len(phrases) == 1 else "(" + " OR ".join(phrases) + ")"
 
 
 def _quote(term: str) -> str:

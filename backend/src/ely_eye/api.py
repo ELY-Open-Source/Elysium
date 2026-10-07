@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from . import __version__
 from .api_cartridges import register as register_cartridge_routes
+from .api_holders import register as register_holder_routes
 from .benchmarks import (
     benchmark_prediction_report,
     benchmark_registry_report,
@@ -246,6 +247,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     register_cartridge_routes(app, settings_dep)
+    register_holder_routes(app, settings_dep)
 
     @app.get("/api/adapters", response_model=list[AdapterStatus])
     def adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> list[AdapterStatus]:

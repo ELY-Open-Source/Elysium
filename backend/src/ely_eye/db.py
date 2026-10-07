@@ -188,12 +188,18 @@ class Database:
         until: datetime | None = None,
         min_trust: float | None = None,
         cartridge_ids: list[str] | None = None,
+        as_holder: str | None = None,
     ) -> FtsPage:
         """BM25 over the FTS index joined to memories that are open right now.
 
         Every filter is a `? IS NULL OR` predicate in one literal statement: the ranking never
         depends on string-built SQL, and the planner sees one shape. A memory with no event time
         cannot answer a time filter, so it drops out when one is asked for.
+
+        `as_holder` applies the sharing rule: a memory is readable by its owner, by anyone named
+        in its visible_to list, by everyone when it is public, and by anyone when nobody owns it.
+        A memory with no holder cannot be private to a holder that does not exist. Without an
+        asker the query runs over the whole library, which is what an operator debugging wants.
         """
         with self.connect() as connection:
             rows = connection.execute(
@@ -221,6 +227,13 @@ class Database:
                         WHERE ca.atom_id = f.atom_id
                           AND ca.cartridge_id IN (SELECT value FROM json_each(?))
                   ))
+                  AND (? IS NULL OR a.holder_id = ''
+                        OR json_extract(a.visibility_json, '$.scope') = 'everyone'
+                        OR a.holder_id = ?
+                        OR EXISTS (
+                              SELECT 1 FROM json_each(json_extract(a.visibility_json, '$.holders'))
+                              WHERE value = ?
+                        ))
                 ORDER BY score
                 LIMIT ? OFFSET ?
                 """,
@@ -242,6 +255,9 @@ class Database:
                     min_trust,
                     None if cartridge_ids is None else to_json(cartridge_ids),
                     None if cartridge_ids is None else to_json(cartridge_ids),
+                    as_holder,
+                    as_holder,
+                    as_holder,
                     limit + 1,
                     offset,
                 ),

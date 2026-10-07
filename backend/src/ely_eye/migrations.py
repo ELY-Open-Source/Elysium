@@ -14,7 +14,7 @@ import sqlite3
 
 from .text_index import index_text
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -80,6 +80,21 @@ _BASE_TABLES = """
     CREATE TABLE IF NOT EXISTS mounts (
         cartridge_id TEXT PRIMARY KEY REFERENCES cartridges(cartridge_id) ON DELETE CASCADE,
         mounted_at TEXT NOT NULL
+    );
+
+    -- The directory of who may hold or answer a memory. A transactive system answers
+    -- "who knows this?" before it answers "what is this?", and it cannot do that without
+    -- an entity to point at. Contact details are free-form on purpose: the transport is
+    -- whoever wired this store together, not the schema.
+    CREATE TABLE IF NOT EXISTS holders (
+        holder_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL DEFAULT 'person'
+            CHECK (kind IN ('person', 'agent', 'service')),
+        knows_about_json TEXT NOT NULL DEFAULT '[]',
+        contact_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS cache_events (

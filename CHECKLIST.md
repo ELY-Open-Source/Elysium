@@ -76,17 +76,34 @@
   - [x] p0-3.6 Go 的 `search_atoms` / `compile_context` 改走 `POST /api/search`，删掉 Go 侧第二套分词器（`store.SearchAtoms` / `ftsQuery` / `tokenPattern`）——两面不可能再漂开，因为只剩一个排序实现
   - [ ] p0-3.7 100k atom 下 p50 <100ms：`python -m bench.scale_check` → `bench/reports/SCALE.md`。基线是 p50 20.16s / 165,973 atoms（`bench/reports/BASELINE.md`）。**未测不写数**：机器负载 3.7–17.9 期间测出来的数不算数
   - 验收：`pytest backend/tests/test_text_index.py backend/tests/test_search_api.py` 绿（18 条，真 FTS5 表 + TestClient）：「钥匙」命中「我们的钥匙放在玄关抽屉里」、`search atoms` 命中 `func SearchAtoms(ctx context.Context)`、`forg` 命中 forgotten、全角 `Ｓｅａｒｃｈ　Ａｔｏｍｓ` 命中、游标翻页无重复、supersede 后旧记忆不再应答；MCP 一致性由 `ely-eye-mcp/internal/mcpserver/search_tools_test.go`（3 条）+ `bash scripts/mcp_write_smoke.sh` PASS 证明；偏差：checklist 写的 `tests/test_retrieval_parity.py` 不存在，实际在 `backend/tests/` 与 Go 测试里
-- [ ] **p0-4** 卡带变成可挂载作用域
-  - [ ] p0-4.1 `mount` / `unmount` / `switch` / `append` 四动词
-  - [ ] p0-4.2 检索按已挂载卡带过滤（作用域，不再是全局）
-  - [ ] p0-4.3 `kv_fingerprint`：model / tokenizer / chat template / adapter hash / rope / 量化 / 引擎版本
-  - [ ] p0-4.4 fingerprint 不匹配则拒绝挂载，错误信息点名差异字段
-  - 验收：`pytest tests/test_cartridge_scope.py tests/test_kv_fingerprint.py` 绿
-- [ ] **p0-5** holder registry + who_knows
-  - [ ] p0-5.1 `holders` 表 + registry CRUD
-  - [ ] p0-5.2 `who_knows` 工具：返回 holder 与置信度，非空结果
-  - [ ] p0-5.3 转介：visited-set + 深度上限 + 终止态 `NO_HOLDER_KNOWS`
-  - [ ] p0-5.4 默认 answer-only 转介，不外泄原文
+- [x] **p0-4** 卡带变成可挂载作用域
+  - [x] p0-4.1 `mount` / `unmount` / `switch` / `append` 四动词（`cartridge.py:CartridgeService`；schema v2→v3 新增 `cartridge_atoms` 成员表与 `cartridge_mounts` 挂载表，重开时自动重建——挂载是机器状态，不是数据事实）
+  - [x] p0-4.2 检索按已挂载卡带过滤（`retrieval.py:search` 默认作作域 = 当前挂载集，显式 `cartridge_ids` 覆盖挂载；什么都没挂时仍是全库，空库行为与以前一致）——偏差：`forget` 同时从所有卡带成员表里掉出，否则“忘了”还能从卡带里搜到
+  - [x] p0-4.3 `kv_fingerprint`（`kv_fingerprint.py`）：model / tokenizer / chat template hash、adapter hash、RoPE 块（factor / original_max_position_embeddings / mrope_interleaved / mrope_section / partial_rotary_factor）、context 长度、引擎版本、指纹格式版本；读不到的项写进 `unverifiable_fields`，不留空
+  - [x] p0-4.4 fingerprint 不匹配则拒绝挂载，错误信息逐字段点名差异（`home_x was built for a different runtime; refusing to mount: rope: factor: cartridge 4.0 vs local 2.0; …`）
+  - 验收：`pytest backend/tests/test_cartridge_scope.py backend/tests/test_kv_fingerprint.py` 绿（26 条：16 作用域 + 10 指纹）；端到端 `bash scripts/mcp_write_smoke.sh` → `PASS: remember, supersede, search, forget and cartridge mounting work through MCP`（挂载后 work 的记忆搜不到、上传后新写的记忆要 append 才能检索、unmount 后全库恢复、改 RoPE factor 后 `mount_cartridge` 报错含 `rope`）；偏差：checklist 写的 `tests/` 不存在，实际在 `backend/tests/`
+  - 偏差记录：四动词同时有 HTTP（`/api/mounts`、`/api/cartridges/{id}/{mount,switch,unmount,append}`）、CLI（`ely-eye mount/mounts/unmount/append`）和 5 个 MCP 工具；`append` 重写 `atoms.parquet` + `sparse_index.bm25.zst` 并重算 DNA，文件先写、后写库，失败不会留半个卡带；**量化没进指纹**——量化是引擎启动参数（`profiles.py` 的 `--cache-type-k q4_0` 等），不在模型快照里，指纹只比快照真说得出的东西，否则就是拿不存在的字段做门禁
+  - 跑出来的两个真缺陷：`atoms.parquet` 根本导不出记忆（pyarrow 拒绝无子字段的 struct，`metadata={}` 炸掉整表 → 六个 JSON 列改存 JSON 文本，读取端 `load_cartridge_atoms` 解码）；`materialize()` 先写成员表后写 cartridges 行，外键拒绝所有卡带
+  - `api.py` 超 500 行，卡带/挂载路由拆到 `api_cartridges.py`；那个模块不能用 `from __future__ import annotations`——FastAPI 会拿模块 globals 去解 `Depends(settings_dep)`，而它只是 `register()` 的参数，结果每条路由都要 `settings` 查询参数
+- [x] **p0-5** holder registry + who_knows
+  - [x] p0-5.1 `holders` 表 + registry CRUD
+    - 验收：`pytest backend/tests/test_transactive.py -k "registry or kind or blank or holding" -q` 通过；schema v5 在旧库上补表。
+    - 事实：`migrations.py` SCHEMA_VERSION 4→5，`holders` 进 `_BASE_TABLES`（holder_id 主键、kind CHECK、knows_about_json、contact_json、created/updated）。CRUD 在 `holder_store.py`（`db.py` 已 498 行，逼近 500 上限，故另立模块）。删除保护：`holder 'x' still holds N memories; forget them before deleting the holder` → HTTP 409。
+    - 偏差：方法名 `list` 在类内遮蔽内置 `list`，mypy 判 `list[Holder]` 注解非法（`Function ... is not valid as a type`）→ 改名 `list_holders()`，不是加 cast 糊过去。
+  - [x] p0-5.2 `who_knows` 工具：返回 holder 与置信度，非空结果
+    - 验收：`pytest backend/tests/test_transactive.py -k "directory or declared" -q`；`bash scripts/mcp_write_smoke.sh` 里 who_knows("护照") 首位是 wife 且带 contact.channel=signal。
+    - 事实：目录**不按可见性过滤**（"她知道"就是答案），回答才按可见性过滤。置信度是序数的：`0.60*相对得分 + 0.25*min(1, matched/3) + 0.15*声明过这个话题`，相对 = top_score / 候选集最高 top_score（避免 BM25 魔法常数：同一 query 在 3 文档库上量级 1e-7）。每条命中附 matched / top_score / latest_time 与 basis 说明。
+    - 根因修复：FTS5 的 `bm25()` 不能聚合（`MAX(-bm25())` + GROUP BY 报 `unable to use function bm25 in the requested context`），子查询/窗口形式也被拒 → 用 FTS5 自带的 `rank` 列（`-MAX(rank)`，实测与 `MAX(-bm25())` 相等，9.1786e-07）。
+    - 根因修复：`fts_query("钥匙在哪里")` 生成与问句等长的短语 → 0 命中（实测 钥匙 ✓ / 钥匙在哪里 ✗）。`text_index.py` 新增 `_cjk_phrase`：整段短语 OR 每个相邻二元组短语，相邻性保留（p0-3 的反精确测试仍成立），等长不再是条件。拉丁路径未动 ⇒ 冻结的 BASELINE 数字不受影响。
+  - [x] p0-5.3 转介：visited-set + 深度上限 + 终止态 `NO_HOLDER_KNOWS`
+    - 验收：`pytest backend/tests/test_transactive.py -k "walks or hop or nobody" -q`。
+    - 事实：`ask()` 先查 asker 可见范围（hop 0），再按 who_knows 命中依次跳转，`asked` 列表即 visited-set，不重复问同一 holder；`max_hops` 限 1..10，越界 `ValueError("ask needs max_hops between 1 and 10, got N")`；终止态 `answered` / `referred` / `no_holder_knows`（无人知道是结果，不是错误：`basis=["no holder has a memory that answers this"]`）。
+    - 根因修复：`if len(asked) >= max_hops: break` 把 asker 自己算作一跳 ⇒ `max_hops=1` 谁也没问就返回 no_holder_knows → 改 `len(asked) - 1 >= max_hops`，docstring 写明「max_hops 数的是 asker 之外被问的人」。
+  - [x] p0-5.4 默认 answer-only 转介，不外泄原文
+    - 验收：`bash scripts/mcp_write_smoke.sh` → `PASS: remember, supersede, search, forget, cartridge mounting and the transactive referral work through MCP`（两个进程、一个 SQLite：husband 通过 MCP `ask` 得到 `status=referred`、`answered_by=wife`、`answer` 为空且整份 JSON 里搜不到妻子的原文）。
+    - 事实：`include_text` 只对可读所有者（asker 本人或无主的 library 条目）显示原文；`referred` 只带 contact 渠道。
+    - 根因修复：`_answered()` 里 `readable = owner in (as_holder, LIBRARY)` 是 SQL 可见性子句之外的第二份、更严的规则，与 `visible_to=[husband]` 冲突（共享记忆被错误隐藏）→ 删掉这份重复判断，SQL 的 `as_holder` 可见性子句是唯一权威。
+    - 偏差：Go 侧 `limit`/`max_hops` 零值曾当真实数字发出，被 API 以 `greater_than` 拒 → 未设置的可选字段一律省略，由服务端定默认值。
   - 验收：`pytest tests/test_transactive.py` 绿；钥匙测试场景通过
 - [ ] **p0-6** 证明套件去自证
   - [ ] p0-6.1 删 arena 答案入墨（`evals.py:1408-1409` 连接线、`evals.py:1417-1426` 白圈）

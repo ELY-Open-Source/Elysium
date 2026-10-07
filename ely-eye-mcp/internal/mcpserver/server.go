@@ -37,6 +37,7 @@ func Run(ctx context.Context, cfg config.Config, version string) error {
 	})
 	server.registerTools(mcpServer)
 	server.registerWriteTools(mcpServer)
+	server.registerDirectoryTools(mcpServer)
 	server.registerMountTools(mcpServer)
 	server.registerResources(mcpServer)
 	if err := mcpServer.Run(ctx, &mcp.StdioTransport{}); err != nil {

@@ -157,10 +157,12 @@ class SearchFilters(BaseModel):
     """Who may answer, in what setting, and how fresh the memory has to be.
 
     A memory with no event time cannot satisfy since/until, so it drops out when a time bound is
-    asked for rather than passing as unknown.
+    asked for rather than passing as unknown. `holder` restricts the answer to one holder's
+    memories; `as_holder` is the identity asking, and applies the sharing rule instead.
     """
 
     holder: str | None = None
+    as_holder: str | None = None
     scenario: str | None = None
     source_id: str | None = None
     modality: Modality | None = None

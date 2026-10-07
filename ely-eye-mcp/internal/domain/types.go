@@ -207,3 +207,43 @@ type ProofSuiteDetail struct {
 	Path        string            `json:"path"`
 	HashHop     HashHopReport     `json:"hashhop"`
 }
+
+type Holder struct {
+	HolderID   string            `json:"holder_id"`
+	Name       string            `json:"name"`
+	Kind       string            `json:"kind"`
+	KnowsAbout []string          `json:"knows_about"`
+	Contact    map[string]string `json:"contact"`
+	CreatedAt  string            `json:"created_at"`
+	UpdatedAt  string            `json:"updated_at"`
+}
+
+type WhoKnowsHit struct {
+	HolderID   string            `json:"holder_id"`
+	Name       string            `json:"name"`
+	Confidence float64           `json:"confidence"`
+	Matched    int64             `json:"matched"`
+	TopScore   float64           `json:"top_score"`
+	LatestTime string            `json:"latest_time,omitempty"`
+	Basis      []string          `json:"basis"`
+	Contact    map[string]string `json:"contact"`
+}
+
+type WhoKnowsReport struct {
+	Query    string        `json:"query"`
+	AsHolder string        `json:"as_holder,omitempty"`
+	Status   string        `json:"status"`
+	Hits     []WhoKnowsHit `json:"hits"`
+}
+
+type ReferralAnswer struct {
+	Question   string   `json:"question"`
+	AsHolder   string   `json:"as_holder,omitempty"`
+	Status     string   `json:"status"`
+	AnsweredBy string   `json:"answered_by,omitempty"`
+	Asked      []string `json:"asked"`
+	Hops       int64    `json:"hops"`
+	AtomIDs    []string `json:"atom_ids"`
+	Answer     string   `json:"answer,omitempty"`
+	Basis      []string `json:"basis"`
+}
