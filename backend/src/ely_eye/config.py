@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ELY_EYE_", env_file=".env", extra="ignore")
 
     home: Path = Field(default_factory=lambda: Path.cwd() / ".ely_eye")
+    default_holder: str = "local"
     model_id: str = "Qwen/Qwen3.5-9B"
     planner_model_id: str = "Qwen/Qwen3.5-0.8B"
     embedding_model_id: str = "Qwen/Qwen3-VL-Embedding-8B"

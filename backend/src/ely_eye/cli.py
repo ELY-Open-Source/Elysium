@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -20,10 +21,11 @@ from .db import Database
 from .embeddings import EmbeddingService
 from .evals import HashHopEvaluator, PRDProofSuite
 from .ingestion import IngestionService
+from .memory import MemoryService
 from .profiles import runtime_profile_report
 from .research_modules import ResearchModuleService
 from .runtime import QwenRuntime
-from .schemas import TrainingAdapterKind
+from .schemas import MemoryOrigin, TimePrecision, TrainingAdapterKind
 from .training import TrainingService
 
 app = typer.Typer(no_args_is_help=True)
@@ -46,17 +48,19 @@ def status() -> None:
     runtime = QwenRuntime(settings).status()
     db = Database(settings)
     typer.echo(
-        {
-            "runtime": runtime.model_dump(mode="json"),
-            "atoms": db.atom_count(),
-            "token_equivalent": db.token_equivalent_sum(),
-            "library_token_equivalent": max(
-                db.token_equivalent_sum(),
-                db.cartridge_token_equivalent_sum(),
-            ),
-            "cartridges": db.cartridge_count(),
-            "data_home": str(settings.home),
-        }
+        json_dump(
+            {
+                "runtime": runtime.model_dump(mode="json"),
+                "atoms": db.atom_count(),
+                "token_equivalent": db.token_equivalent_sum(),
+                "library_token_equivalent": max(
+                    db.token_equivalent_sum(),
+                    db.cartridge_token_equivalent_sum(),
+                ),
+                "cartridges": db.cartridge_count(),
+                "data_home": str(settings.home),
+            }
+        )
     )
 
 
@@ -64,6 +68,69 @@ def status() -> None:
 def ingest(path: Path, cartridge_name: str | None = None) -> None:
     result = IngestionService(get_settings()).ingest_path(path, cartridge_name)
     typer.echo(result.model_dump_json(indent=2))
+
+
+def _moment(value: str, option: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError(f"{option} {value!r} is not an ISO timestamp: {error}") from error
+
+
+@app.command()
+def remember(
+    text: str,
+    holder: str = typer.Option("", "--holder", help="who owns this memory"),
+    origin: MemoryOrigin = MemoryOrigin.self_,
+    scenario: str = "",
+    event_time: str = typer.Option("", "--event-time", help="when it was true, ISO with offset"),
+    precision: TimePrecision = TimePrecision.unknown,
+    retention_until: str = typer.Option("", "--retention-until"),
+) -> None:
+    settings = get_settings()
+    atom = MemoryService(settings).remember(
+        text,
+        holder_id=holder or settings.default_holder,
+        origin=origin,
+        scenario=scenario,
+        event_time=_moment(event_time, "--event-time"),
+        event_time_precision=precision,
+        retention_until=_moment(retention_until, "--retention-until"),
+    )
+    typer.echo(atom.model_dump_json(indent=2))
+
+
+@app.command()
+def supersede(
+    atom_id: str,
+    text: str,
+    holder: str = typer.Option("", "--holder"),
+    scenario: str = "",
+    event_time: str = typer.Option("", "--event-time"),
+    precision: TimePrecision = TimePrecision.unknown,
+) -> None:
+    settings = get_settings()
+    atom = MemoryService(settings).supersede(
+        atom_id,
+        text=text,
+        holder_id=holder or settings.default_holder,
+        scenario=scenario,
+        event_time=_moment(event_time, "--event-time"),
+        event_time_precision=precision,
+    )
+    typer.echo(atom.model_dump_json(indent=2))
+
+
+@app.command()
+def forget(atom_id: str = "", source_id: str = "", reason: str = "") -> None:
+    report = MemoryService(get_settings()).forget(
+        atom_id=atom_id or None,
+        source_id=source_id or None,
+        reason=reason,
+    )
+    typer.echo(report.model_dump_json(indent=2))
 
 
 @app.command("build-dense-index")

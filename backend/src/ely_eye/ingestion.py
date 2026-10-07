@@ -7,12 +7,11 @@ import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import fitz
 import cv2
+import pymupdf as fitz
 from PIL import Image
 
 from .config import Settings, get_settings
@@ -26,8 +25,14 @@ from .schemas import (
     SourceRecord,
     TrustScores,
 )
-from .storage import ObjectStore, guess_mime, safe_source_id, sha256_bytes, sha256_file, token_equivalent
-
+from .storage import (
+    ObjectStore,
+    guess_mime,
+    safe_source_id,
+    sha256_bytes,
+    sha256_file,
+    token_equivalent,
+)
 
 SUPPORTED_TEXT_EXTENSIONS = {
     ".txt",
@@ -440,7 +445,8 @@ def code_context_entry(root: Path, path: Path) -> dict[str, Any]:
 def repository_call_graph(code_entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     edges: list[dict[str, Any]] = []
     for entry in code_entries:
-        symbols = entry.get("symbols") if isinstance(entry.get("symbols"), dict) else {}
+        declared = entry.get("symbols")
+        symbols = declared if isinstance(declared, dict) else {}
         for call in symbols.get("calls", []):
             if not isinstance(call, dict):
                 continue

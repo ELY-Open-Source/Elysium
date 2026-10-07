@@ -35,6 +35,7 @@ from .evaluation_schemas import (
 )
 from .evidence_graph import EvidenceGraphService
 from .ingestion import IngestionService
+from .memory import MemoryService
 from .profiles import runtime_profile_report
 from .research_modules import ResearchModuleService
 from .runtime import QwenRuntime, RuntimeUnavailableError
@@ -43,10 +44,16 @@ from .schemas import (
     AdapterStatus,
     AnswerResponse,
     CartridgeAssetReport,
+    EvidenceAtom,
+    ForgetReport,
+    ForgetRequest,
+    MemoryOrigin,
     MemoryStatus,
     PathIngestRequest,
+    RememberRequest,
     RuntimeProfile,
     RuntimeProfileReport,
+    SupersedeRequest,
     SystemStatus,
     UploadIngestRequest,
 )
@@ -182,6 +189,50 @@ def create_app() -> FastAPI:
             verifier=report,
             runtime_backend=generation.backend,
         )
+
+    @app.post("/api/memory", response_model=EvidenceAtom)
+    def remember(
+        request: RememberRequest, settings: Annotated[Settings, Depends(settings_dep)]
+    ) -> EvidenceAtom:
+        try:
+            return MemoryService(settings).remember(
+                request.text,
+                holder_id=settings.default_holder,
+                origin=MemoryOrigin.self_,
+                scenario=request.scenario,
+                event_time=request.event_time,
+                event_time_precision=request.event_time_precision,
+                event_time_source=request.event_time_source,
+                retention_until=request.retention_until,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/api/memory/supersede", response_model=EvidenceAtom)
+    def supersede(
+        request: SupersedeRequest, settings: Annotated[Settings, Depends(settings_dep)]
+    ) -> EvidenceAtom:
+        try:
+            return MemoryService(settings).supersede(
+                request.atom_id,
+                text=request.text,
+                holder_id=settings.default_holder,
+                scenario=request.scenario,
+                event_time=request.event_time,
+                event_time_precision=request.event_time_precision,
+                event_time_source=request.event_time_source,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post("/api/memory/forget", response_model=ForgetReport)
+    def forget(request: ForgetRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> ForgetReport:
+        try:
+            return MemoryService(settings).forget(
+                atom_id=request.atom_id, source_id=request.source_id, reason=request.reason
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/api/cartridges")
     def cartridges(settings: Annotated[Settings, Depends(settings_dep)]):

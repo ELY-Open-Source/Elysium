@@ -18,9 +18,11 @@ func (s *Store) FetchAtom(ctx context.Context, atomID string) (domain.Atom, erro
 		return domain.Atom{}, errors.New("atom_id is required")
 	}
 	row := s.db.QueryRowContext(ctx, `
-		SELECT atom_id, source_id, modality, source, time, text, COALESCE(image_ref, ''),
+		SELECT atom_id, source_id, modality, source, ingested_at,
+		       COALESCE(holder_id, ''), COALESCE(origin, ''), COALESCE(scenario, ''),
+		       COALESCE(event_time, ''), text, COALESCE(image_ref, ''),
 		       COALESCE(layout_json, ''), relations_json, trust_json, token_equivalent, metadata_json
-		FROM atoms
+		FROM v_atoms_current
 		WHERE atom_id = ?`, atomID)
 	atom, err := scanAtom(row)
 	if err != nil {
@@ -48,12 +50,14 @@ func (s *Store) SearchAtoms(ctx context.Context, query string, modality string, 
 	}
 	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT a.atom_id, a.source_id, a.modality, a.source, a.time, a.text,
+		SELECT a.atom_id, a.source_id, a.modality, a.source, a.ingested_at,
+		       COALESCE(a.holder_id, ''), COALESCE(a.origin, ''), COALESCE(a.scenario, ''),
+		       COALESCE(a.event_time, ''), a.text,
 		       COALESCE(a.image_ref, ''), COALESCE(a.layout_json, ''),
 		       a.relations_json, a.trust_json, a.token_equivalent, a.metadata_json,
 		       bm25(atom_fts) AS score
 		FROM atom_fts
-		JOIN atoms a ON a.atom_id = atom_fts.atom_id
+		JOIN v_atoms_current a ON a.atom_id = atom_fts.atom_id
 		WHERE atom_fts MATCH ? `+filter+`
 		ORDER BY score
 		LIMIT ?`, args...)
@@ -104,7 +108,11 @@ func scanAtom(scanner atomScanner) (domain.Atom, error) {
 		&atom.SourceID,
 		&atom.Modality,
 		&atom.Source,
-		&atom.Time,
+		&atom.IngestedAt,
+		&atom.HolderID,
+		&atom.Origin,
+		&atom.Scenario,
+		&atom.EventTime,
 		&atom.Text,
 		&atom.ImageRef,
 		&layout,
@@ -147,7 +155,11 @@ func scanAtomHit(scanner atomScanner) (domain.Atom, float64, error) {
 		&atom.SourceID,
 		&atom.Modality,
 		&atom.Source,
-		&atom.Time,
+		&atom.IngestedAt,
+		&atom.HolderID,
+		&atom.Origin,
+		&atom.Scenario,
+		&atom.EventTime,
 		&atom.Text,
 		&atom.ImageRef,
 		&layout,

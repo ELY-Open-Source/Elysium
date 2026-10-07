@@ -221,6 +221,66 @@ class Database:
             ).fetchall()
         return [(row["atom_id"], float(-row["score"])) for row in rows]
 
+    def source_id_of_atom(self, atom_id: str) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT source_id FROM atoms WHERE atom_id = ?", (atom_id,)).fetchone()
+        return None if row is None else str(row["source_id"])
+
+    def atoms_of_source(self, source_id: str) -> list[EvidenceAtom]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM atoms WHERE source_id = ? ORDER BY atom_id", (source_id,)
+            ).fetchall()
+        return [self._row_to_atom(row) for row in rows]
+
+    def close_atoms(self, atom_ids: list[str], closed_at: datetime) -> int:
+        """Stop treating these memories as current; the rows stay for time travel."""
+        if not atom_ids:
+            return 0
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE atoms SET valid_to = ? "
+                "WHERE valid_to IS NULL AND atom_id IN (SELECT value FROM json_each(?))",
+                (closed_at.isoformat(), _json(atom_ids)),
+            )
+        return int(cursor.rowcount)
+
+    def delete_atoms(self, atom_ids: list[str]) -> int:
+        if not atom_ids:
+            return 0
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM atom_fts WHERE atom_id IN (SELECT value FROM json_each(?))", (_json(atom_ids),)
+            )
+            cursor = connection.execute(
+                "DELETE FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (_json(atom_ids),)
+            )
+        return int(cursor.rowcount)
+
+    def delete_edges_touching(self, atom_ids: list[str]) -> int:
+        if not atom_ids:
+            return 0
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM evidence_edges "
+                "WHERE from_atom_id IN (SELECT value FROM json_each(?)) "
+                "OR to_atom_id IN (SELECT value FROM json_each(?))",
+                (_json(atom_ids), _json(atom_ids)),
+            )
+        return int(cursor.rowcount)
+
+    def clear_cache_events(self, reason: str) -> int:
+        """Empty the cache and leave one trace row proving why it is empty."""
+        with self.connect() as connection:
+            cursor = connection.execute("DELETE FROM cache_events")
+            cleared = int(cursor.rowcount)
+            connection.execute(
+                "INSERT INTO cache_events(ts, layer, cache_key, event, bytes_estimate, metadata_json) "
+                "VALUES (?, 'memory', ?, 'invalidated', 0, ?)",
+                (utc_now().isoformat(), reason, _json({"entries_cleared": cleared})),
+            )
+        return cleared
+
     def atom_count(self) -> int:
         with self.connect() as connection:
             return int(connection.execute("SELECT COUNT(*) FROM atoms").fetchone()[0])

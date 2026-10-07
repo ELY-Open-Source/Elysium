@@ -5,7 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def utc_now() -> datetime:
@@ -115,6 +115,16 @@ class EvidenceAtom(BaseModel):
         if self.atom_id in self.supersedes:
             raise ValueError(f"{self.atom_id}: an atom cannot supersede itself")
         return self
+
+    @field_validator("ingested_at", "event_time", "event_time_end", "valid_from", "valid_to", "retention_until")
+    @classmethod
+    def _times_are_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            raise ValueError(
+                "memory timestamps need an explicit offset, e.g. 2026-05-01T12:00:00+08:00; "
+                "a naive time cannot be compared with one that has an offset"
+            )
+        return value
 
 class SourceRecord(BaseModel):
     source_id: str
@@ -377,6 +387,42 @@ class RuntimeProfileReport(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     profiles: list[RuntimeLaunchProfile]
     validations: list[RuntimeProfileValidation] = Field(default_factory=list)
+
+class ForgetReport(BaseModel):
+    """What a forget actually removed, including the derived copies that have to go with it."""
+
+    source_id: str
+    atom_ids: list[str]
+    atoms_deleted: int
+    edges_deleted: int
+    cache_entries_cleared: int
+    vector_index_dropped: bool
+    affected_cartridges: list[dict[str, Any]]
+    reason: str
+
+
+class RememberRequest(BaseModel):
+    """A memory as a caller states it. Holder, origin and ingestion time are stamped by the
+    server, so they are absent here on purpose: a client cannot claim to be somebody else.
+    """
+
+    text: str
+    scenario: str = ""
+    event_time: datetime | None = None
+    event_time_precision: TimePrecision = TimePrecision.unknown
+    event_time_source: str = ""
+    retention_until: datetime | None = None
+
+
+class SupersedeRequest(RememberRequest):
+    atom_id: str
+
+
+class ForgetRequest(BaseModel):
+    atom_id: str | None = None
+    source_id: str | None = None
+    reason: str = ""
+
 
 class UploadIngestRequest(BaseModel):
     cartridge_name: str | None = None

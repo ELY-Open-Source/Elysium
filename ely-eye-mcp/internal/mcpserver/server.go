@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
 	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
 	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/store"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -16,6 +17,7 @@ import (
 type Server struct {
 	cfg     config.Config
 	store   *store.Store
+	api     *apiclient.Client
 	version string
 }
 
@@ -25,15 +27,16 @@ func Run(ctx context.Context, cfg config.Config, version string) error {
 		return err
 	}
 	defer db.Close()
-	server := &Server{cfg: cfg, store: db, version: version}
+	server := &Server{cfg: cfg, store: db, api: apiclient.New(cfg.APIBaseURL), version: version}
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "ely-eye",
 		Title:   "Ely-Eye Context Cartridge MCP",
 		Version: version,
 	}, &mcp.ServerOptions{
-		Instructions: "Use Ely-Eye tools to retrieve local cartridge context, evidence atoms, proof suites, and compiled evidence packs. Tools read local Ely-Eye state and do not mutate the production database.",
+		Instructions: "Use Ely-Eye tools to retrieve local cartridge context, evidence atoms, proof suites, and compiled evidence packs. Read tools mirror local Ely-Eye state without writing. remember, supersede_memory and forget_memory mutate memory through the Ely-Eye API, which must be running (`ely-eye serve`); the server, not the caller, decides who owns a memory.",
 	})
 	server.registerTools(mcpServer)
+	server.registerWriteTools(mcpServer)
 	server.registerResources(mcpServer)
 	if err := mcpServer.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		if errors.Is(err, io.EOF) || strings.HasSuffix(err.Error(), "EOF") {

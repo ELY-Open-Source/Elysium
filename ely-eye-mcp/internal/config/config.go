@@ -11,12 +11,14 @@ type Config struct {
 	ElyEyeHome  string `json:"ely_eye_home"`
 	Database    string `json:"database"`
 	Binary      string `json:"binary"`
+	APIBaseURL  string `json:"api_base_url"`
 }
 
-// Resolve locates the Ely-Eye data home and its SQLite database. The server is
-// a read-only mirror of any local .ely_eye store, so identity is anchored on the
-// database itself rather than on Ely-Eye repository layout. This lets the MCP
-// server be deployed for any project that owns an .ely_eye/data/ely_eye.sqlite.
+// Resolve locates the Ely-Eye data home and its SQLite database. Reads mirror
+// any local .ely_eye store directly, so identity is anchored on the database
+// itself rather than on Ely-Eye repository layout. This lets the MCP server be
+// deployed for any project that owns an .ely_eye/data/ely_eye.sqlite. Writes go
+// through the Ely-Eye API, which owns the memory rules.
 func Resolve(projectRoot string, elyEyeHome string, binary string) (Config, error) {
 	home, err := resolveHome(projectRoot, elyEyeHome)
 	if err != nil {
@@ -48,7 +50,16 @@ func Resolve(projectRoot string, elyEyeHome string, binary string) (Config, erro
 		ElyEyeHome:  home,
 		Database:    db,
 		Binary:      binary,
+		APIBaseURL:  apiBaseURL(),
 	}, nil
+}
+
+// apiBaseURL points at the Ely-Eye API that owns every write rule.
+func apiBaseURL() string {
+	if fromEnv := os.Getenv("ELY_EYE_API"); fromEnv != "" {
+		return fromEnv
+	}
+	return "http://127.0.0.1:8765"
 }
 
 func resolveHome(projectRoot string, elyEyeHome string) (string, error) {

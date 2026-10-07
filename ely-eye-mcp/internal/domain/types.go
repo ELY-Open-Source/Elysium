@@ -1,5 +1,37 @@
 package domain
 
+// Memory mirrors the Evidence Atom the Ely-Eye API returns for a write. The
+// server stamps holder, origin and ingestion time, so the MCP side never
+// invents them.
+type Memory struct {
+	AtomID             string   `json:"atom_id"`
+	SourceID           string   `json:"source_id"`
+	Source             string   `json:"source"`
+	HolderID           string   `json:"holder_id"`
+	Origin             string   `json:"origin"`
+	Scenario           string   `json:"scenario"`
+	Text               string   `json:"text"`
+	IngestedAt         string   `json:"ingested_at"`
+	EventTime          string   `json:"event_time,omitempty"`
+	EventTimePrecision string   `json:"event_time_precision,omitempty"`
+	ValidFrom          string   `json:"valid_from,omitempty"`
+	ValidTo            string   `json:"valid_to,omitempty"`
+	RetentionUntil     string   `json:"retention_until,omitempty"`
+	Supersedes         []string `json:"supersedes"`
+	TokenEquivalent    int64    `json:"token_equivalent"`
+}
+
+type ForgetReport struct {
+	SourceID            string   `json:"source_id"`
+	AtomIDs             []string `json:"atom_ids"`
+	AtomsDeleted        int      `json:"atoms_deleted"`
+	EdgesDeleted        int      `json:"edges_deleted"`
+	CacheEntriesCleared int      `json:"cache_entries_cleared"`
+	VectorIndexDropped  bool     `json:"vector_index_dropped"`
+	AffectedCartridges  []any    `json:"affected_cartridges"`
+	Reason              string   `json:"reason"`
+}
+
 type CacheLayer struct {
 	Layer         string `json:"layer"`
 	Entries       int    `json:"entries"`
@@ -44,7 +76,11 @@ type Atom struct {
 	SourceID        string `json:"source_id"`
 	Modality        string `json:"modality"`
 	Source          string `json:"source"`
-	Time            string `json:"time"`
+	IngestedAt      string `json:"ingested_at"`
+	HolderID        string `json:"holder_id,omitempty"`
+	Origin          string `json:"origin,omitempty"`
+	Scenario        string `json:"scenario,omitempty"`
+	EventTime       string `json:"event_time,omitempty"`
 	Text            string `json:"text"`
 	ImageRef        string `json:"image_ref,omitempty"`
 	Layout          any    `json:"layout,omitempty"`
@@ -65,7 +101,9 @@ type AtomSummary struct {
 	SourceID        string `json:"source_id"`
 	Modality        string `json:"modality"`
 	Source          string `json:"source"`
-	Time            string `json:"time"`
+	IngestedAt      string `json:"ingested_at"`
+	HolderID        string `json:"holder_id,omitempty"`
+	Scenario        string `json:"scenario,omitempty"`
 	TextPreview     string `json:"text_preview"`
 	ImageRef        string `json:"image_ref,omitempty"`
 	TokenEquivalent int64  `json:"token_equivalent"`
