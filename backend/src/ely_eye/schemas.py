@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .kv_fingerprint import KvFingerprint
+
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -162,6 +164,7 @@ class SearchFilters(BaseModel):
     scenario: str | None = None
     source_id: str | None = None
     modality: Modality | None = None
+    cartridge_ids: list[str] | None = None
     since: datetime | None = None
     until: datetime | None = None
     min_trust: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -256,6 +259,18 @@ class SystemStatus(BaseModel):
     profiles: dict[str, dict[str, Any]]
     data_home: str
 
+class MountState(BaseModel):
+    """What is mounted now, and whether that narrows a search."""
+
+    mounted: list[str]
+    scoped: bool
+    atoms_in_scope: int
+
+
+class AppendRequest(BaseModel):
+    atom_ids: list[str]
+
+
 class CartridgeManifest(BaseModel):
     cartridge_id: str
     name: str
@@ -265,6 +280,7 @@ class CartridgeManifest(BaseModel):
     atom_count: int
     token_equivalent: int
     artifacts: dict[str, str]
+    kv_fingerprint: KvFingerprint | None = None
     dna: str | None = None
 
 class AdapterManifest(BaseModel):

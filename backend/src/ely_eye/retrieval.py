@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 from collections import defaultdict
 
+from . import cartridge_store
 from .config import Settings, get_settings
 from .db import Database
 from .embeddings import EmbeddingService
@@ -44,11 +45,16 @@ class RetrievalService:
         if limit <= 0:
             raise ValueError(f"search needs a positive limit, got {limit}")
         offset = decode_cursor(cursor)
+        criteria = (filters or SearchFilters()).model_dump(exclude_none=True)
+        scope = criteria.get("cartridge_ids")
+        if scope is None:
+            scope = cartridge_store.mounted_ids(self.db) or None
+        criteria["cartridge_ids"] = scope
         page = self.db.search_atoms(
             query,
             limit=limit * CANDIDATE_WINDOW,
             offset=offset,
-            **(filters or SearchFilters()).model_dump(exclude_none=True),
+            **criteria,
         )
         rankings: list[list[str]] = [[atom_id for atom_id, _ in page.rows]]
         scores: dict[str, dict[str, float]] = defaultdict(dict)
@@ -56,6 +62,9 @@ class RetrievalService:
             scores[atom_id]["sparse_score"] = bm25
         if self.embeddings.enabled():
             dense = self._dense_search(query, limit * CANDIDATE_WINDOW)
+            if scope:
+                allowed = cartridge_store.atoms_of_cartridges(self.db, scope)
+                dense = {atom_id: score for atom_id, score in dense.items() if atom_id in allowed}
             rankings.append(list(dense))
             for atom_id, cosine in dense.items():
                 scores[atom_id]["dense_score"] = cosine

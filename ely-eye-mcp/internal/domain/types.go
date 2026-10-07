@@ -71,6 +71,28 @@ type CartridgeDetail struct {
 	AssetReport        any               `json:"asset_report,omitempty"`
 }
 
+// MountState is what the server lets a search see right now.
+type MountState struct {
+	Mounted      []string `json:"mounted"`
+	Scoped       bool     `json:"scoped"`
+	AtomsInScope int      `json:"atoms_in_scope"`
+}
+
+// CartridgeManifest is the header a cartridge carries, including the KV fingerprint
+// that decides whether it may be mounted on this machine.
+type CartridgeManifest struct {
+	CartridgeID     string            `json:"cartridge_id"`
+	Name            string            `json:"name"`
+	CreatedAt       string            `json:"created_at"`
+	ModelBase       string            `json:"model_base"`
+	SourceCount     int               `json:"source_count"`
+	AtomCount       int               `json:"atom_count"`
+	TokenEquivalent int64             `json:"token_equivalent"`
+	Artifacts       map[string]string `json:"artifacts"`
+	KVFingerprint   map[string]any    `json:"kv_fingerprint,omitempty"`
+	DNA             string            `json:"dna,omitempty"`
+}
+
 type Atom struct {
 	AtomID          string `json:"atom_id"`
 	SourceID        string `json:"source_id"`

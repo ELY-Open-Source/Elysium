@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     home: Path = Field(default_factory=lambda: Path.cwd() / ".ely_eye")
     default_holder: str = "local"
     model_id: str = "Qwen/Qwen3.5-9B"
+    model_dir: Path | None = None
+    kv_cache_dtype: str = "auto"
     planner_model_id: str = "Qwen/Qwen3.5-0.8B"
     embedding_model_id: str = "Qwen/Qwen3-VL-Embedding-8B"
     adapter_dir: Path | None = None

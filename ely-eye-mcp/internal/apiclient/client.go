@@ -34,19 +34,16 @@ func New(baseURL string) *Client {
 	}
 }
 
-// Post sends body as JSON and decodes the response into out. A rejected request
-// carries the server's own reason, which is the rule the caller broke.
-func (c *Client) Post(ctx context.Context, path string, body any, out any) error {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("cannot encode the request for %s: %w", path, err)
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(payload))
+// Get fetches a JSON resource into out.
+func (c *Client) Get(ctx context.Context, path string, out any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
 	if err != nil {
 		return fmt.Errorf("cannot build the request for %s: %w", path, err)
 	}
-	request.Header.Set("Content-Type", "application/json")
+	return c.do(request, path, out)
+}
 
+func (c *Client) do(request *http.Request, path string, out any) error {
 	response, err := c.HTTP.Do(request)
 	if err != nil {
 		return fmt.Errorf("the Ely-Eye API at %s is unreachable; start it with `ely-eye serve`: %w", c.BaseURL, err)
@@ -67,6 +64,21 @@ func (c *Client) Post(ctx context.Context, path string, body any, out any) error
 		return fmt.Errorf("%s returned JSON that does not decode: %w", path, err)
 	}
 	return nil
+}
+
+// Post sends body as JSON and decodes the response into out. A rejected request
+// carries the server's own reason, which is the rule the caller broke.
+func (c *Client) Post(ctx context.Context, path string, body any, out any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("cannot encode the request for %s: %w", path, err)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("cannot build the request for %s: %w", path, err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	return c.do(request, path, out)
 }
 
 // serverReason prefers FastAPI's {"detail": "..."} so the caller sees the broken

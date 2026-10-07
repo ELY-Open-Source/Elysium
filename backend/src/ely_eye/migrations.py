@@ -14,7 +14,7 @@ import sqlite3
 
 from .text_index import index_text
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -66,6 +66,20 @@ _BASE_TABLES = """
         dna TEXT,
         token_equivalent INTEGER NOT NULL,
         created_at TEXT NOT NULL
+    );
+
+    -- Membership lives in the live store, not only in the copied parquet, otherwise
+    -- "mount this cartridge" cannot scope a query against the atoms it holds.
+    CREATE TABLE IF NOT EXISTS cartridge_atoms (
+        cartridge_id TEXT NOT NULL REFERENCES cartridges(cartridge_id) ON DELETE CASCADE,
+        atom_id TEXT NOT NULL REFERENCES atoms(atom_id) ON DELETE CASCADE,
+        added_at TEXT NOT NULL,
+        PRIMARY KEY (cartridge_id, atom_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS mounts (
+        cartridge_id TEXT PRIMARY KEY REFERENCES cartridges(cartridge_id) ON DELETE CASCADE,
+        mounted_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS cache_events (

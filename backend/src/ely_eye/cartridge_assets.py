@@ -14,12 +14,11 @@ import pyarrow.parquet as pq
 import zstandard as zstd
 from PIL import Image
 
-from .cartridge import CartridgeService
+from .cartridge import JSON_PARQUET_COLUMNS, CartridgeService
 from .config import Settings, get_settings
 from .db import Database
 from .schemas import CartridgeAssetReport, CartridgeAssetStatus
 from .storage import ObjectStore, sha256_file
-
 
 TEXT_VECTOR_DIMS = 384
 VISUAL_VECTOR_DIMS = 256
@@ -269,7 +268,17 @@ class CartridgeAssetService:
 def load_cartridge_atoms(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(path)
-    return pq.read_table(path).to_pylist()
+    rows = pq.read_table(path).to_pylist()
+    for row in rows:
+        for field in JSON_PARQUET_COLUMNS:
+            try:
+                row[field] = json.loads(row[field])
+            except (TypeError, json.JSONDecodeError) as error:
+                raise ValueError(
+                    f"{path}: column {field!r} is not readable JSON text ({error}); "
+                    "rebuild the cartridge"
+                ) from error
+    return rows
 
 
 def hashed_text_vector(text: str, dims: int) -> np.ndarray:
@@ -298,7 +307,7 @@ def visual_image_vector(path: Path, dims: int) -> np.ndarray:
 
 
 def capsule_hash(seed: str, index: int, label: str) -> str:
-    return hashlib.sha256(f"{seed}:{index}:{label}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{seed}:{index}:{label}".encode()).hexdigest()
 
 
 def merkle_root(hashes: list[str]) -> str:

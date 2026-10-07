@@ -168,13 +168,45 @@ def forget(atom_id: str = "", source_id: str = "", reason: str = "") -> None:
 def build_dense_index() -> None:
     index = EmbeddingService(get_settings()).build_index()
     dimensions = int(index.vectors.shape[1]) if index.vectors.size else 0
-    typer.echo({"atoms": len(index.atom_ids), "dimensions": dimensions})
+    typer.echo(json_dump({"atoms": len(index.atom_ids), "dimensions": dimensions}))
 
 
 @app.command("list-cartridges")
 def list_cartridges() -> None:
     for manifest in CartridgeService(get_settings()).list_manifests():
         typer.echo(manifest.model_dump_json(indent=2))
+
+
+@app.command("mounts")
+def mounts() -> None:
+    typer.echo(CartridgeService(get_settings()).mount_state().model_dump_json(indent=2))
+
+
+@app.command()
+def mount(cartridge_id: str) -> None:
+    """Add a cartridge to the mounted set; a mounted search answers only from it."""
+    typer.echo(CartridgeService(get_settings()).mount(cartridge_id).model_dump_json(indent=2))
+
+
+@app.command()
+def switch(cartridge_id: str) -> None:
+    """Mount one cartridge and nothing else."""
+    typer.echo(CartridgeService(get_settings()).switch(cartridge_id).model_dump_json(indent=2))
+
+
+@app.command()
+def unmount(cartridge_id: str) -> None:
+    typer.echo(CartridgeService(get_settings()).unmount(cartridge_id).model_dump_json(indent=2))
+
+
+@app.command()
+def append(
+    cartridge_id: str,
+    atom_id: list[str] = typer.Option(..., "--atom-id"),  # noqa: B008  # typer reads option defaults itself
+) -> None:
+    """Add memories to an existing cartridge; the bundle and its DNA follow."""
+    service = CartridgeService(get_settings())
+    typer.echo(service.append(cartridge_id, list(atom_id)).model_dump_json(indent=2))
 
 
 @app.command("hashhop")

@@ -187,6 +187,7 @@ class Database:
         since: datetime | None = None,
         until: datetime | None = None,
         min_trust: float | None = None,
+        cartridge_ids: list[str] | None = None,
     ) -> FtsPage:
         """BM25 over the FTS index joined to memories that are open right now.
 
@@ -215,6 +216,11 @@ class Database:
                             json_extract(a.trust_json, '$.model')
                         ) >= ?
                   ))
+                  AND (? IS NULL OR EXISTS (
+                        SELECT 1 FROM cartridge_atoms AS ca
+                        WHERE ca.atom_id = f.atom_id
+                          AND ca.cartridge_id IN (SELECT value FROM json_each(?))
+                  ))
                 ORDER BY score
                 LIMIT ? OFFSET ?
                 """,
@@ -234,6 +240,8 @@ class Database:
                     None if until is None else until.isoformat(),
                     min_trust,
                     min_trust,
+                    None if cartridge_ids is None else to_json(cartridge_ids),
+                    None if cartridge_ids is None else to_json(cartridge_ids),
                     limit + 1,
                     offset,
                 ),
@@ -327,6 +335,17 @@ class Database:
             rows = connection.execute(
                 "SELECT source_id, path, kind, mime, sha256, size_bytes, created_at, metadata_json "
                 "FROM sources ORDER BY created_at DESC"
+            ).fetchall()
+        return [row_to_source(row) for row in rows]
+
+    def get_sources(self, source_ids: list[str]) -> list[SourceRecord]:
+        if not source_ids:
+            return []
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT source_id, path, kind, mime, sha256, size_bytes, created_at, metadata_json "
+                "FROM sources WHERE source_id IN (SELECT value FROM json_each(?))",
+                (to_json(source_ids),),
             ).fetchall()
         return [row_to_source(row) for row in rows]
 

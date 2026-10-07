@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import __version__
+from .api_cartridges import register as register_cartridge_routes
 from .benchmarks import (
     benchmark_prediction_report,
     benchmark_registry_report,
@@ -18,7 +19,6 @@ from .benchmarks import (
 )
 from .cache_fabric import CacheFabric
 from .cartridge import CartridgeService
-from .cartridge_assets import CartridgeAssetService
 from .compiler import ContextCompiler
 from .config import Settings, get_settings
 from .db import Database
@@ -44,7 +44,6 @@ from .schemas import (
     AdapterManifest,
     AdapterStatus,
     AnswerResponse,
-    CartridgeAssetReport,
     EvidenceAtom,
     ForgetReport,
     ForgetRequest,
@@ -246,47 +245,7 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @app.get("/api/cartridges")
-    def cartridges(settings: Annotated[Settings, Depends(settings_dep)]):
-        return CartridgeService(settings).list_manifests()
-
-    @app.post("/api/cartridges/{cartridge_id}/finalize", response_model=CartridgeAssetReport)
-    def finalize_cartridge(
-        cartridge_id: str,
-        settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> CartridgeAssetReport:
-        try:
-            return CartridgeAssetService(settings).finalize(cartridge_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @app.post("/api/cartridges/{cartridge_id}/refresh")
-    def refresh_cartridge(
-        cartridge_id: str,
-        settings: Annotated[Settings, Depends(settings_dep)],
-    ):
-        db = Database(settings)
-        try:
-            return CartridgeService(settings, db).rebuild(
-                cartridge_id=cartridge_id,
-                atoms=db.list_atoms(),
-                sources=db.list_sources(),
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @app.get("/api/cartridges/{cartridge_id}/assets", response_model=CartridgeAssetReport)
-    def cartridge_assets(
-        cartridge_id: str,
-        settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> CartridgeAssetReport:
-        try:
-            report = CartridgeAssetService(settings).status(cartridge_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if report is None:
-            raise HTTPException(status_code=404, detail="Cartridge assets have not been finalized.")
-        return report
+    register_cartridge_routes(app, settings_dep)
 
     @app.get("/api/adapters", response_model=list[AdapterStatus])
     def adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> list[AdapterStatus]:
