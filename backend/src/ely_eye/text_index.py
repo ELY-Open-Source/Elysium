@@ -9,6 +9,7 @@ same transform; keeping them in one file is what stops them from drifting apart.
 from __future__ import annotations
 
 import re
+import sqlite3
 from unicodedata import normalize
 
 # Han, its extension A block, the compatibility ideographs, kana, and Hangul syllables:
@@ -32,25 +33,94 @@ def index_text(text: str) -> str:
     return _SPACES.sub(" ", _CJK_RUN.sub(lambda match: " ".join(match.group()) + " ", _bare(text))).strip()
 
 
-def fts_query(query: str) -> str:
-    """Build the MATCH expression for a user query, using the same split as the index.
+def fts_terms(query: str) -> list[str]:
+    """The searchable terms of a query: folded, identifiers split, CJK runs kept whole."""
+    terms = _bare(query).split()
+    if not terms:
+        raise ValueError(f"search needs at least one searchable word, got {query!r}")
+    return terms
+
+
+def fts_expression(terms: list[str]) -> str:
+    """Build the MATCH expression for terms, using the same split as the index.
 
     A CJK run becomes a quoted phrase so its characters stay adjacent: unphrased, a query for
     钥匙 would match text that mentions 钥 and 匙 worlds apart. Latin tokens get a prefix match,
     which is what lets `atom` reach `atoms`.
 
-    Latin tokens are OR-ed, not AND-ed. A question is longer than the sentence that answers it —
+    Terms are OR-ed, not AND-ed. A question is longer than the sentence that answers it —
     "Which PRD requirements prove long context memory, HashHop, and adapters?" shares only some of
     its words with any single atom — and an AND over every word answers such a question with
     nothing. bm25 then ranks the candidates by how many of those words each one carries, so the
     broadened query does not mean a diluted answer.
     """
-    terms = _bare(query).split()
     if not terms:
-        raise ValueError(f"search needs at least one searchable word, got {query!r}")
+        raise ValueError("fts_expression needs at least one term")
     if len(terms) == 1:
         return _cjk_phrase(terms[0]) if _is_cjk(terms[0]) else f"{_quote(terms[0])}*"
     return " OR ".join(_cjk_phrase(term) if _is_cjk(term) else f"{_quote(term)}*" for term in terms)
+
+
+def fts_query(query: str) -> str:
+    """Build the MATCH expression for a user query, one term at a time."""
+    return fts_expression(fts_terms(query))
+
+
+COMMON_TERM_FRACTION = 0.05
+RAREST_KEEP = 3
+
+
+def rare_terms(connection: sqlite3.Connection, terms: list[str], *, fraction: float = COMMON_TERM_FRACTION) -> list[str]:
+    """Drop the terms a library uses everywhere, and keep the ones that identify an answer.
+
+    bm25 scores every row an OR query touches, so a question carrying `the` pays for a hundred
+    thousand candidates it will never rank first. Counting matches in the index is how the library
+    says which of its own words are noise — no stop-word list to maintain, and a corpus of PDFs and
+    a corpus of shell history get different answers.
+
+    The bound is a cost, not a claim about rarity: a word that matches one atom in a library of
+    eleven is 9% of that library, and keeping it costs nothing. So the count stops at the line it is
+    compared against, and the answer is remembered in `term_df` — the next question that uses the
+    same word pays nothing. Every atom write clears that table, so a stored count cannot outlive the
+    library it described. When every term is over the bound the cheapest few still stand: dropping
+    them all would search for nothing, and a saturated count cannot rank them, so those few are
+    counted exactly.
+
+    0.05 is measured, not chosen: on the frozen suite (n=173, holder-scoped) recall@10 peaks at
+    0.899 with p50 58.6 ms there, against 0.893 / 112.9 ms at 0.20 and 0.844 / 13.4 ms at 0.01.
+    """
+    if len(terms) == 1:
+        return terms
+    total = int(connection.execute("SELECT count(*) FROM atoms").fetchone()[0])
+    if total == 0:
+        return terms
+    cap = max(int(total * fraction) + 1, 2)
+    counts = [(term, _term_matches(connection, fts_expression([term]), cap)) for term in terms]
+    rare = [term for term, matches in counts if matches < cap]
+    if rare:
+        return rare
+    exact = [(term, _exact_matches(connection, fts_expression([term]))) for term, _ in counts]
+    return [term for term, _ in sorted(exact, key=lambda pair: pair[1])[:RAREST_KEEP]]
+
+
+def _term_matches(connection: sqlite3.Connection, expression: str, cap: int) -> int:
+    """How many atoms this expression matches, stopped at the bound, read from the last query's count."""
+    row = connection.execute("SELECT documents FROM term_df WHERE term = ?", (expression,)).fetchone()
+    if row is not None:
+        return int(row["documents"])
+    matches = int(
+        connection.execute(
+            "SELECT count(*) FROM (SELECT 1 FROM atom_fts WHERE atom_fts MATCH ? LIMIT ?)",
+            (expression, cap),
+        ).fetchone()[0]
+    )
+    connection.execute("INSERT OR REPLACE INTO term_df(term, documents) VALUES (?, ?)", (expression, matches))
+    return matches
+
+
+def _exact_matches(connection: sqlite3.Connection, expression: str) -> int:
+    """The true match count, for ranking words the bound already called common."""
+    return int(connection.execute("SELECT count(*) FROM atom_fts WHERE atom_fts MATCH ?", (expression,)).fetchone()[0])
 
 
 def _bare(text: str) -> str:

@@ -12,7 +12,7 @@ from .config import Settings, get_settings
 from .migrations import apply as apply_migrations
 from .row_codec import atom_params, from_json, row_to_atom, row_to_source, to_json
 from .schemas import EvidenceAtom, SourceRecord, utc_now
-from .text_index import fts_query, index_text
+from .text_index import fts_expression, fts_terms, index_text, rare_terms
 
 
 @dataclass(frozen=True)
@@ -122,6 +122,8 @@ class Database:
                 "INSERT INTO atom_fts(atom_id, source, text) VALUES (?, ?, ?)",
                 [(atom.atom_id, index_text(atom.source), index_text(atom.text)) for atom in atoms],
             )
+            # New text changes which words are common, so every remembered count is void.
+            connection.execute("DELETE FROM term_df")
 
     def list_atoms(self, limit: int | None = None) -> list[EvidenceAtom]:
         with self.connect() as connection:
@@ -202,6 +204,7 @@ class Database:
         asker the query runs over the whole library, which is what an operator debugging wants.
         """
         with self.connect() as connection:
+            expression = fts_expression(rare_terms(connection, fts_terms(query)))
             rows = connection.execute(
                 """
                 SELECT f.atom_id, bm25(atom_fts) AS score
@@ -238,7 +241,7 @@ class Database:
                 LIMIT ? OFFSET ?
                 """,
                 (
-                    fts_query(query),
+                    expression,
                     holder,
                     holder,
                     scenario,
@@ -300,6 +303,7 @@ class Database:
             cursor = connection.execute(
                 "DELETE FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(atom_ids),)
             )
+            connection.execute("DELETE FROM term_df")
         return int(cursor.rowcount)
 
     def delete_edges_touching(self, atom_ids: list[str]) -> int:

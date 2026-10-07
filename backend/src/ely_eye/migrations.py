@@ -14,7 +14,7 @@ import sqlite3
 
 from .text_index import index_text
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -114,6 +114,13 @@ _BASE_TABLES = """
         relation TEXT NOT NULL,
         confidence REAL NOT NULL,
         metadata_json TEXT NOT NULL
+    );
+
+    -- How many atoms one query expression matches, remembered so the next question does not
+    -- count the same rows again. Every atom write clears it, so a count is never read stale.
+    CREATE TABLE IF NOT EXISTS term_df (
+        term TEXT PRIMARY KEY,
+        documents INTEGER NOT NULL
     );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS atom_fts USING fts5(

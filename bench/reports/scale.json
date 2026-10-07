@@ -1,0 +1,32 @@
+{
+  "database": "bench/runs/baseline/data/ely_eye.sqlite",
+  "atoms": 165973,
+  "migration_seconds": 0.00044073900062358007,
+  "dense_embeddings_enabled": false,
+  "probes": 300,
+  "probe_modalities": [
+    "code",
+    "image",
+    "pdf",
+    "ui_screenshot",
+    "video"
+  ],
+  "latency": {
+    "queries": 300,
+    "mean": 0.06524801251696771,
+    "p50": 0.057020749500225065,
+    "p95": 0.13832052519683205,
+    "max": 0.5395459059946006
+  },
+  "machine": {
+    "system": "Linux",
+    "release": "6.18.40.1-microsoft-standard-WSL2",
+    "cpus": 32,
+    "threads_per_query": 4,
+    "load_average_1_5_15": [
+      1.77,
+      1.62,
+      1.64
+    ]
+  }
+}

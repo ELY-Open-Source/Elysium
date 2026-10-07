@@ -7,10 +7,22 @@ here inserts indexed text and asks the engine the question the user would ask.
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 
-from ely_eye.text_index import fts_query, index_text
+from ely_eye.config import Settings
+from ely_eye.db import Database
+from ely_eye.memory import MemoryService
+from ely_eye.schemas import MemoryOrigin
+from ely_eye.text_index import (
+    RAREST_KEEP,
+    fts_expression,
+    fts_query,
+    fts_terms,
+    index_text,
+    rare_terms,
+)
 
 
 def _fts(rows: list[str]) -> sqlite3.Connection:
@@ -108,3 +120,87 @@ def test_a_mixed_query_ranks_the_memory_holding_both_halves_first() -> None:
 
     assert ranked[0] == "钥匙放在 drawer 里"
     assert set(ranked) == {"钥匙放在 drawer 里", "钥匙在玄关", "the drawer is empty"}
+
+
+def _library(rows: list[str]) -> sqlite3.Connection:
+    """A store shaped like the product's: atoms, its FTS mirror, and the count cache."""
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute("CREATE TABLE atoms (atom_id TEXT PRIMARY KEY, text TEXT NOT NULL)")
+    connection.execute(
+        "CREATE VIRTUAL TABLE atom_fts USING fts5(atom_id UNINDEXED, source, text, tokenize = 'unicode61')"
+    )
+    connection.execute("CREATE TABLE term_df (term TEXT PRIMARY KEY, documents INTEGER NOT NULL)")
+    for index, row in enumerate(rows):
+        connection.execute("INSERT INTO atoms (atom_id, text) VALUES (?, ?)", (f"a{index}", row))
+        connection.execute(
+            "INSERT INTO atom_fts (atom_id, source, text) VALUES (?, ?, ?)",
+            (f"a{index}", "", index_text(row)),
+        )
+    return connection
+
+
+def _shelf(word: str) -> list[str]:
+    return [f"the {other} {word} converter" for other in ("csv", "xml", "json", "html", "yaml")]
+
+
+def test_a_word_the_library_uses_everywhere_is_dropped_from_the_query() -> None:
+    """bm25 scores every row an OR query touches, so a common word buys cost, not answers."""
+    rows = _shelf("pdf") + _shelf("docx") + ["the parser follows the hashhop chain"]
+    connection = _library(rows)
+
+    kept = rare_terms(connection, fts_terms("the hashhop"))
+
+    assert kept == ["hashhop"], "the word every row carries must not decide how many rows get scored"
+    hits = connection.execute(
+        "SELECT atoms.text FROM atoms JOIN atom_fts ON atom_fts.atom_id = atoms.atom_id WHERE atom_fts MATCH ?",
+        (fts_expression(kept),),
+    ).fetchall()
+    assert [row[0] for row in hits] == ["the parser follows the hashhop chain"]
+
+
+def test_a_query_whose_words_are_all_common_keeps_the_rarest_of_them() -> None:
+    """Dropping every word would search for nothing, so the least common words answer instead."""
+    rows = [f"alpha {other}" for other in ("one", "two", "three", "four", "five")] + [
+        f"beta {other}" for other in ("six", "seven")
+    ]
+    connection = _library(rows)
+
+    kept = rare_terms(connection, ["alpha", "beta"])
+
+    assert len(kept) == min(RAREST_KEEP, 2)
+    assert kept == ["beta", "alpha"], "the rarer word must lead"
+
+
+def test_a_query_of_one_word_is_never_filtered() -> None:
+    connection = _library(_shelf("pdf"))
+
+    assert rare_terms(connection, ["the"]) == ["the"], "dropping the only word would leave nothing to match"
+
+
+def test_an_empty_library_keeps_every_term() -> None:
+    connection = _library([])
+
+    assert rare_terms(connection, ["the", "hashhop"]) == ["the", "hashhop"]
+
+
+def test_the_remembered_match_counts_are_voided_by_a_write(tmp_path: Path) -> None:
+    """A count is only true of the library it was measured against, so any atom write clears it."""
+    settings = Settings(home=tmp_path)
+    memory = MemoryService(settings=settings, database=Database(settings))
+    for index in range(20):
+        memory.remember(f"the converter parses format {index} natively", holder_id="wife", origin=MemoryOrigin.self_)
+    memory.db.search_atoms("the converter", limit=5)
+
+    with memory.db.connect() as connection:
+        assert int(connection.execute("SELECT count(*) FROM term_df").fetchone()[0]) > 0
+
+    memory.remember("the parser follows the hashhop chain", holder_id="wife", origin=MemoryOrigin.self_)
+
+    with memory.db.connect() as connection:
+        assert int(connection.execute("SELECT count(*) FROM term_df").fetchone()[0]) == 0
+
+    page = memory.db.search_atoms("hashhop chain", limit=5)
+    assert "the parser follows the hashhop chain" in [
+        atom.text for atom in memory.db.get_atoms([row[0] for row in page.rows])
+    ], "a cleared cache must cost time, not answers"

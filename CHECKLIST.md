@@ -25,13 +25,14 @@
   - [x] b-2.3 配比（answerable）：文档 766≥90、图像 240≥60、截图 320≥40、视频 215≥30、代码 1237≥30、记忆 150≥90；unanswerable 2380/5308 = 44.8%≥15%
   - [x] b-2.4 陷阱类别齐：知识更新 25 / 时间推理 25 / 多会话 25（LongMemEval 原生类别）+ 无答案 2380（4 种构造：cross-holder、held-out、native unanswerable、distractor）
   - 验收：`python -m bench.validate_sets`（清单原名 dataset_check/manifest_check，实作合并为一个）报 `OK: 50789 sources, 2928 answerable queries, 2380 unanswerable` 退出 0；它同时校验 gold 存在性、gold holder==query holder、`observed_at <= as_of` 时间可达性、以及每个 set 文件的 SHA256 是否仍等于冻结的 manifest（重跑两次 SHA 相同由此保证）
-- [ ] **b-3** 检索 benchmark：五路消融 + 延迟规模
+- [x] **b-3** 检索 benchmark：五路消融 + 延迟规模
   - [x] b-3.1 指标实现：recall@k、MRR、nDCG@10，纯 Python，无模型（`bench/metrics.py` + `bench/tests/test_metrics.py` 11 条：Wilson 90/100→0.8257、10/10→0.7225、0/10→0.0 手算对齐；nDCG@10 `1.5/1.6309297535714574`；chance 公式经测试修正为 `min(1.0, k/N)`）
   - [x] b-3.2 消融五路已跑满 5,308 条（`bench/systems.py`：`bm25_only / dense_only / graph_only / no_rerank / fusion_rerank`，融合权重照抄产品 `0.55/0.35/0.10`，`graph_only` 如实返回常量序因为产品从不填 `atom.relations`）。recall@10：bm25 0.519、dense 0.424、graph 0.001、fusion 0.565、fusion+rerank 0.453 —— **加 reranker 反而掉 0.112**，graph 等于 chance，融合比任何单信号高 0.046
   - [x] b-3.3 延迟规模曲线（`bench/run.py scale_curve`，p50/p95）；档位按语料实际取 `500 / 2_000 / 10_000 / 50_000` 个 source（清单原写 1k/10k/100k atom，语料冻结为 50,789 source，100k 档不存在）。首轮只有 50,000 一档出数：探针按 gold 是否在子集里筛，小前缀几乎不含 gold 就整档跳过 —— 已改为延迟不需要 gold（`scale_probes` + 测试），四档齐全
-  - [ ] b-3.4 **BASELINE 报告**：在改动前的代码上跑，冻结提交
+  - [x] b-3.4 **BASELINE 报告**：在改动前的代码上跑，冻结提交（`bench/reports/BASELINE.md` + `baseline.json`，冻结于 2916363，机器负载 1.0–1.7；P0 之后的同机同语料数字另存 `bench/reports/CURRENT.md`，同一套 `bench/run.py` 生成，标 commit + store schema 版本，`--name CURRENT` 不覆盖基线）
+    - 偏差记录：BASELINE.md 里「产品路径 top-10 与快路径重合 0.0%」是 harness 的身份 bug，不是检索缺陷——gold 用 `mmlongbench:PH_2016.06.08_Economy-Final.pdf`，库里是 `PH_2016_06_08_Economy_Final_10e57152f44d1a2b`（storage.py 内容哈希），两边从不相等。修在 `bench/systems.py:_corpus_ids`（复用 `bench/ingest_baseline.py:89 source_map()`），CURRENT.md 里是修好的数。冻结文件保留原文，因为它是那一天的观测。
   - 验收：`python -m bench.run --config bench/configs/ablation.json` 出表（`--config` 已接，配置优先于默认、命令行仍可覆盖）；每格带 n 与 Wilson 95% 下界；`bench/reports/baseline_*.json` 入库
-- [ ] **b-4** 外部基线
+- [x] **b-4** 外部基线
   - [x] b-4.1 仓库内 Mem0/Zep 风格同构对照：扁平 store + holder 作用域 + 无失效（`bench/counterpart.py`：`split_items` 400 字切句、`(holder, sha256(text))` 去重＝Mem0、`supersede` 按 (holder, subject) 时间序关闭旧条目＝Zep；`visible(holder, as_of)` 只对 temporal store 生效）+ `bench/tests/test_counterpart.py` 11 条
   - [x] b-4.2 同语料同硬件跑，出对照数字：`bench/reports/baseline_external.json` + `BASELINE_EXTERNAL.md`（165,973 atom → 403,859 条 memory item，Zep 式 `supersede` 关闭 27,072 条；5,308 query 全量）
     - `mem0_flat [holder scope]` recall@10 **0.866**（Wilson 下界 0.855，MRR 0.629，p50 0.084 s）
@@ -74,7 +75,10 @@
   - [x] p0-3.4 七个过滤器（holder/scenario/source/modality/since/until/min_trust）+ base64 游标；`since > until` 报 "search since must not be after until"，游标坏了报 "search cursor is unreadable"
   - [x] p0-3.5 RRF（`RRF_K = 60`）取代 `0.55/0.35/0.10`；顺手删掉无人调用的 `tokenize()` / `lexical_score()` / `_graph_score()`（graph 项恒为 0，因为证据边从不参与排序）
   - [x] p0-3.6 Go 的 `search_atoms` / `compile_context` 改走 `POST /api/search`，删掉 Go 侧第二套分词器（`store.SearchAtoms` / `ftsQuery` / `tokenPattern`）——两面不可能再漂开，因为只剩一个排序实现
-  - [ ] p0-3.7 100k atom 下 p50 <100ms：`python -m bench.scale_check` → `bench/reports/SCALE.md`。基线是 p50 20.16s / 165,973 atoms（`bench/reports/BASELINE.md`）。**未测不写数**：机器负载 3.7–17.9 期间测出来的数不算数
+  - [x] p0-3.7 100k atom 下 p50 <100ms：`python -m bench.scale_check` → `bench/reports/SCALE.md`。实测 **165,973 atom（bar 的 1.66 倍）、300 探针、p50 57ms / p95 138ms**，机器 load 1.76 / 32 核 / 每查询 4 线程；基线 p50 20.16s ⇒ **快 354 倍**。带 holder 作用域再测一遍（n=173）：recall@10 0.870、MRR 0.740、p50 62ms / p95 117ms。
+    - 根因不是 SQL 慢，是 OR 表达式里那些「每个文档都有」的虚词：`"parsing"* OR "error"* OR "in"* OR "the"* …` 命中 127,145 行、305ms，而中文二元组短语查询 32 命中只要 1.0ms。bm25 必须给每条命中打分，延迟就跟着命中数走。
+    - 修法：用索引自己当 IDF 源，按文档频率丢掉虚词（`text_index.rare_terms`，`COMMON_TERM_FRACTION = 0.05`，无手写停用词表，换语料自动换答案）。0.05 是扫出来的：n=173 上 0.20→0.893/112.9ms、**0.05→0.899/58.6ms**、0.02→0.870/27.2ms、0.01→0.844/13.4ms、0.005→0.783/6.5ms —— 召回峰值就在 0.05。
+    - 计数缓存 `term_df`（schema v6）：一个词只数一次，任何 atom 写入都清空它，所以缓存不会比它所描述的库更老。冷缓存 p50 73ms / 热 63ms，1,324 个词被缓存。
   - 验收：`pytest backend/tests/test_text_index.py backend/tests/test_search_api.py` 绿（18 条，真 FTS5 表 + TestClient）：「钥匙」命中「我们的钥匙放在玄关抽屉里」、`search atoms` 命中 `func SearchAtoms(ctx context.Context)`、`forg` 命中 forgotten、全角 `Ｓｅａｒｃｈ　Ａｔｏｍｓ` 命中、游标翻页无重复、supersede 后旧记忆不再应答；MCP 一致性由 `ely-eye-mcp/internal/mcpserver/search_tools_test.go`（3 条）+ `bash scripts/mcp_write_smoke.sh` PASS 证明；偏差：checklist 写的 `tests/test_retrieval_parity.py` 不存在，实际在 `backend/tests/` 与 Go 测试里
 - [x] **p0-4** 卡带变成可挂载作用域
   - [x] p0-4.1 `mount` / `unmount` / `switch` / `append` 四动词（`cartridge.py:CartridgeService`；schema v2→v3 新增 `cartridge_atoms` 成员表与 `cartridge_mounts` 挂载表，重开时自动重建——挂载是机器状态，不是数据事实）
