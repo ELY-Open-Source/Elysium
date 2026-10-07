@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .config import Settings, get_settings
-from .schemas import EvidenceAtom, SourceRecord
+from .migrations import apply as apply_migrations
+from .schemas import EvidenceAtom, MemoryOrigin, SourceRecord, TimePrecision, utc_now
 
 
 def _json(value: Any) -> str:
@@ -19,7 +20,16 @@ def _json(value: Any) -> str:
 def _loads(value: str | None, default: Any) -> Any:
     if value is None or value == "":
         return default
-    return json.loads(value)
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"stored JSON is unreadable: {error}") from error
+
+
+def _datetime(value: str | None) -> datetime | None:
+    if value is None or value == "":
+        return None
+    return datetime.fromisoformat(value)
 
 
 class Database:
@@ -30,7 +40,7 @@ class Database:
         self.init()
 
     @contextmanager
-    def connect(self) -> Iterable[sqlite3.Connection]:
+    def connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
@@ -43,76 +53,7 @@ class Database:
 
     def init(self) -> None:
         with sqlite3.connect(self.path) as connection:
-            connection.executescript(
-                """
-                PRAGMA foreign_keys = ON;
-
-                CREATE TABLE IF NOT EXISTS sources (
-                    source_id TEXT PRIMARY KEY,
-                    path TEXT NOT NULL,
-                    kind TEXT NOT NULL,
-                    mime TEXT NOT NULL,
-                    sha256 TEXT NOT NULL,
-                    size_bytes INTEGER NOT NULL,
-                    created_at TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS atoms (
-                    atom_id TEXT PRIMARY KEY,
-                    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
-                    modality TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    time TEXT NOT NULL,
-                    text TEXT NOT NULL,
-                    image_ref TEXT,
-                    embedding_refs_json TEXT NOT NULL,
-                    layout_json TEXT,
-                    relations_json TEXT NOT NULL,
-                    trust_json TEXT NOT NULL,
-                    token_equivalent INTEGER NOT NULL,
-                    metadata_json TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_atoms_source_id ON atoms(source_id);
-                CREATE INDEX IF NOT EXISTS idx_atoms_modality ON atoms(modality);
-                CREATE VIRTUAL TABLE IF NOT EXISTS atom_fts USING fts5(
-                    atom_id UNINDEXED,
-                    source,
-                    text,
-                    tokenize = 'unicode61'
-                );
-
-                CREATE TABLE IF NOT EXISTS cartridges (
-                    cartridge_id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    root_path TEXT NOT NULL,
-                    manifest_json TEXT NOT NULL,
-                    dna TEXT,
-                    token_equivalent INTEGER NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS cache_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ts TEXT NOT NULL,
-                    layer TEXT NOT NULL,
-                    cache_key TEXT NOT NULL,
-                    event TEXT NOT NULL,
-                    bytes_estimate INTEGER NOT NULL,
-                    metadata_json TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS evidence_edges (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    from_atom_id TEXT NOT NULL,
-                    to_atom_id TEXT NOT NULL,
-                    relation TEXT NOT NULL,
-                    confidence REAL NOT NULL,
-                    metadata_json TEXT NOT NULL
-                );
-                """
-            )
+            apply_migrations(connection)
 
     def upsert_sources(self, sources: list[SourceRecord]) -> None:
         with self.connect() as connection:
@@ -150,15 +91,17 @@ class Database:
             connection.executemany(
                 """
                 INSERT INTO atoms (
-                    atom_id, source_id, modality, source, time, text, image_ref,
+                    atom_id, source_id, modality, source, ingested_at, text, image_ref,
                     embedding_refs_json, layout_json, relations_json, trust_json,
-                    token_equivalent, metadata_json
+                    token_equivalent, metadata_json, holder_id, origin, scenario,
+                    event_time, event_time_end, event_time_precision, event_time_source,
+                    valid_from, valid_to, supersedes_json, visibility_json, retention_until
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(atom_id) DO UPDATE SET
                     modality=excluded.modality,
                     source=excluded.source,
-                    time=excluded.time,
+                    ingested_at=excluded.ingested_at,
                     text=excluded.text,
                     image_ref=excluded.image_ref,
                     embedding_refs_json=excluded.embedding_refs_json,
@@ -166,7 +109,19 @@ class Database:
                     relations_json=excluded.relations_json,
                     trust_json=excluded.trust_json,
                     token_equivalent=excluded.token_equivalent,
-                    metadata_json=excluded.metadata_json
+                    metadata_json=excluded.metadata_json,
+                    holder_id=excluded.holder_id,
+                    origin=excluded.origin,
+                    scenario=excluded.scenario,
+                    event_time=excluded.event_time,
+                    event_time_end=excluded.event_time_end,
+                    event_time_precision=excluded.event_time_precision,
+                    event_time_source=excluded.event_time_source,
+                    valid_from=excluded.valid_from,
+                    valid_to=excluded.valid_to,
+                    supersedes_json=excluded.supersedes_json,
+                    visibility_json=excluded.visibility_json,
+                    retention_until=excluded.retention_until
                 """,
                 [self._atom_params(atom) for atom in atoms],
             )
@@ -182,7 +137,7 @@ class Database:
             atom.source_id,
             atom.modality.value,
             atom.source,
-            atom.time.isoformat(),
+            atom.ingested_at.isoformat(),
             atom.text,
             atom.image_ref,
             _json(atom.embedding_refs),
@@ -191,25 +146,63 @@ class Database:
             _json(atom.trust.model_dump()),
             atom.token_equivalent,
             _json(atom.metadata),
+            atom.holder_id,
+            atom.origin.value,
+            atom.scenario,
+            atom.event_time.isoformat() if atom.event_time else None,
+            atom.event_time_end.isoformat() if atom.event_time_end else None,
+            atom.event_time_precision.value,
+            atom.event_time_source,
+            atom.valid_from.isoformat() if atom.valid_from else None,
+            atom.valid_to.isoformat() if atom.valid_to else None,
+            _json(atom.supersedes),
+            _json(atom.visibility.model_dump()),
+            atom.retention_until.isoformat() if atom.retention_until else None,
         )
 
     def list_atoms(self, limit: int | None = None) -> list[EvidenceAtom]:
-        query = "SELECT * FROM atoms ORDER BY time DESC"
-        params: tuple[Any, ...] = ()
-        if limit is not None:
-            query += " LIMIT ?"
-            params = (limit,)
         with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+            if limit is None:
+                rows = connection.execute("SELECT * FROM atoms ORDER BY ingested_at DESC").fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM atoms ORDER BY ingested_at DESC LIMIT ?", (limit,)
+                ).fetchall()
+        return [self._row_to_atom(row) for row in rows]
+
+    def atoms_as_of(self, moment: datetime, holder: str | None = None) -> list[EvidenceAtom]:
+        """Memories that were open at `moment`, the question a parameterless view cannot ask.
+
+        Same predicate as v_atoms_current minus the retention filter: retention says how long
+        the system keeps a memory, not whether it was true then. Unknown bounds read as open.
+        """
+        stamp = moment.isoformat()
+        with self.connect() as connection:
+            if holder is None:
+                rows = connection.execute(
+                    "SELECT * FROM atoms "
+                    "WHERE (valid_from IS NULL OR valid_from <= ?) "
+                    "AND (valid_to IS NULL OR valid_to > ?) "
+                    "ORDER BY ingested_at DESC",
+                    (stamp, stamp),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM atoms "
+                    "WHERE holder_id = ? "
+                    "AND (valid_from IS NULL OR valid_from <= ?) "
+                    "AND (valid_to IS NULL OR valid_to > ?) "
+                    "ORDER BY ingested_at DESC",
+                    (holder, stamp, stamp),
+                ).fetchall()
         return [self._row_to_atom(row) for row in rows]
 
     def get_atoms(self, atom_ids: list[str]) -> list[EvidenceAtom]:
         if not atom_ids:
             return []
-        placeholders = ",".join("?" for _ in atom_ids)
         with self.connect() as connection:
             rows = connection.execute(
-                f"SELECT * FROM atoms WHERE atom_id IN ({placeholders})", atom_ids
+                "SELECT * FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (_json(atom_ids),)
             ).fetchall()
         by_id = {row["atom_id"]: self._row_to_atom(row) for row in rows}
         return [by_id[atom_id] for atom_id in atom_ids if atom_id in by_id]
@@ -318,7 +311,7 @@ class Database:
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    datetime.utcnow().isoformat(),
+                    utc_now().isoformat(),
                     layer,
                     cache_key,
                     event,
@@ -349,16 +342,18 @@ class Database:
             )
 
     def list_evidence_edges(self, limit: int | None = None) -> list[dict[str, Any]]:
-        query = (
-            "SELECT from_atom_id, to_atom_id, relation, confidence, metadata_json "
-            "FROM evidence_edges ORDER BY id DESC"
-        )
-        params: tuple[Any, ...] = ()
-        if limit is not None:
-            query += " LIMIT ?"
-            params = (limit,)
         with self.connect() as connection:
-            rows = connection.execute(query, params).fetchall()
+            if limit is None:
+                rows = connection.execute(
+                    "SELECT from_atom_id, to_atom_id, relation, confidence, metadata_json "
+                    "FROM evidence_edges ORDER BY id DESC"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT from_atom_id, to_atom_id, relation, confidence, metadata_json "
+                    "FROM evidence_edges ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
         return [
             {
                 "from_atom_id": row["from_atom_id"],
@@ -387,7 +382,7 @@ class Database:
             ).fetchall()
 
     def _row_to_atom(self, row: sqlite3.Row) -> EvidenceAtom:
-        from .schemas import LayoutBox, Modality, TrustScores
+        from .schemas import LayoutBox, Modality, TrustScores, Visibility
 
         layout_data = _loads(row["layout_json"], None)
         return EvidenceAtom(
@@ -395,7 +390,7 @@ class Database:
             modality=Modality(row["modality"]),
             source_id=row["source_id"],
             source=row["source"],
-            time=datetime.fromisoformat(row["time"]),
+            ingested_at=datetime.fromisoformat(row["ingested_at"]),
             text=row["text"],
             image_ref=row["image_ref"],
             embedding_refs=_loads(row["embedding_refs_json"], []),
@@ -404,6 +399,18 @@ class Database:
             trust=TrustScores(**_loads(row["trust_json"], {"parser": 0.0})),
             token_equivalent=int(row["token_equivalent"]),
             metadata=_loads(row["metadata_json"], {}),
+            holder_id=row["holder_id"],
+            origin=MemoryOrigin(row["origin"]),
+            scenario=row["scenario"],
+            event_time=_datetime(row["event_time"]),
+            event_time_end=_datetime(row["event_time_end"]),
+            event_time_precision=TimePrecision(row["event_time_precision"]),
+            event_time_source=row["event_time_source"],
+            valid_from=_datetime(row["valid_from"]),
+            valid_to=_datetime(row["valid_to"]),
+            supersedes=_loads(row["supersedes_json"], []),
+            visibility=Visibility(**_loads(row["visibility_json"], {})),
+            retention_until=_datetime(row["retention_until"]),
         )
 
     def _row_to_source(self, row: sqlite3.Row) -> SourceRecord:

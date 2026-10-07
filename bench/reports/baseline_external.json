@@ -2,15 +2,15 @@
  "meta": {
   "answerable": 2928,
   "extraction": "lexical (see bench/counterpart.py); LLM extraction deferred with the generator",
-  "generated_at": "2026-10-07T16:54:23+00:00",
+  "generated_at": "2026-10-07T17:26:07+00:00",
   "git_commit": "c4e2982506faaf350a4b06738923899fc44bdedd",
   "limit_per_modality": null,
   "machine": {
    "cpus": 32,
    "load_average_1_5_15": [
-    6.23,
-    4.72,
-    4.44
+    1.47,
+    2.81,
+    10.33
    ],
    "release": "6.18.40.1-microsoft-standard-WSL2",
    "system": "Linux"
@@ -42,7 +42,7 @@
      "recall_at_1": 0.549717057396928,
      "recall_at_10": 0.952303961196443,
      "recall_at_5": 0.8884397736459175,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "conversation": {
      "abstention_rate_answerable": 0.0,
@@ -56,7 +56,7 @@
      "recall_at_1": 0.657888888888889,
      "recall_at_10": 0.9927777777777778,
      "recall_at_5": 0.9814444444444445,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "image": {
      "abstention_rate_answerable": 0.0,
@@ -70,7 +70,7 @@
      "recall_at_1": 0.42291666666666666,
      "recall_at_10": 0.6458333333333334,
      "recall_at_5": 0.6,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "pdf": {
      "abstention_rate_answerable": 0.0,
@@ -84,7 +84,7 @@
      "recall_at_1": 0.587467362924282,
      "recall_at_10": 0.9164490861618799,
      "recall_at_5": 0.825065274151436,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "ui_screenshot": {
      "abstention_rate_answerable": 0.0,
@@ -98,7 +98,7 @@
      "recall_at_1": 0.21875,
      "recall_at_10": 0.621875,
      "recall_at_5": 0.465625,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "video": {
      "abstention_rate_answerable": 0.0,
@@ -112,16 +112,16 @@
      "recall_at_1": 0.2837209302325581,
      "recall_at_10": 0.7162790697674418,
      "recall_at_5": 0.5255813953488372,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     }
    },
    "closed_items": 0,
    "items": 403859,
    "latency_seconds": {
-    "max": 15.670968882004672,
-    "mean": 0.09444417075096513,
-    "p50": 0.08692938649983262,
-    "p95": 0.10732038790265505,
+    "max": 7.547149860001809,
+    "mean": 0.09187759584445908,
+    "p50": 0.08432659949903609,
+    "p95": 0.13331470334669573,
     "queries": 5308
    },
    "overall": {
@@ -136,9 +136,121 @@
     "recall_at_1": 0.49903802367941713,
     "recall_at_10": 0.8664332877959927,
     "recall_at_5": 0.7801286429872496,
-    "wrong_holder_confidence_unanswerable": 1.0
+    "top_hit_from_holder_unanswerable": 1.0
    },
-   "store": "mem0_flat"
+   "store": "mem0_flat [holder scope]"
+  },
+  {
+   "by_modality": {
+    "code": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.349232012934519,
+     "hit_at_10_wilson_lower": 0.3231693767503265,
+     "mrr": 0.21579377911229164,
+     "n_answerable": 1237,
+     "n_unanswerable": 1237,
+     "ndcg_at_10": 0.24771932445387607,
+     "recall_at_1": 0.15683104284559418,
+     "recall_at_10": 0.349232012934519,
+     "recall_at_5": 0.2991107518189167,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "conversation": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.5733333333333334,
+     "hit_at_10_wilson_lower": 0.4933252687249978,
+     "mrr": 0.37327513227513226,
+     "n_answerable": 150,
+     "n_unanswerable": 150,
+     "ndcg_at_10": 0.38064109675098423,
+     "recall_at_1": 0.2188888888888889,
+     "recall_at_10": 0.5004444444444445,
+     "recall_at_5": 0.4146666666666667,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "image": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.5333333333333333,
+     "hit_at_10_wilson_lower": 0.4701883065323697,
+     "mrr": 0.36166170634920636,
+     "n_answerable": 240,
+     "n_unanswerable": 240,
+     "ndcg_at_10": 0.3979762690192957,
+     "recall_at_1": 0.26458333333333334,
+     "recall_at_10": 0.525,
+     "recall_at_5": 0.4708333333333333,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "pdf": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.6827676240208878,
+     "hit_at_10_wilson_lower": 0.6489674562308053,
+     "mrr": 0.5150985328857391,
+     "n_answerable": 766,
+     "n_unanswerable": 218,
+     "ndcg_at_10": 0.555124937448977,
+     "recall_at_1": 0.43994778067885115,
+     "recall_at_10": 0.6827676240208878,
+     "recall_at_5": 0.6109660574412533,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "ui_screenshot": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.075,
+     "hit_at_10_wilson_lower": 0.05091491480619657,
+     "mrr": 0.032880704365079366,
+     "n_answerable": 320,
+     "n_unanswerable": 320,
+     "ndcg_at_10": 0.04277852579814079,
+     "recall_at_1": 0.01875,
+     "recall_at_10": 0.075,
+     "recall_at_5": 0.059375,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "video": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.11627906976744186,
+     "hit_at_10_wilson_lower": 0.08001303523895324,
+     "mrr": 0.06852713178294573,
+     "n_answerable": 215,
+     "n_unanswerable": 215,
+     "ndcg_at_10": 0.08038135054972745,
+     "recall_at_1": 0.04186046511627907,
+     "recall_at_10": 0.11627906976744186,
+     "recall_at_5": 0.11627906976744186,
+     "top_hit_from_holder_unanswerable": 0.0
+    }
+   },
+   "closed_items": 0,
+   "items": 403859,
+   "latency_seconds": {
+    "max": 2.318251260003308,
+    "mean": 0.10140667538014644,
+    "p50": 0.09026374550012406,
+    "p95": 0.17443375029943126,
+    "queries": 5308
+   },
+   "overall": {
+    "abstention_rate_answerable": 0.0,
+    "abstention_rate_unanswerable": 0.0,
+    "hit_at_10": 0.41598360655737704,
+    "hit_at_10_wilson_lower": 0.39825196843019733,
+    "mrr": 0.2833154436638043,
+    "n_answerable": 2928,
+    "n_unanswerable": 2380,
+    "ndcg_at_10": 0.31258063324325003,
+    "recall_at_1": 0.2193761384335155,
+    "recall_at_10": 0.41156648451730415,
+    "recall_at_5": 0.3610655737704918,
+    "top_hit_from_holder_unanswerable": 0.0
+   },
+   "store": "mem0_flat [whole corpus]"
   },
   {
    "by_modality": {
@@ -154,7 +266,7 @@
      "recall_at_1": 0.549717057396928,
      "recall_at_10": 0.952303961196443,
      "recall_at_5": 0.8884397736459175,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "conversation": {
      "abstention_rate_answerable": 0.0,
@@ -168,7 +280,7 @@
      "recall_at_1": 0.637888888888889,
      "recall_at_10": 0.9783333333333334,
      "recall_at_5": 0.9458888888888889,
-     "wrong_holder_confidence_unanswerable": 0.8866666666666667
+     "top_hit_from_holder_unanswerable": 0.8866666666666667
     },
     "image": {
      "abstention_rate_answerable": 0.0,
@@ -182,7 +294,7 @@
      "recall_at_1": 0.42291666666666666,
      "recall_at_10": 0.6458333333333334,
      "recall_at_5": 0.6,
-     "wrong_holder_confidence_unanswerable": 0.5
+     "top_hit_from_holder_unanswerable": 0.5
     },
     "pdf": {
      "abstention_rate_answerable": 0.0,
@@ -196,7 +308,7 @@
      "recall_at_1": 0.587467362924282,
      "recall_at_10": 0.9164490861618799,
      "recall_at_5": 0.825065274151436,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "ui_screenshot": {
      "abstention_rate_answerable": 0.0,
@@ -210,7 +322,7 @@
      "recall_at_1": 0.21875,
      "recall_at_10": 0.621875,
      "recall_at_5": 0.465625,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     },
     "video": {
      "abstention_rate_answerable": 0.0,
@@ -224,16 +336,16 @@
      "recall_at_1": 0.2837209302325581,
      "recall_at_10": 0.7162790697674418,
      "recall_at_5": 0.5255813953488372,
-     "wrong_holder_confidence_unanswerable": 1.0
+     "top_hit_from_holder_unanswerable": 1.0
     }
    },
    "closed_items": 27072,
    "items": 403859,
    "latency_seconds": {
-    "max": 10.518811015004758,
-    "mean": 0.09140969146306362,
-    "p50": 0.0847548475030635,
-    "p95": 0.10844126994816179,
+    "max": 18.72793256899604,
+    "mean": 0.09218696485981677,
+    "p50": 0.08754261549984221,
+    "p95": 0.11125843500121846,
     "queries": 5308
    },
    "overall": {
@@ -248,9 +360,121 @@
     "recall_at_1": 0.4980134335154827,
     "recall_at_10": 0.865693306010929,
     "recall_at_5": 0.7783071493624771,
-    "wrong_holder_confidence_unanswerable": 0.942436974789916
+    "top_hit_from_holder_unanswerable": 0.942436974789916
    },
-   "store": "zep_temporal"
+   "store": "zep_temporal [holder scope]"
+  },
+  {
+   "by_modality": {
+    "code": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.35004042037186744,
+     "hit_at_10_wilson_lower": 0.32396114426502914,
+     "mrr": 0.21595449820995496,
+     "n_answerable": 1237,
+     "n_unanswerable": 1237,
+     "ndcg_at_10": 0.24802826744611478,
+     "recall_at_1": 0.15683104284559418,
+     "recall_at_10": 0.35004042037186744,
+     "recall_at_5": 0.2991107518189167,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "conversation": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.6666666666666666,
+     "hit_at_10_wilson_lower": 0.5878975668678504,
+     "mrr": 0.42928042328042326,
+     "n_answerable": 150,
+     "n_unanswerable": 150,
+     "ndcg_at_10": 0.4447119968977239,
+     "recall_at_1": 0.2391111111111111,
+     "recall_at_10": 0.5912222222222222,
+     "recall_at_5": 0.4597777777777778,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "image": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.5708333333333333,
+     "hit_at_10_wilson_lower": 0.5075830430993526,
+     "mrr": 0.4262020502645502,
+     "n_answerable": 240,
+     "n_unanswerable": 240,
+     "ndcg_at_10": 0.45449292583858186,
+     "recall_at_1": 0.35208333333333336,
+     "recall_at_10": 0.5625,
+     "recall_at_5": 0.5083333333333333,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "pdf": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.685378590078329,
+     "hit_at_10_wilson_lower": 0.6516380300993592,
+     "mrr": 0.518995296116706,
+     "n_answerable": 766,
+     "n_unanswerable": 218,
+     "ndcg_at_10": 0.5587707901607282,
+     "recall_at_1": 0.44386422976501305,
+     "recall_at_10": 0.685378590078329,
+     "recall_at_5": 0.6174934725848564,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "ui_screenshot": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.11875,
+     "hit_at_10_wilson_lower": 0.08775049817160425,
+     "mrr": 0.05682539682539682,
+     "n_answerable": 320,
+     "n_unanswerable": 320,
+     "ndcg_at_10": 0.0711722029605294,
+     "recall_at_1": 0.0375,
+     "recall_at_10": 0.11875,
+     "recall_at_5": 0.08125,
+     "top_hit_from_holder_unanswerable": 0.0
+    },
+    "video": {
+     "abstention_rate_answerable": 0.0,
+     "abstention_rate_unanswerable": 0.0,
+     "hit_at_10": 0.16279069767441862,
+     "hit_at_10_wilson_lower": 0.1194411092694439,
+     "mrr": 0.08660022148394242,
+     "n_answerable": 215,
+     "n_unanswerable": 215,
+     "ndcg_at_10": 0.10455353510193785,
+     "recall_at_1": 0.05581395348837209,
+     "recall_at_10": 0.16279069767441862,
+     "recall_at_5": 0.12093023255813953,
+     "top_hit_from_holder_unanswerable": 0.0
+    }
+   },
+   "closed_items": 27072,
+   "items": 403859,
+   "latency_seconds": {
+    "max": 0.2064202700057649,
+    "mean": 0.08776056289499023,
+    "p50": 0.08638653549860464,
+    "p95": 0.10662773229960291,
+    "queries": 5308
+   },
+   "overall": {
+    "abstention_rate_answerable": 0.0,
+    "abstention_rate_unanswerable": 0.0,
+    "hit_at_10": 0.43306010928961747,
+    "hit_at_10_wilson_lower": 0.41521181569494575,
+    "mrr": 0.29650609332986383,
+    "n_answerable": 2928,
+    "n_unanswerable": 2380,
+    "ndcg_at_10": 0.32645785820497475,
+    "recall_at_1": 0.23168260473588342,
+    "recall_at_10": 0.42851206739526415,
+    "recall_at_5": 0.3708902550091075,
+    "top_hit_from_holder_unanswerable": 0.0
+   },
+   "store": "zep_temporal [whole corpus]"
   }
  ]
 }

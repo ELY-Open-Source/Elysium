@@ -24,6 +24,15 @@ from .config import Settings, get_settings
 from .db import Database
 from .embeddings import EmbeddingService
 from .evals import HashHopEvaluator, PRDProofSuite
+from .evaluation_schemas import (
+    BenchmarkPredictionReport,
+    BenchmarkRegistryReport,
+    BenchmarkSampleReport,
+    BenchmarkSourceReport,
+    HashHopProof,
+    ProofCheck,
+    ProofSuiteReport,
+)
 from .evidence_graph import EvidenceGraphService
 from .ingestion import IngestionService
 from .profiles import runtime_profile_report
@@ -33,16 +42,9 @@ from .schemas import (
     AdapterManifest,
     AdapterStatus,
     AnswerResponse,
-    BenchmarkRegistryReport,
-    BenchmarkPredictionReport,
-    BenchmarkSampleReport,
-    BenchmarkSourceReport,
     CartridgeAssetReport,
-    HashHopProof,
     MemoryStatus,
     PathIngestRequest,
-    ProofCheck,
-    ProofSuiteReport,
     RuntimeProfile,
     RuntimeProfileReport,
     SystemStatus,

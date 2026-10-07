@@ -12,19 +12,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from bench.counterpart import (
     Counterpart,
+    SourceMeta,
     build_counterparts,
     build_items,
     load_item_atoms,
     load_source_index,
 )
 from bench.ingest_baseline import RUNS, database_path
-from bench.metrics import aggregate, score_query
+from bench.metrics import aggregate, chance_recall_at_k, score_query
 from bench.run import Query, git_commit, holder_index, load_queries
 from bench.sets_common import ROOT
 from bench.systems import machine_facts
@@ -35,6 +37,22 @@ HOLDER_SCOPE = "holder scope"
 WHOLE_CORPUS_SCOPE = "whole corpus"
 SCOPES = (HOLDER_SCOPE, WHOLE_CORPUS_SCOPE)
 PROGRESS_EVERY = 500
+
+
+def chance_rows(index: dict[str, SourceMeta], queries: list[Query]) -> dict[str, Any]:
+    """What random guessing scores in each candidate set, so a scoped score is not read as skill."""
+    per_holder: dict[str, int] = {}
+    for meta in index.values():
+        per_holder[meta.holder] = per_holder.get(meta.holder, 0) + 1
+    sizes = [per_holder[query.holder] for query in queries if query.holder in per_holder]
+    if not sizes:
+        raise SystemExit("no query holder appears in the corpus index")
+    return {
+        "recall_at_10": chance_recall_at_k(1, len(index), TOP_K),
+        "recall_at_10_holder_scope": sum(chance_recall_at_k(1, size, TOP_K) for size in sizes) / len(sizes),
+        "median_holder_sources": float(statistics.median(sizes)),
+        "note": "expected recall@10 of a random ranking inside the candidate set each row is allowed to see",
+    }
 
 
 def score_store(store: Counterpart, queries: list[Query], holder_of: dict[str, str], scope: str) -> dict[str, Any]:
@@ -87,6 +105,12 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         (
             "- extraction is lexical for both stores; Mem0's real add() and Zep's graph builder call a "
             "generator model, which this round does not have"
+        ),
+        (
+            f"- chance: random guessing scores recall@10 {report['chance']['recall_at_10']:.5f} over the whole "
+            f"corpus and {report['chance']['recall_at_10_holder_scope']:.4f} inside one holder's memory "
+            f"(median {report['chance']['median_holder_sources']:.0f} sources per holder); read each row against "
+            "its own floor"
         ),
         "",
         (
@@ -166,6 +190,7 @@ def main() -> int:
             "extraction": "lexical (see bench/counterpart.py); LLM extraction deferred with the generator",
             "machine": machine_facts(),
         },
+        "chance": chance_rows(index, queries),
         "stores": [score_store(store, queries, holder_of, scope) for store in stores for scope in SCOPES],
     }
     REPORTS.mkdir(parents=True, exist_ok=True)

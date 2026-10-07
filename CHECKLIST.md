@@ -33,8 +33,13 @@
   - 验收：`python -m bench.run --config bench/configs/ablation.json` 出表（`--config` 已接，配置优先于默认、命令行仍可覆盖）；每格带 n 与 Wilson 95% 下界；`bench/reports/baseline_*.json` 入库
 - [ ] **b-4** 外部基线
   - [x] b-4.1 仓库内 Mem0/Zep 风格同构对照：扁平 store + holder 作用域 + 无失效（`bench/counterpart.py`：`split_items` 400 字切句、`(holder, sha256(text))` 去重＝Mem0、`supersede` 按 (holder, subject) 时间序关闭旧条目＝Zep；`visible(holder, as_of)` 只对 temporal store 生效）+ `bench/tests/test_counterpart.py` 11 条
-  - [~] b-4.2 同语料同硬件跑，出对照数字：`bench/run_external.py` 全量在跑（165,973 atom → 403,859 条 memory item，Zep 式 `supersede` 关闭 27,072 条），数字待 `bench/reports/baseline_external.json`
-  - [ ] b-4.3 附录：真 Mem0 跑法与参考值，标明其 `add()` 依赖 LLM 的不可比因素
+  - [x] b-4.2 同语料同硬件跑，出对照数字：`bench/reports/baseline_external.json` + `BASELINE_EXTERNAL.md`（165,973 atom → 403,859 条 memory item，Zep 式 `supersede` 关闭 27,072 条；5,308 query 全量）
+    - `mem0_flat [holder scope]` recall@10 **0.866**（Wilson 下界 0.855，MRR 0.629，p50 0.084 s）
+    - `mem0_flat [whole corpus]` recall@10 **0.412**（p50 0.090 s）
+    - `zep_temporal [holder scope]` 0.866；`zep_temporal [whole corpus]` 0.429
+    - 读法：同一个 ranker、同一批 item，只把候选集从全库换成「这个 holder 的记忆」，recall@10 从 0.412 涨到 0.866（+0.454）——**收益来自 holder 边界，不是更好的排序**；Zep 式失效只在跨 holder 时有小幅正效应（conversation +0.091），在 holder 作用域内反而让 conversation 从 0.993 掉到 0.978、并把 5.8% 的不可答题变成拒答
+    - 交叉校验：counterpart 的 whole-corpus 纯稠密 0.412 ≈ 产品 `dense_only` 0.424，两套 harness 互相印证
+  - [x] b-4.3 附录：真 Mem0 跑法与参考值，标明其 `add()` 依赖 LLM 的不可比因素（`bench/reports/EXTERNAL_APPENDIX.md`：Mem0 论文 LOCOMO 判分表 full-context 72.90 / Mem0^g 68.44 / Mem0 66.88 / Zep 65.99 / best RAG 60.97，附 token 预算与 p50/p95 延迟；四条不可比理由，其中关键一条是论文只报 search/answer 延迟、不报 `add()` 成本，Zep 的图是异步构建的）
   - 验收：`bench/reports/baseline_external_*.json`；对照基线与 ely-eye 同标注集同指标
 - [x] **b-5** 反自证审计（`bench/audit.py` + `bench/tests/test_audit.py` 9 条）
   - [x] b-5.1 单次尝试：禁 best-of-N 重摇 —— AST 规则：`while` 循环的测试或 `break` 守卫里出现分数词（pass_rate/target/recall/accuracy/score/hit_rate）即违规；函数名含 `best_of/reroll/until_pass` 即违规。已抓到产品现行违规 `backend/src/ely_eye/evals.py:2351`（Visual HashHop 达标即停）
@@ -48,13 +53,13 @@
 
 ## 阶段 1 — P0：让它成为记忆
 
-- [ ] **p0-1** 记忆模型加四维度
-  - [ ] p0-1.1 `holder_id` + `origin`（self / observed / artifact / third_party）+ 写入方不可伪造
-  - [ ] p0-1.2 双时间轴：`event_time` / `event_time_end` / `event_time_precision` / `event_time_source` + `valid_from` / `valid_to` + `supersedes`
-  - [ ] p0-1.3 `scenario` + `visibility`（holder / visible_to / purpose / retention_until）
-  - [ ] p0-1.4 `PRAGMA user_version` 迁移框架 + 旧库可重放
-  - [ ] p0-1.5 视图 `v_atoms_current` 与 `v_atoms_as_of(:ts)`
-  - 验收：`pytest tests/test_memory_schema.py tests/test_migrations.py` 绿；时间旅行返回历史版本
+- [x] **p0-1** 记忆模型加四维度
+  - [x] p0-1.1 `holder_id` + `origin`（self / observed / artifact / third_party）——字段与 DB CHECK 已上；「写入方不可伪造」是服务端盖章，归 p0-2.3
+  - [x] p0-1.2 双时间轴：`event_time` / `event_time_end` / `event_time_precision` / `event_time_source` + `valid_from` / `valid_to` + `supersedes`（旧 `time` 列重命名为 `ingested_at`，只有一个名字）
+  - [x] p0-1.3 `scenario` + `visibility`（scope=holder / visible_to / everyone + holders + purpose）+ `retention_until`（提升为真列，因为 current 视图要过滤它）
+  - [x] p0-1.4 `PRAGMA user_version` 迁移框架 + 旧库可重放（`migrations.py`：v1 库原地 ALTER + RENAME COLUMN 升到 v2，行不丢；版本高于本构建则 SystemExit）
+  - [x] p0-1.5 视图 `v_atoms_current` + 时间旅行查询——偏差记录：SQLite 视图不能带参数，所以 as-of 是 `db.atoms_as_of(moment, holder=None)`，谓词与视图一致但去掉 retention（retention 是保存策略，不是当时是否为真）
+  - 验收：`pytest backend/tests/test_memory_schema.py` 绿（8 条，含 v1→v2 升级不丢行、时间旅行返回历史版本）；实际路径是 `backend/tests/`，不是 `tests/`
 - [ ] **p0-2** 写入路径
   - [ ] p0-2.1 `remember` / `forget` / `supersede` 三写，Python 单一写者
   - [ ] p0-2.2 MCP 工具面 + HTTP `POST /api/memory{,/forget,/supersede}` + CLI 三面同源

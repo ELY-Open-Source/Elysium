@@ -8,7 +8,7 @@ from ast import literal_eval
 from pathlib import Path
 from typing import Any
 
-from .schemas import (
+from .evaluation_schemas import (
     BenchmarkPredictionReport,
     BenchmarkPredictionStatus,
     BenchmarkRegistryReport,
@@ -18,7 +18,6 @@ from .schemas import (
     BenchmarkSourceStatus,
     BenchmarkSpec,
 )
-
 
 STANDARD_BENCHMARKS = (
     BenchmarkSpec(
@@ -125,7 +124,7 @@ def benchmark_source_report(timeout: int = 20) -> BenchmarkSourceReport:
                     sibling_count=len(siblings),
                 )
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # a probe records its failure instead of crashing the proof run
             sources.append(
                 BenchmarkSourceStatus(
                     name=benchmark.name,
@@ -217,7 +216,7 @@ def load_benchmark_sample(benchmark: BenchmarkSpec, output_root: Path) -> Benchm
             sample_sha256=sha256_json(normalized),
             media_artifacts=media_artifacts,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # a probe records its failure instead of crashing the proof run
         message = str(exc).splitlines()[0]
         status = "gated" if "gated dataset" in message.lower() or "authenticated" in message.lower() else "failed"
         return BenchmarkSampleStatus(
@@ -274,7 +273,7 @@ def predict_benchmark_sample(benchmark: BenchmarkSpec, output_root: Path, runtim
             output_tokens=generation.output_tokens,
             media_artifacts=prediction_media,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # a probe records its failure instead of crashing the proof run
         message = str(exc).splitlines()[0]
         status = "gated" if "gated dataset" in message.lower() or "authenticated" in message.lower() else "failed"
         config, split = BENCHMARK_SAMPLE_LOADS.get(benchmark.name, (None, None))
@@ -351,7 +350,10 @@ def load_records(path: Path) -> list[dict[str, Any]]:
         with path.open("r", encoding="utf-8") as handle:
             return [json.loads(line) for line in handle if line.strip()]
     if suffix == ".json":
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"{path}: cannot read the benchmark file ({error})") from error
         if isinstance(data, list):
             return [dict(item) for item in data if isinstance(item, dict)]
         if isinstance(data, dict):

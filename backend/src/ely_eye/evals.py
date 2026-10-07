@@ -25,6 +25,11 @@ from .cartridge_assets import CartridgeAssetService, merkle_root
 from .compiler import ContextCompiler
 from .config import Settings, get_settings
 from .db import Database
+from .evaluation_schemas import (
+    HashHopProof,
+    ProofCheck,
+    ProofSuiteReport,
+)
 from .evidence_graph import EvidenceGraphService
 from .ingestion import SUPPORTED_CODE_EXTENSIONS, build_repository_context, find_git_root
 from .profiles import runtime_profile_report
@@ -36,10 +41,7 @@ from .schemas import (
     CompiledContext,
     ContextPlan,
     EvidenceAtom,
-    HashHopProof,
     Modality,
-    ProofCheck,
-    ProofSuiteReport,
     RetrievalHit,
     RuntimeProfile,
     TrainingAdapterKind,
@@ -56,7 +58,7 @@ from .training import (
     sha256_file,
     sha256_tree,
 )
-from .verifier import VisualContradictionLens, Verifier
+from .verifier import Verifier, VisualContradictionLens
 
 
 class HashHopEvaluator:
@@ -101,11 +103,14 @@ class HashHopEvaluator:
         proof = self.generate_text_proof(hops, token_equivalent)
         root = Path(proof.artifacts[0]).parent
         chain_path = root / "hashhop_text.jsonl"
-        records = [
-            json.loads(line)
-            for line in chain_path.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
+        try:
+            chain_text = chain_path.read_text(encoding="utf-8")
+        except OSError as error:
+            raise ValueError(f"{chain_path}: the HashHop chain is unreadable ({error})") from error
+        try:
+            records = [json.loads(line) for line in chain_text.splitlines() if line.strip()]
+        except json.JSONDecodeError as error:
+            raise ValueError(f"{chain_path}: the HashHop chain holds a malformed line ({error})") from error
         decoys = [
             {"from": secrets.token_hex(16), "to": secrets.token_hex(16)}
             for _ in range(max(4, hops * 2))
@@ -775,7 +780,7 @@ class PRDProofSuite:
                     f"{citation_report.citation_accuracy:.2f}"
                 ),
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # a probe records its failure instead of crashing the proof run
             payload["error"] = str(exc)
             write_json(artifact, payload)
             return ProofCheck(
@@ -876,7 +881,7 @@ class PRDProofSuite:
                     "last_segment": segments[-1] if segments else None,
                 }
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # a probe records its failure instead of crashing the proof run
             payload["error"] = str(exc)
         write_json(artifact, payload)
         return ProofCheck(
@@ -903,7 +908,10 @@ class PRDProofSuite:
         graph_path = cartridge_root / manifest.artifacts["temporal_graph"]
         computed_dna = self.cartridges.compute_dna(cartridge_root)
         atom_rows = parquet_row_count(atoms_path)
-        sources = json.loads(sources_path.read_text(encoding="utf-8")) if sources_path.exists() else []
+        try:
+            sources = json.loads(sources_path.read_text(encoding="utf-8")) if sources_path.exists() else []
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"{sources_path}: the cartridge source list is unreadable ({error})") from error
         question = "Which Ely-Eye PRD requirements prove long context memory, HashHop, and adapters?"
         compiler = ContextCompiler(self.settings, self.db)
         replay_a = compiler.compile(question, RuntimeProfile.library_100m)
@@ -1531,7 +1539,7 @@ def peft_config_loads(path: Path) -> bool:
 
         PeftConfig.from_pretrained(path)
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001  # a probe records its failure instead of crashing the proof run
         return False
 
 
@@ -1585,7 +1593,7 @@ def training_payload_contract_ok(payload: dict[str, Any], manifest: AdapterManif
         and payload.get("precision") == TRAINING_PRECISION
         and payload.get("framework") == TRAINING_FRAMEWORK
         and payload.get("optimizer_family") == manifest.optimizer_family
-        and payload.get("gradient_checkpointing") is True
+        and bool(payload.get("gradient_checkpointing"))
         and payload.get("gradient_checkpointing_mode") == GRADIENT_CHECKPOINTING_MODE
         and payload.get("autocast_dtype") == AUTOCAST_DTYPE
         and payload.get("unsloth_version") == manifest.unsloth_version
@@ -1876,10 +1884,13 @@ def read_memory_capsule(path: Path) -> dict[str, Any]:
     prefix = b"ELYMEMCAP1\n"
     if not data.startswith(prefix):
         raise ValueError(f"Invalid memory capsule header: {path}")
-    payload = zstd.ZstdDecompressor().decompress(data[len(prefix) :])
-    parsed = json.loads(payload.decode("utf-8"))
+    try:
+        payload = zstd.ZstdDecompressor().decompress(data[len(prefix) :])
+        parsed = json.loads(payload.decode("utf-8"))
+    except (zstd.ZstdError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"Cannot decode the memory capsule at {path}: {error}") from error
     if not isinstance(parsed, dict):
-        raise ValueError(f"Invalid memory capsule payload: {path}")
+        raise ValueError(f"Invalid memory capsule payload: {path}")  # noqa: TRY004  # the capsule's own bytes are wrong, not the caller's argument
     return parsed
 
 
@@ -1896,11 +1907,14 @@ def hashhop_chain_valid(proof: HashHopProof) -> bool:
     chain_artifacts = [Path(path) for path in proof.artifacts if path.endswith(".jsonl")]
     if len(chain_artifacts) != 1 or not chain_artifacts[0].exists():
         return False
-    rows = [
-        json.loads(line)
-        for line in chain_artifacts[0].read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    try:
+        rows = [
+            json.loads(line)
+            for line in chain_artifacts[0].read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError):
+        return False  # an unreadable chain is not a valid chain, and this is a predicate
     if len(rows) != proof.hops:
         return False
     if rows[0]["from"] != proof.query_id or rows[-1]["to"] != proof.expected_target_id:
