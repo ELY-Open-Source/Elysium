@@ -117,9 +117,9 @@ class _FakeProcessor:
 
 @pytest.fixture(autouse=True)
 def _no_stale_loads():
-    adapters.clear_loads()
+    adapters._ATTACHMENTS.clear()
     yield
-    adapters.clear_loads()
+    adapters._ATTACHMENTS.clear()
 
 
 def test_a_library_adapter_is_selected_for_its_kind(tmp_path: Path) -> None:
@@ -217,6 +217,43 @@ def test_unload_stops_claiming_a_model_that_is_gone(tmp_path: Path, monkeypatch)
     row = next(item for item in adapters.plan(settings, database).adapters if item.kind == CORE)
     assert row.state == "available"
     assert "that model is gone" in row.reason, row.reason
+
+
+def test_a_loaded_row_names_the_adapter_that_is_actually_attached(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    attached = _write_adapter(settings.adapters_dir / "x", adapter_id="adapter-x")
+    monkeypatch.setattr(adapters, "load_into_model", lambda model, path: _FakeModel())
+    monkeypatch.setattr(QwenRuntime, "_load_base_model", lambda self: (_FakeModel(), object()))
+    runtime = QwenRuntime(settings)
+    runtime._load_transformers()
+    _write_adapter(settings.adapters_dir / "y", adapter_id="adapter-y")
+    row = next(item for item in adapters.plan(settings, Database(settings)).adapters if item.kind == CORE)
+    assert row.state == "loaded"
+    assert row.adapter_id == "adapter-x", f"the row promises {row.adapter_id} but {attached} is attached"
+    assert row.path == str(attached) and row.reason.endswith(str(attached)), row.reason
+
+
+def test_one_unload_does_not_declare_another_live_model_gone(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    _write_adapter(settings.adapters_dir / "x", adapter_id="adapter-x")
+    monkeypatch.setattr(adapters, "load_into_model", lambda model, path: _FakeModel())
+    monkeypatch.setattr(QwenRuntime, "_load_base_model", lambda self: (_FakeModel(), object()))
+    first = QwenRuntime(settings)
+    first._load_transformers()
+    _write_adapter(settings.adapters_dir / "y", adapter_id="adapter-y")
+    second = QwenRuntime(settings)
+    second._load_transformers()
+    database = Database(settings)
+    row = next(item for item in adapters.plan(settings, database).adapters if item.kind == CORE)
+    assert row.state == "loaded" and row.adapter_id == "adapter-y"
+    assert "another live model still holds adapter-x" in row.reason, row.reason
+    first.unload()
+    row = next(item for item in adapters.plan(settings, database).adapters if item.kind == CORE)
+    assert row.state == "loaded" and row.adapter_id == "adapter-y"
+    assert "gone" not in row.reason, row.reason
+    second.unload()
+    row = next(item for item in adapters.plan(settings, database).adapters if item.kind == CORE)
+    assert row.state == "available" and "that model is gone" in row.reason, row.reason
 
 
 def test_a_rejected_candidate_does_not_claim_another_adapter_won(tmp_path: Path) -> None:

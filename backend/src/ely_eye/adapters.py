@@ -34,16 +34,25 @@ class AdapterSource:
 
 @dataclass(frozen=True)
 class LoadRecord:
-    """An adapter this process attached to a model."""
+    """One adapter this process attached to one model."""
 
-    kind: TrainingAdapterKind
-    adapter_id: str
-    path: str
+    source: AdapterSource
     sha256: str
 
+    @property
+    def kind(self) -> TrainingAdapterKind:
+        return self.source.manifest.kind
 
-_LOADED: dict[str, LoadRecord] = {}
-_LIVE: dict[str, weakref.ReferenceType[object]] = {}
+    @property
+    def adapter_id(self) -> str:
+        return self.source.manifest.adapter_id
+
+    @property
+    def path(self) -> str:
+        return str(self.source.path)
+
+
+_ATTACHMENTS: list[tuple[LoadRecord, weakref.ReferenceType[object]]] = []
 
 
 def read_manifest(path: Path) -> AdapterManifest:
@@ -153,31 +162,21 @@ def _preference(source: AdapterSource) -> tuple[bool, bool, float]:
 
 
 def load_records() -> list[LoadRecord]:
-    return list(_LOADED.values())
+    """Every adapter still attached, or attached since the last load, in attachment order."""
+    return [record for record, _reference in _ATTACHMENTS]
 
 
-def live_kinds() -> set[str]:
-    """Kinds whose attached model is still alive, not merely attached once."""
-    alive = {kind for kind, reference in _LIVE.items() if reference() is not None}
-    for kind in [kind for kind, reference in _LIVE.items() if reference() is None]:
-        del _LIVE[kind]
-    return alive
-
-
-def clear_loads() -> None:
-    _LOADED.clear()
-    _LIVE.clear()
+def live_attachments() -> list[LoadRecord]:
+    """Attachments whose model still exists; a dead model cannot be claimed as loaded."""
+    return [record for record, reference in _ATTACHMENTS if reference() is not None]
 
 
 def record_load(source: AdapterSource, model: Any) -> LoadRecord:
-    record = LoadRecord(
-        kind=source.manifest.kind,
-        adapter_id=source.manifest.adapter_id,
-        path=str(source.path),
-        sha256=source.manifest.sha256,
-    )
-    _LOADED[record.kind.value] = record
-    _LIVE[record.kind.value] = weakref.ref(model)
+    record = LoadRecord(source=source, sha256=source.manifest.sha256)
+    _ATTACHMENTS[:] = [
+        (item, reference) for item, reference in _ATTACHMENTS if reference() is not None
+    ]
+    _ATTACHMENTS.append((record, weakref.ref(model)))
     logger.info("loaded adapter %s (%s) from %s", record.adapter_id, record.kind.value, record.path)
     return record
 
@@ -197,44 +196,57 @@ def plan(settings: Settings, database: Database) -> AdapterLoadReport:
     sources, mounted = discover(settings, database)
     rows: list[AdapterChoice] = []
     winners: dict[str, AdapterSource | None] = {}
-    alive = live_kinds()
+    attached = live_attachments()
     for kind in TrainingAdapterKind:
         source, state, reason = resolve(sources, settings, kind)
         winners[kind.value] = source
-        record = next((item for item in load_records() if item.kind == kind), None)
-        if record is not None:
-            if kind.value in alive:
-                state, reason = "loaded", f"attached to the live model from {record.path}"
-            else:
-                state = "available"
-                reason = f"attached earlier in this process from {record.path}; that model is gone"
-        rows.append(
-            AdapterChoice(
-                kind=kind,
-                state=state,
-                reason=reason,
-                path=str(source.path) if source else None,
-                adapter_id=source.manifest.adapter_id if source else None,
-                base_model=source.manifest.base_model if source else settings.model_id,
-                origin=source.origin if source else None,
-                cartridge_id=source.cartridge_id if source else None,
-            )
-        )
+        live = [record for record in attached if record.kind == kind]
+        earlier = next((record for record in reversed(load_records()) if record.kind == kind), None)
+        if live:
+            newest = live[-1]
+            state = "loaded"
+            reason = f"attached to the live model from {newest.path}"
+            held = sorted({record.adapter_id for record in live[:-1] if record.adapter_id != newest.adapter_id})
+            if held:
+                reason = f"{reason}; another live model still holds {' and '.join(held)}"
+            rows.append(_choice(kind, state, reason, newest.source))
+            continue
+        if earlier is not None and source is not None:
+            state = "available"
+            reason = f"{reason}; {earlier.adapter_id} was attached earlier in this process and that model is gone"
+        rows.append(_choice(kind, state, reason, source))
     for source in sources:
         winner = winners.get(source.manifest.kind.value)
         if winner is None or source.path == winner.path:
             continue
         rows.append(
-            AdapterChoice(
-                kind=source.manifest.kind,
-                state="deferred",
-                reason=f"shadowed by {winner.manifest.adapter_id} for the current mount",
-                path=str(source.path),
-                adapter_id=source.manifest.adapter_id,
-                base_model=source.manifest.base_model,
-                origin=source.origin,
-                cartridge_id=source.cartridge_id,
+            _choice(
+                source.manifest.kind,
+                "deferred",
+                f"shadowed by {winner.manifest.adapter_id} for the current mount",
+                source,
                 shadowed=True,
             )
         )
     return AdapterLoadReport(model_id=settings.model_id, mounted=mounted, adapters=rows)
+
+
+def _choice(
+    kind: TrainingAdapterKind,
+    state: AdapterState,
+    reason: str,
+    source: AdapterSource | None,
+    shadowed: bool = False,
+) -> AdapterChoice:
+    """Build one report row from the adapter the row is actually talking about."""
+    return AdapterChoice(
+        kind=kind,
+        state=state,
+        reason=reason,
+        path=str(source.path) if source else None,
+        adapter_id=source.manifest.adapter_id if source else None,
+        base_model=source.manifest.base_model if source else None,
+        origin=source.origin if source else None,
+        cartridge_id=source.cartridge_id if source else None,
+        shadowed=shadowed,
+    )
