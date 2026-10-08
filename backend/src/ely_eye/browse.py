@@ -55,11 +55,7 @@ def browse(
 
 
 def picture(settings: Settings, atom_id: str) -> Picture | None:
-    """The stored bytes behind one atom, through the same visibility view search uses.
-
-    None covers three cases the caller cannot tell apart and does not need to: the atom is unknown,
-    it was forgotten, or its bytes are gone. All three mean "there is no picture to show".
-    """
+    """The stored bytes behind one atom; None means there is no picture to show, for any of the three reasons."""
     database = Database(settings)
     with database.connect() as connection:
         row = connection.execute(

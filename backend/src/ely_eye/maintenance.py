@@ -15,8 +15,9 @@ from .cartridge_store import mounted_ids
 from .config import Settings
 from .db import Database
 from .migrations import SCHEMA_VERSION
-from .schemas import SenseStatus, utc_now
+from .schemas import utc_now
 from .senses import sense_facts
+from .status_schemas import SenseStatus
 
 BACKUP_FILE = "ely_eye.sqlite"
 MANIFEST_FILE = "backup_manifest.json"

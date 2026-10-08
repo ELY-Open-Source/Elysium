@@ -7,7 +7,7 @@ from typing import Any
 
 from .config import Settings, get_settings
 from .db import Database
-from .schemas import CacheLayerStatus
+from .status_schemas import CacheLayerStatus
 
 SEMANTIC_LAYER = "semantic"
 

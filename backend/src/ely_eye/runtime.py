@@ -13,7 +13,8 @@ import httpx
 from . import adapters
 from .config import Settings, get_settings
 from .db import Database
-from .schemas import CompiledContext, RuntimeStatus, TrainingAdapterKind
+from .schemas import CompiledContext, TrainingAdapterKind
+from .status_schemas import RuntimeStatus
 from .storage import ObjectStore
 
 logger = logging.getLogger("ely_eye.runtime")

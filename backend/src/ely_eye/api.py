@@ -39,7 +39,6 @@ from .schemas import (
     ForgetReport,
     ForgetRequest,
     MemoryOrigin,
-    MemoryStatus,
     Modality,
     PathIngestRequest,
     RememberRequest,
@@ -48,10 +47,10 @@ from .schemas import (
     SearchRequest,
     SearchResult,
     SupersedeRequest,
-    SystemStatus,
     UploadIngestRequest,
 )
 from .senses import sense_facts
+from .status_schemas import MemoryStatus, SystemStatus
 from .training import safetensor_weight_stats
 from .verifier import Verifier, VisualContradictionLens
 

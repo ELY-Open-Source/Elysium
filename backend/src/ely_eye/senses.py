@@ -7,16 +7,12 @@ from pathlib import Path
 from .config import Settings
 from .db import Database
 from .embeddings import EmbeddingService
-from .schemas import DenseState, SenseState, SenseStatus, VisualState
+from .status_schemas import DenseState, SenseState, SenseStatus, VisualState
 from .visual_index import VisualIndex
 
 
 def sense_facts(settings: Settings, database: Database, visual: VisualIndex | None = None) -> SenseStatus:
-    """Report the senses as facts, so the UI and the doctor cannot disagree about what is missing.
-
-    A path set but gone on disk is a different failure from a path never set: the first is a broken
-    install, the second is a machine that was never given that sense.
-    """
+    """Report the senses as facts, so the UI and the doctor cannot disagree about what is missing."""
     index = visual or VisualIndex(settings, database)
     claimed = _picture_claim(database)
     on_disk = index.visual_atom_ids()
