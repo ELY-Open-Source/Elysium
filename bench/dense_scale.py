@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sqlite3
 import time
 from collections.abc import Sequence
@@ -22,7 +21,7 @@ import numpy as np
 from bench.query_set import load_queries, scale_probes
 from bench.report import git_commit
 from bench.run import latency
-from bench.systems import DENSE_MODEL, MODELS, machine_facts
+from bench.systems import DENSE_MODEL, MODELS, copy_store, machine_facts
 
 if TYPE_CHECKING:
     from ely_eye.db import Database
@@ -63,20 +62,6 @@ def vector_footprint(database: Any, table: str) -> tuple[int, str]:
             "SELECT COALESCE(SUM(length(embedding)), 0) FROM vec_atoms"
         ).fetchone()[0]
     return int(payload), "vector bytes only, this sqlite3 has no dbstat"
-
-
-def copy_store(home: Path, scratch: Path) -> tuple[Path, float]:
-    """Work on a copy: the baseline store is frozen evidence and must not be migrated in place."""
-    source = home / "data" / "ely_eye.sqlite"
-    if not source.is_file():
-        raise SystemExit(f"{source}: no product database, build it with python -m bench.ingest_baseline")
-    data = scratch / "data"
-    data.mkdir(parents=True, exist_ok=True)
-    began = time.perf_counter()
-    for suffix in ("", "-wal", "-shm"):
-        if (path := Path(str(source) + suffix)).is_file():
-            shutil.copyfile(path, data / (source.name + suffix))
-    return scratch, time.perf_counter() - began
 
 
 def stored_vectors(database: Database) -> tuple[list[str], np.ndarray]:

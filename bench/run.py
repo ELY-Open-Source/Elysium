@@ -73,6 +73,7 @@ def live_check(
     fast_rankings: dict[str, list[str]],
     top_k: int = 10,
     live_queries: int = LIVE_QUERIES,
+    scratch: Path | None = None,
 ) -> dict[str, Any]:
     """Score the unmodified RetrievalService on its own, as its holder would ask it.
 
@@ -85,7 +86,11 @@ def live_check(
     if not chosen:
         raise SystemExit("live check needs answerable queries")
     rankings, distinct, timings = live_product_rankings(
-        DB_HOME, [query.text for query in chosen], top_k, as_holders=[query.holder for query in chosen]
+        DB_HOME,
+        [query.text for query in chosen],
+        top_k,
+        as_holders=[query.holder for query in chosen],
+        scratch=scratch,
     )
     overlaps = [
         len(set(fast_rankings[query.query_id]) & set(ranking)) / top_k
@@ -229,6 +234,12 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=None, help="score at most this many queries per modality")
     parser.add_argument("--no-live", action="store_true", help="skip the unmodified RetrievalService path")
     parser.add_argument("--live-queries", type=int, default=LIVE_QUERIES)
+    parser.add_argument(
+        "--live-scratch",
+        type=Path,
+        default=ROOT / "runs" / "live",
+        help="copy the store here before the product path opens it, so the frozen baseline stays frozen",
+    )
     parser.add_argument("--no-scale", action="store_true", help="skip the latency/scale curve")
     parser.add_argument(
         "--remeasure-latency",
@@ -325,7 +336,9 @@ def main() -> int:
     # A crash in the live or scale phase should not cost every finished arm.
     (DB_HOME / "partial_report.json").write_text(json.dumps(report, indent=1, sort_keys=True), encoding="utf-8")
     if not args.no_live:
-        report["live_product"] = live_check(queries, fast_rankings, live_queries=args.live_queries)
+        report["live_product"] = live_check(
+            queries, fast_rankings, live_queries=args.live_queries, scratch=args.live_scratch
+        )
     if not args.no_scale:
         report["scale"] = scale_curve(queries, atoms, [arm for arm in arms_requested if arm in ("bm25_only", "dense_only")])
 

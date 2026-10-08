@@ -14,11 +14,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-from bench.dense_scale import copy_store
 from bench.query_set import load_queries, scale_probes
 from bench.report import git_commit
 from bench.run import latency
-from bench.systems import machine_facts
+from bench.systems import copy_store, machine_facts
 
 DEFAULT_HOME = Path("bench/runs/baseline")
 DEFAULT_SCRATCH = Path("bench/runs/scale")

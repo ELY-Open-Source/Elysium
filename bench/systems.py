@@ -13,6 +13,7 @@ import json
 import os
 import platform
 import re
+import shutil
 import sqlite3
 import time
 from collections.abc import Sequence
@@ -445,11 +446,26 @@ def _corpus_ids(database: Database) -> dict[str, str]:
     return ids
 
 
+def copy_store(home: Path, scratch: Path) -> tuple[Path, float]:
+    """Work on a copy: the baseline store is frozen evidence and must not be migrated in place."""
+    source = home / "data" / "ely_eye.sqlite"
+    if not source.is_file():
+        raise SystemExit(f"{source}: no product database, build it with python -m bench.ingest_baseline")
+    data = scratch / "data"
+    data.mkdir(parents=True, exist_ok=True)
+    began = time.perf_counter()
+    for suffix in ("", "-wal", "-shm"):
+        if (path := Path(str(source) + suffix)).is_file():
+            shutil.copyfile(path, data / (source.name + suffix))
+    return scratch, time.perf_counter() - began
+
+
 def live_product_rankings(
     db_home: Path,
     queries: Sequence[str],
     top_k: int = 10,
     as_holders: Sequence[str | None] | None = None,
+    scratch: Path | None = None,
 ) -> tuple[list[list[str]], list[int], list[float]]:
     """Rankings from the unmodified RetrievalService, with per-query wall time.
 
@@ -460,6 +476,9 @@ def live_product_rankings(
     The second list counts how many distinct sources the product's top-k atoms came from: the
     product ranks atoms and never diversifies, so ten slots can be filled by fragments of one
     document, and that is invisible once the hits are collapsed.
+
+    `scratch` copies the store before opening it. The product path migrates whatever it opens, and
+    the baseline store is cited evidence, so a benchmark that measures the product must not edit it.
     """
     from ely_eye.config import Settings
     from ely_eye.db import Database
@@ -468,6 +487,8 @@ def live_product_rankings(
 
     if as_holders is not None and len(as_holders) != len(queries):
         raise SystemExit(f"{len(as_holders)} holders for {len(queries)} queries")
+    if scratch is not None:
+        db_home, _ = copy_store(db_home, scratch)
     settings = Settings(home=db_home)
     database = Database(settings)
     service = RetrievalService(settings=settings, database=database)
