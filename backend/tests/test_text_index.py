@@ -15,6 +15,7 @@ from ely_eye.config import Settings
 from ely_eye.db import Database
 from ely_eye.memory import MemoryService
 from ely_eye.schemas import MemoryOrigin
+from ely_eye.store_search import search_atoms
 from ely_eye.text_index import (
     RAREST_KEEP,
     fts_expression,
@@ -190,7 +191,7 @@ def test_the_remembered_match_counts_are_voided_by_a_write(tmp_path: Path) -> No
     memory = MemoryService(settings=settings, database=Database(settings))
     for index in range(20):
         memory.remember(f"the converter parses format {index} natively", holder_id="wife", origin=MemoryOrigin.self_)
-    memory.db.search_atoms("the converter", limit=5)
+    search_atoms(memory.db, "the converter", limit=5)
 
     with memory.db.connect() as connection:
         assert int(connection.execute("SELECT count(*) FROM term_df").fetchone()[0]) > 0
@@ -200,7 +201,7 @@ def test_the_remembered_match_counts_are_voided_by_a_write(tmp_path: Path) -> No
     with memory.db.connect() as connection:
         assert int(connection.execute("SELECT count(*) FROM term_df").fetchone()[0]) == 0
 
-    page = memory.db.search_atoms("hashhop chain", limit=5)
+    page = search_atoms(memory.db, "hashhop chain", limit=5)
     assert "the parser follows the hashhop chain" in [
         atom.text for atom in memory.db.get_atoms([row[0] for row in page.rows])
     ], "a cleared cache must cost time, not answers"

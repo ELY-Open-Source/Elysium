@@ -65,8 +65,7 @@ class ClipEncoder:
         if self._tokenizer is None:
             from transformers import BertTokenizer
 
-            # The export is BERT-style (vocab.txt, [CLS]=101); transformers 5 unified the fast and
-            # slow tokenizers, so the name the CLIP docs use is an alias for this one.
+            # The export is BERT-style (vocab.txt, [CLS]=101); transformers 5 aliases the fast and slow tokenizers, so this is the name the CLIP docs mean.
             self._tokenizer = BertTokenizer.from_pretrained(str(self.model_dir))
         return self._tokenizer
 

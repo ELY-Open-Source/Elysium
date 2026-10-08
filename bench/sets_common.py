@@ -13,8 +13,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 CORPUS = ROOT / "corpus"
 SETS = ROOT / "sets"
-# Derived media (images pulled out of parquet, video frames, crops) lives outside
-# the repository: tens of thousands of new files inside it swamps repo tooling.
+# Derived media (parquet images, video frames, crops) lives outside the repository: tens of thousands of new files inside it swamps repo tooling.
 DATA_ROOT = Path(os.environ.get("ELY_EYE_BENCH_DATA", str(Path.home() / "ely_eye_bench_data")))
 CORPUS_ROOTS = {"corpus": CORPUS, "derived": DATA_ROOT}
 MODALITIES = ("pdf", "image", "ui_screenshot", "video", "code", "conversation")

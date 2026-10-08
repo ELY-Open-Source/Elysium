@@ -26,12 +26,10 @@ ROOT = Path(__file__).resolve().parent
 REPORTS = ROOT / "reports"
 CORPUS_MANIFEST = ROOT / "corpus" / "manifest.jsonl"
 
-# Words that only appear where a score is being compared to a target. A while-loop that re-rolls
-# until one of them clears is best-of-N whatever the function is called.
+# Words that only appear where a score is compared to a target; a loop that re-rolls until one clears is best-of-N whatever it is called.
 SCORE_WORDS = ("pass_rate", "pass_target", "accuracy", "recall", "hit_rate", "score", "target")
 RETRY_MARKERS = ("best_of", "bestof", "reroll", "re_roll", "until_pass", "retry_until")
-# The scorer must stay a pure function of (query, ranked ids, gold ids). Anything else and the
-# thing being graded starts grading itself.
+# The scorer must stay a pure function of (query, ranked ids, gold ids), or the thing being graded starts grading itself.
 SCORER_FORBIDDEN = ("ely_eye", "transformers", "sentence_transformers", "torch", "bench.systems", "bench.counterpart")
 FROZEN_REPORTS = ("baseline.json", "baseline_external.json")
 

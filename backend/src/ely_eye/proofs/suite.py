@@ -71,9 +71,7 @@ class PRDProofSuite(TrainingChecks, CartridgeChecks, RuntimeChecks, VisualChecks
             self._cache_trace_check(proof_root),
             self._visual_contradiction_check(proof_root),
         ]
-        # A deferred or removed check is not a failure and not a pass: the suite is only as green
-        # as the checks that actually ran. A claim that never ran holds the verdict, because
-        # "passed" would say the PRD is proven while part of it was never attempted.
+        # A deferred or removed check is neither a failure nor a pass: the suite is only as green as the checks that ran, because "passed" would claim a proof that never ran.
         failed = [check for check in checks if check.status == "failed"]
         unrun = [check for check in checks if check.status in ("deferred", "removed")]
         status: Literal["passed", "failed", "deferred"] = (

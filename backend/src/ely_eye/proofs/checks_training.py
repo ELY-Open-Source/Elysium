@@ -18,11 +18,8 @@ from ..schemas import (
     AdapterManifest,
     TrainingAdapterKind,
 )
-from ..training import (
-    safetensor_weight_stats,
-    sha256_file,
-    sha256_tree,
-)
+from ..training_common import sha256_file, sha256_tree
+from ..training_metrics import safetensor_weight_stats
 
 # A fixed puzzle count per hop depth. The old suite re-rolled until the running rate crossed its
 from .report import (
@@ -85,8 +82,7 @@ class TrainingChecks:
             trace_report = validate_training_trace(manifest, adapter_root)
             proof_report = validate_training_proof(manifest, adapter_root)
             contract_report = validate_training_contract(manifest)
-            # Named conditions, so a failure can say which promise broke instead of listing the
-            # adapters that happened to be present.
+            # Named conditions, so a failure says which promise broke instead of listing the adapters that happened to be present.
             conditions: list[tuple[str, bool]] = [
                 ("sample_count", manifest.sample_count > 0),
                 ("max_steps", manifest.max_steps > 0),

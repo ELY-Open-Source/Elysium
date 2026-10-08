@@ -27,7 +27,8 @@ from bench.counterpart import (
 )
 from bench.ingest_baseline import RUNS, database_path
 from bench.metrics import aggregate, chance_recall_at_k, score_query
-from bench.run import Query, git_commit, holder_index, load_queries
+from bench.query_set import Query, holder_index, load_queries
+from bench.report import git_commit
 from bench.sets_common import ROOT
 from bench.systems import machine_facts
 

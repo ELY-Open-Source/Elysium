@@ -14,9 +14,10 @@ from pathlib import Path
 
 from . import cartridge_store
 from .config import Settings, get_settings
-from .db import Database, FtsPage
+from .db import Database
 from .embeddings import EmbeddingService
 from .schemas import EvidenceAtom, RetrievalHit, SearchFilters, SearchResult
+from .store_search import FtsPage, search_atoms
 from .visual_index import VisualIndex
 
 RRF_K = 60
@@ -58,10 +59,9 @@ class RetrievalService:
         if scope is None:
             scope = cartridge_store.mounted_ids(self.db) or None
         criteria["cartridge_ids"] = scope
-        # A picture-only question has no words for BM25, so the word ranking is skipped rather
-        # than asked to match an empty expression, which would answer nothing for the wrong reason.
+        # A picture-only question has no words for BM25, so the word ranking is skipped rather than matching an empty expression.
         page = (
-            self.db.search_atoms(query, limit=limit * CANDIDATE_WINDOW, offset=offset, **criteria)
+            search_atoms(self.db, query, limit=limit * CANDIDATE_WINDOW, offset=offset, **criteria)
             if query.strip()
             else FtsPage(rows=[], has_more=False)
         )

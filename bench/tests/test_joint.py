@@ -16,16 +16,9 @@ import numpy as np
 import pytest
 
 from bench import systems
-from bench.run import (
-    Query,
-    fingerprint,
-    latency,
-    load_rankings,
-    remeasure_latency,
-    scale_arm_names,
-    scale_probes,
-    write_markdown,
-)
+from bench.query_set import Query, scale_probes
+from bench.report import scale_arm_names, write_markdown
+from bench.run import fingerprint, latency, load_rankings, remeasure_latency
 from bench.systems import ARMS, ArmRunner, Atom, JointRunner
 from bench.tests.test_systems import ATOMS
 

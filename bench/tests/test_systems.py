@@ -27,8 +27,7 @@ ATOMS = [
     Atom(atom_id="a3", source_id="src_red", text="the key hangs on the red door"),
 ]
 
-# The product names a source by content hash; the benchmark names the same file by
-# its corpus id (the source_id above). load_atoms joins the two through sources.path.
+# The product names a source by content hash, the benchmark by corpus id; load_atoms joins the two through sources.path.
 PRODUCT_SOURCES = {"prod_red_9f3a": "/fixture/red.png", "prod_blue_1c77": "/fixture/blue.png"}
 ATOM_PRODUCT_IDS = ["prod_red_9f3a", "prod_blue_1c77", "prod_red_9f3a"]
 
@@ -123,8 +122,7 @@ def test_load_atoms_returns_every_row_in_a_stable_order(tmp_path: Path, monkeypa
     make_database(db)
     loaded = load_atoms(db)
     assert [atom.atom_id for atom in loaded] == ["a1", "a2", "a3"]
-    # The database stores the product's content-hash id; the caller gets the corpus id
-    # the gold annotations use.
+    # The database stores the product's content-hash id; the caller gets the corpus id the gold annotations use.
     assert [atom.source_id for atom in loaded] == ["src_red", "src_blue", "src_red"]
     assert loaded[2].text == "the key hangs on the red door"
 

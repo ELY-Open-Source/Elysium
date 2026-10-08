@@ -182,15 +182,11 @@ class CartridgeChecks:
         question = "Which Ely-Eye PRD requirements prove long context memory, HashHop, and adapters?"
         compiler = ContextCompiler(self.settings, self.db)
         artifact = proof_root / "cartridge_replay.json"
-        # The replay must come out of the cartridge, not out of whatever the live store happens
-        # to hold: mounting is what makes the cartridge the retrieval scope (retrieval scopes by
-        # the mounted set), so an unmounted replay would prove only that compiling is stable.
+        # The replay must come out of the cartridge, so mounting is what makes the cartridge the retrieval scope; an unmounted replay would prove only that compiling is stable.
         try:
             self.cartridges.mount(cartridge_id)
         except ValueError as error:
-            # The KV fingerprint gate refuses to mount a cartridge whose model snapshot this
-            # machine cannot read. A missing input is not a failed claim, so the check reports
-            # the refusal instead of crashing the suite.
+            # The KV fingerprint gate refuses a cartridge whose model snapshot this machine cannot read; a missing input is not a failed claim, so report the refusal instead of crashing the suite.
             write_json(artifact, {"verdict": "deferred", "why": str(error)})
             return ProofCheck(
                 name="Context Cartridge Replay",
@@ -271,8 +267,7 @@ class CartridgeChecks:
         call_graph = context["code"]["call_graph"]
         git_context = context["git"]
         issue_pr_history = context["issue_pr_history"]
-        # Building a context object from files on disk is not evidence the repository reached the
-        # store: the claim is that the repository is queryable, so the store has to hold it.
+        # Building a context from files on disk is not evidence the repository reached the store; the claim is that it is queryable.
         stored_sources = [source for source in self.db.list_sources() if source.path.startswith(str(root))]
         stored_atoms = self.db.atom_count()
         artifact = proof_root / "repository_input.json"
@@ -355,8 +350,7 @@ class CartridgeChecks:
                 reason="an empty store answers every question with an empty context, which would make the two compiles agree for the wrong reason",
                 rerun="ely-eye remember or ely-eye ingest first, then re-run this proof",
             )
-        # The nonce keeps the key unique; the quoted text keeps the question answerable, so a pass
-        # means the cache served a real context rather than two identical empty ones.
+        # The nonce keeps the key unique and the quoted text keeps the question answerable, so a pass means the cache served a real context.
         question = f"{probe[0].text[:60]} cache proof {secrets.token_hex(6)}"
         before = _semantic_counters(fabric)
         first = compiler.compile(question, RuntimeProfile.library_100m)

@@ -74,8 +74,7 @@ def image_name(corpus_id: str, raw: bytes) -> str:
             stem = corpus_id[: -len(known)]
             break
     if len(stem.encode()) > 120 or safe_segment(stem, f"corpus-id {corpus_id!r}") != stem:
-        # Any character we would have to rewrite means the id is not filesystem-safe:
-        # fall back to a digest so two ids can never land on the same file.
+        # Any character we would have to rewrite means the id is not filesystem-safe, so fall back to a digest that cannot collide.
         stem = hashlib.sha256(corpus_id.encode()).hexdigest()[:20]
     return stem + suffix
 

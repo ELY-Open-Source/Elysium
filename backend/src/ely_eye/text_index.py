@@ -12,15 +12,13 @@ import re
 import sqlite3
 from unicodedata import normalize
 
-# Han, its extension A block, the compatibility ideographs, kana, and Hangul syllables:
-# scripts written without spaces. One source of truth for both the tokenizer and the query.
+# Han, its extension A block, compatibility ideographs, kana and Hangul syllables: scripts written without spaces, shared by tokenizer and query.
 _BLOCKS = ((0x3400, 0x4DBF), (0x4E00, 0x9FFF), (0xF900, 0xFAFF), (0x3040, 0x30FF), (0xAC00, 0xD7AF))
 _CJK_CLASS = "".join(f"{chr(start)}-{chr(end)}" for start, end in _BLOCKS)
 _CJK_CHARS = frozenset("".join("".join(chr(code) for code in range(start, end + 1)) for start, end in _BLOCKS))
 
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[A-Za-z])(?=\d)")
-# Everything a reader would not type as a word: symbols, punctuation, and the underscore
-# that joins identifiers. `[^[^\W\s]` looks equivalent but deletes CJK characters on 3.14.
+# What a reader would not type as a word; `[^[^\W\s]` looks equivalent but deletes CJK characters on 3.14.
 _SEPARATORS = re.compile(r"[^\w\s]|_")
 _CJK_RUN = re.compile(f"[{_CJK_CLASS}]+")
 _SPACES = re.compile(r"\s+")

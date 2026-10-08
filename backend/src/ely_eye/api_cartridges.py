@@ -1,8 +1,6 @@
 """Cartridge and mount routes: a cartridge is a retrieval scope, not only an export."""
 
-# No `from __future__ import annotations` here: FastAPI reads the route signatures, and
-# string annotations would be resolved against this module's globals, where the injected
-# settings_dep lives only as a parameter of register().
+# No `from __future__ import annotations`: FastAPI resolves route annotations against this module's globals, where settings_dep exists only as a register() parameter.
 
 from collections.abc import Callable
 from typing import Annotated

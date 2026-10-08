@@ -20,6 +20,7 @@ from ely_eye.schemas import (
     TrustScores,
     Visibility,
 )
+from ely_eye.store_search import search_fts
 
 NOW = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
 
@@ -235,9 +236,9 @@ def test_a_second_version_database_rebuilds_its_index_on_upgrade(tmp_path: Path)
             "INSERT INTO atom_fts(atom_id, source, text) VALUES ('key', 'notes/key.txt', '钥匙放在玄关抽屉里')"
         )
         connection.execute("PRAGMA user_version = 2")
-    assert database.search_fts("钥匙", 5) == [], "the old index really could not answer this query"
+    assert search_fts(database, "钥匙", 5) == [], "the old index really could not answer this query"
 
     upgraded = _database(tmp_path)
-    assert [atom_id for atom_id, _ in upgraded.search_fts("钥匙", 5)] == ["key"]
+    assert [atom_id for atom_id, _ in search_fts(upgraded, "钥匙", 5)] == ["key"]
     with upgraded.connect() as connection:
         assert int(connection.execute("PRAGMA user_version").fetchone()[0]) == SCHEMA_VERSION

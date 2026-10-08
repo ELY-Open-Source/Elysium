@@ -135,10 +135,7 @@ tokenize = 'unicode61'
 -- per CJK character and per identifier fragment, which is what makes those queries match.
 """
 
-# A memory is usable now when nothing has closed it, it had begun by now, and its
-# retention has not lapsed. Unknown bounds read as visible: absence of evidence about
-# when a legacy row was true is not evidence that it is false. The clock is formatted to
-# match how Python writes an aware datetime, so the comparison is exact to the millisecond.
+# A memory is usable now when nothing closed it, it had begun by now, and its retention has not lapsed; unknown bounds read as visible, because silence about when a legacy row was true is not evidence that it is false.
 VIEWS = """
     CREATE VIEW IF NOT EXISTS v_atoms_current AS
     SELECT * FROM atoms
@@ -153,8 +150,7 @@ VIEWS = """
     CREATE INDEX IF NOT EXISTS idx_atoms_valid_to ON atoms(valid_to);
 """
 
-# Columns the first version lacked, in the order they are added. Every one is nullable
-# or has a default, so an existing row survives the upgrade with its meaning intact.
+# Columns the first version lacked, in the order added; each is nullable or defaulted so an existing row keeps its meaning.
 _V1_TO_V2_COLUMNS = (
     ("holder_id", "TEXT NOT NULL DEFAULT ''"),
     ("origin", "TEXT NOT NULL DEFAULT 'artifact'"),

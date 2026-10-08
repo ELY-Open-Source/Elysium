@@ -11,8 +11,7 @@ from typing import Any, Literal
 
 from PIL import Image, ImageDraw, ImageFont
 
-# The four arena positions a model may answer with. Naming them once keeps the puzzle, the parser,
-# and the scoring keyed on the same values instead of four spellings in three files.
+# The four arena positions a model may answer with, named once so the puzzle, parser and scoring share one spelling.
 SlotName = Literal["top-left", "top-right", "bottom-left", "bottom-right"]
 SLOTS: tuple[SlotName, ...] = ("top-left", "top-right", "bottom-left", "bottom-right")
 

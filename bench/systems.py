@@ -324,8 +324,7 @@ class ArmRunner:
         return float(np.percentile(np.asarray(self.timings), fraction * 100))
 
 
-# Which measured signals each arm consumes; JointRunner times each signal once and
-# attributes it to every arm that uses it.
+# Which measured signals each arm consumes; JointRunner times each signal once and attributes it to every arm that uses it.
 ARM_COMPONENTS: dict[str, tuple[str, ...]] = {
     "bm25_only": ("sparse",),
     "dense_only": ("dense",),

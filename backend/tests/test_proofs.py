@@ -26,8 +26,7 @@ from ely_eye.proofs.contradictions import (
 from ely_eye.proofs.table import render_table
 from ely_eye.schemas import MemoryOrigin
 
-# The replay question is fixed inside the suite, so the fixture memory has to answer it in words
-# the ranker can match.
+# The replay question is fixed inside the suite, so the fixture memory must answer it in words the ranker can match.
 PRD_MEMORY = "PRD requirements prove long context memory, HashHop proof, and adapter training."
 OTHER_KEYS = "PRD requirements also prove cache invalidation for HashHop proof and adapters."
 
@@ -95,8 +94,7 @@ def test_the_repository_check_fails_when_the_repository_never_reached_the_store(
 
 def test_the_replay_check_answers_only_from_the_cartridge_it_mounts(harness: Harness) -> None:
     inside = harness.remember(PRD_MEMORY)
-    # A second memory that answers the same question but stays out of the cartridge: an unmounted
-    # replay against the live store would have found it and called that a cartridge replay.
+    # A second memory answering the same question but outside the cartridge: an unmounted replay would have found it and called that a cartridge replay.
     harness.remember(OTHER_KEYS)
     cartridge_id = harness.cartridge("keys", [inside])
     manifest = next(
@@ -275,8 +273,7 @@ def test_the_hashhop_arena_marks_no_candidate_as_the_answer(harness: Harness, tm
 
     render_visual_hash_arena(tiles["top-left"], tiles, output)
 
-    # Every candidate box carries the same outline: a ring, an arrow, or a highlighted slot would
-    # tell a model the answer without reading a pixel of the source tile.
+    # Every candidate box carries the same outline: a ring, arrow or highlighted slot would give the answer without reading the tile.
     image = Image.open(output).convert("RGB")
     border_colors = {image.getpixel((box[0] + 2, box[1] + 40)) for box in boxes.values()}
     assert border_colors == {(180, 190, 205)}

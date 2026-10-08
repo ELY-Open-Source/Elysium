@@ -32,8 +32,7 @@ class ContextCompiler:
             if compiled.hits:
                 self.cache.record_hit(SEMANTIC_LAYER, cache_key)
                 return compiled
-            # A cached context with no evidence in it is not an answer, so counting it as a hit
-            # would let an empty cache entry look like a warm cache.
+            # A cached context with no evidence is not an answer; counting it would make an empty entry look like a warm cache.
             self.cache.record_miss(
                 SEMANTIC_LAYER, cache_key, metadata={"reason": "cached context has no hits"}
             )

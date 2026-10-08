@@ -27,8 +27,7 @@ INDEX_NAME = "clip_image_index.npy"
 MAP_NAME = "clip_image_index_atoms.json"
 GRAPH_PART = Path("onnx") / "model_fp16.onnx"
 
-# Loading 48k vectors costs about as much as the search itself, and the API builds a fresh
-# service per request, so the array is kept per process and re-read only when the file changes.
+# Loading 48k vectors costs about as much as the search itself and the API builds a fresh service per request, so the array is cached per process and re-read when the file changes.
 _LOADED: dict[tuple[str, float], tuple[list[str], np.ndarray]] = {}
 
 

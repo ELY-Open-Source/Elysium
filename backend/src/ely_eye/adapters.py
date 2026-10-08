@@ -194,7 +194,7 @@ def record_load(source: AdapterSource, model: Any) -> LoadRecord:
 
 def load_into_model(model: Any, path: Path) -> Any:
     """Attach one LoRA to a live model; the only place generation imports peft."""
-    from .training import bitsandbytes_gaudi_probe_guard
+    from .training_metrics import bitsandbytes_gaudi_probe_guard
 
     with bitsandbytes_gaudi_probe_guard():
         from peft import PeftModel

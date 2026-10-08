@@ -12,16 +12,16 @@ from ..schemas import (
     AdapterManifest,
     TrainingAdapterKind,
 )
-from ..training import (
+from ..training_common import (
     AUTOCAST_DTYPE,
     GRADIENT_CHECKPOINTING_MODE,
     TRAINING_FRAMEWORK,
     TRAINING_METHOD,
     TRAINING_PRECISION,
     TRAINING_PROOF_VERSION,
-    safetensor_weight_stats,
     sha256_file,
 )
+from ..training_metrics import safetensor_weight_stats
 
 
 def cuda_bf16_training(environment: dict[str, Any]) -> bool:

@@ -51,7 +51,7 @@ from .schemas import (
 )
 from .senses import sense_facts
 from .status_schemas import MemoryStatus, SystemStatus
-from .training import safetensor_weight_stats
+from .training_metrics import safetensor_weight_stats
 from .verifier import Verifier, VisualContradictionLens
 
 

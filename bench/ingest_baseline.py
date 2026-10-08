@@ -35,9 +35,7 @@ REPO = Path(__file__).resolve().parent.parent
 RUNS = REPO / "bench" / "runs" / "baseline"
 SHARDS = RUNS / "shards"
 TABLES = ("sources", "atoms", "atom_fts", "cartridges", "cache_events", "evidence_edges")
-# Virtual-address ceiling per worker. ONNX Runtime and torch reserve far more address space than
-# they touch, so a 3 GiB ceiling killed OCR on large images ("Unable to allocate 582. MiB for an
-# array with shape (5632, 9024, 3)") even though resident memory stayed near 1.5 GiB.
+# ONNX Runtime and torch reserve far more address space than they touch, so a 3 GiB ceiling killed OCR on large images ("Unable to allocate 582. MiB for an array with shape (5632, 9024, 3)") while resident memory stayed near 1.5 GiB.
 WORKER_MEMORY_BYTES = 6 * 1024**3
 MAX_POOL_ATTEMPTS = 5
 DELETE_STATEMENTS = (
@@ -125,8 +123,7 @@ def _pin_inference_threads() -> None:
         options = ort.SessionOptions()
         options.intra_op_num_threads = 1
         options.inter_op_num_threads = 1
-        # The CPU arena keeps freed blocks mapped, so a worker that OCRs thousands of pages grows its
-        # resident set until it hits its ceiling on an 11 MiB array. Hand the memory back instead.
+        # The CPU arena keeps freed blocks mapped, so a worker OCRing thousands of pages grows until it hits its ceiling on an 11 MiB array.
         options.enable_cpu_mem_arena = False
         kwargs["sess_options"] = options
         return original(model_path, *args, **kwargs)
@@ -197,8 +194,7 @@ def ingest_shard(job: tuple[int, list[Path]]) -> dict:
         with ledger.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(outcome) + "\n")
         if ingested % 25 == 0:
-            # ONNX Runtime keeps the address space it has touched, and one shard runs thousands of
-            # files, so the arena has to be handed back or the worker hits its ceiling on an 11 MiB array.
+            # ONNX Runtime keeps the address space it touched, so one shard of thousands of files has to hand the arena back.
             gc.collect()
             elapsed = time.monotonic() - started
             print(f"shard-{index:02d} {ingested}/{len(paths)} files in {elapsed / 60:.1f} min", flush=True)
@@ -310,9 +306,7 @@ def merge() -> dict:
                     copied_objects += 1
     connection.commit()
 
-    # A file processed in two attempts lands in two shards. The atoms table
-    # dedupes on atom_id; fts5 has no key and kept every copy (288,266 rows for
-    # 165,973 atoms), which would inflate the product's text search statistics.
+    # A file processed twice lands in two shards: atoms dedupe on atom_id but fts5 has no key and kept every copy (288,266 rows for 165,973 atoms).
     connection.execute("DELETE FROM atom_fts")
     connection.execute(
         "INSERT INTO atom_fts (atom_id, source, text) SELECT atom_id, source, text FROM atoms"
@@ -335,8 +329,7 @@ def merge() -> dict:
         raise SystemExit(f"{main_db}: {len(unmapped)} sources are not named by the corpus index, first {unmapped[:3]}")
     product_paths = {path for path, _ in rows}
     product_ids = {source_id for _, source_id in rows}
-    # The product names a source by content hash, so two byte-identical files
-    # collapse into one source row (500 duplicate LongMemEval sessions).
+    # The product names a source by content hash, so byte-identical files collapse into one source row (500 duplicate LongMemEval sessions).
     collapsed_input = sorted(path for path in done - product_paths if safe_source_id(Path(path), sha256_bytes(Path(path).read_bytes())) in product_ids)
     unaccounted = sorted(done - product_paths - set(collapsed_input))
     if unaccounted:
@@ -363,8 +356,7 @@ def merge() -> dict:
         )
     counts["uncovered_sources"] = len(total - covered)
     if counts["files_not_ingested"] == 0 and covered != total:
-        # Two honest reasons: byte-identical inputs collapse into one content-hashed
-        # source, and files the product cannot ingest at all. Anything else is a bug.
+        # Two honest reasons: byte-identical inputs collapse into one content-hashed source, and files the product cannot ingest at all.
         explained = counts["duplicate_content_files"] + counts["files_failed"]
         if counts["uncovered_sources"] > explained:
             raise SystemExit(

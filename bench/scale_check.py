@@ -14,7 +14,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from bench.run import latency, load_queries, scale_probes
+from bench.query_set import load_queries, scale_probes
+from bench.run import latency
 from bench.systems import machine_facts
 
 DEFAULT_HOME = Path("bench/runs/baseline")

@@ -275,8 +275,7 @@ class CartridgeService:
             for field in JSON_PARQUET_COLUMNS:
                 row[field] = json.dumps(row[field], ensure_ascii=False, sort_keys=True)
             rows.append(row)
-        # An empty struct column has no child field, and Parquet cannot write one: a memory
-        # atom carries metadata={} and would crash the export.
+        # Parquet cannot write an empty struct column, and a memory atom carries metadata={}.
         table = pa.Table.from_pylist(rows) if rows else pa.Table.from_pydict({"atom_id": []})
         pq.write_table(table, path, compression="zstd")
 

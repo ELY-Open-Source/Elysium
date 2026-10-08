@@ -33,8 +33,7 @@ LIBRARY = "library"
 WHO_KNOWS_LIMIT = 8
 MAX_HOPS_LIMIT = 10
 
-# Confidence is ordinal: it orders candidates, it does not estimate a probability. The weights
-# say what the evidence is worth relative to itself, and every hit carries the raw numbers too.
+# Confidence is ordinal: it orders candidates, it does not estimate a probability, and every hit carries the raw numbers too.
 CONFIDENCE_SATURATE = 3
 WEIGHT_STRENGTH = 0.60
 WEIGHT_COVERAGE = 0.25

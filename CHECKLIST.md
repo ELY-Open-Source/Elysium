@@ -318,12 +318,22 @@
   - 第 2 轮 FAIL 三条：① **翻页其实没被测到**——E2E 等的是「行数变化」，而搜索列表与浏览列表共用 `.atom-row`，那一刻的 13 行里有一条是搜索命中；把 `nextPage()` 里的 `setCursor`+`loadBrowse` 删掉、或把翻页改成追加而不是替换，E2E 都还 PASS。改成 `data-testid="browse-list"` + 每行 `data-atom`，断言第一页正好 12 行、下一页零重叠、末页 = `total−12`、Prev 复原；两个变异现在各自红：`Next page did not swap the page: the pager is not paging` 与 `the next page repeated 12 of 12 atoms from the first page` ② CHECKLIST 写 `App.tsx`「130 行的壳」，`wc -l` 是 131 ③ CHECKLIST 引的拒绝挂载原文被 smoke 的 `.slice(0,120)` 砍掉了后半句 `; set ELY_EYE_MODEL_DIR to the model snapshot`，改成 slice 200 并照原文记。
   - 同一轮实测为真：263 passed；ruff 干净；全仓 mypy 24 错/6 文件（净新增 0）；go build/vet/test+gofmt 干净；`npm run build`+`eslint .` 干净；`ui_smoke.sh` PASS（4.0s）；`mcp_write_smoke.sh` PASS（3.2s）；30 条路由与 `HTTP_SURFACE` 一致；senses 单一真相（`api.py:52/:105` 与 `maintenance.py:238` 都只渲染 `sense_facts()`）；26 个 `types.ts` 接口对着 pydantic 模型逐个 diff 零编造字段；8 条被删路由无人引用，它们背后的函数都还从 CLI/proof 可达。pyright 在那 8 个文件：reviewer 的工作树 **0 errors**，我这棵树多两条 `runtime.py:283` 的 tuple 告警——它只在 `qwen_vl_utils` 那个无类型导入被解析时出现，HEAD 的副本同样有，不是本轮引入；两边都不是新增。
   - 第 3 轮 **PASS**（`9f91ff7..b0895eb`，~40 条 shell / 14 次工具调用，本轮 34 分钟）。reviewer 是跑过不是读过：`ui_smoke.sh` exit 0（4.26s，拒绝挂载整句可见）；三个变异各自红——删 `nextPage()` 的 setCursor+loadBrowse → `the pager is not paging`，翻页改追加 → `repeated 12 of 12`，它自己加的第三个（删 `previousPage()` 的复原）→ `Timeout 15000ms`；改完 `git checkout` 后回到 exit 0。门禁重跑：263 passed、npm build+lint 干净、go build/vet/test+gofmt 干净、`mcp_write_smoke.sh` PASS 3.26s、ruff 干净、mypy 冷缓存查 8 个文件 Success、全仓 mypy 24 错/6 文件。数字全对：schemas.py 469、status_schemas.py 74（只从 schemas 拿 `TrainingAdapterKind`，反向无导入）、多行 docstring 114、App.tsx 131、拒绝文案与 `cartridge.py:169-173` 逐字一致、30 条路由与 `HTTP_SURFACE` 完全相等且 8 条删掉的都报 gone、`PAGE_SIZE=12` 两处同值、末页 135−12=123 行、`types.ts` 26 个接口、前端最大文件 `styles.css` 492。它同时指出两点不是缺陷但记着：`PAGE_SIZE` 是手拄到 harness 的（组件改了会变红不会变绿，已在记录里写明）；末页的 `total−12` 读的是未过滤的 `GET /api/atoms?limit=1`，只对是因为前一行刚好把 modality 清掉了。
-- [ ] **p1-6** 代码卫生
-  - [ ] p1-6.1 `evals.py` 2413 行拆到 ≤500 行/文件
-  - [ ] p1-6.2 删 dead code 与未调用函数
-  - [ ] p1-6.3 删 v1/v2/v3 废弃端口
-  - [ ] p1-6.4 注释压到 ≤1 行
-  - 验收：`python -m bench.filesize_check` 报无文件 >500 行；vulture/grep 证据
+- [x] **p1-6** 代码卫生
+  - [x] p1-6.1 每个文件 ≤500 行
+    - 验收命令 `python -m bench.filesize_check` → `OK: no tracked source file exceeds 500 lines`。这个脚本是本轮加的：500 行规则之前只靠记忆执行
+    - `evals.py` 2413 行在 p0-6 已拆成 `proofs/*`（最大 430）。本轮拆的：`db.py` 503→396（BM25 检索搬进 `store_search.py` 105）、`bench/run.py` 609→351（`query_set.py` 80 + `report.py` 211）、`benchmarks.py` 619→424（`benchmark_scoring.py` 262）、`training.py` 1630→94（`training_{common,encode,metrics,datasets,lora,retrieval}.py` = 108/177/307/387/408/358，`TrainingService` 留成薄壳喂 `cli.py` 的 10 个调用点）、`schemas.py` 534→469（p1-5 拆出 `status_schemas.py` 74）
+    - 「拆分不改行为」的证据：脚本把每个搬走函数的**函数体去缩进后与 HEAD 逐字节比对**——training 侧 53 个、benchmarks 侧 21 个，**全部相同，0 处不同，0 个缺失**。方法转函数只重写 def 头，`self.settings`→`settings` 这类替换是正文里唯一的改动
+    - 新增 `backend/tests/test_training_split.py`（6 条）：CPU 能跑的纯函数逐个测；最后一条用 `inspect.signature` 断言薄壳参数表 = 模块函数参数表去掉注入的两个参数——这条就是抓 `self` 泄漏那类 bug 的
+  - [x] p1-6.2 删 dead code 与未调用函数
+    - 度量口径（第一版误报 201 个，因为只查了别的文件）：每个顶层 `def` 对**所有**跟踪文件计数（含自己），再排除 pytest 用例与 typer 命令（框架按名字调）→ 8 个零引用，全删：`cartridge_store.py:47 cartridges_holding_atom`、`cartridge_store.py:97 clear_mounts`、`training.py:1316 gradient_checkpointing_enabled`、`retrieval.py:172 group_hits_by_source`、`bench/ingest_baseline.py:239 ingested_paths`、`proofs/report.py:83 is_finite_number`、`runtime.py:432 parse_runtime_json`、`ingestion_repository.py:317 write_sources_json`；重扫 **0**
+    - 两个为什么是死的：`memory.py` 靠读每颗卡带自己的 `sources.json` 回答归属（导出的卡带可以不在库里）；`set_mounts(database, [], stamp)` 换集合本来就能清空挂载表
+    - 顺手删 `backend/build/`（712KB 的 `python -m build` 残留，gitignore 内，0 个跟踪文件）——它让 grep 撒谎
+  - [x] p1-6.3 删 v1/v2/v3 废弃端口
+    - 量完的结论是**没有可删的**，不是没做：每个 `v1/v2/v3` 都承重——磁盘格式标签（`ely-eye-memory-capsule-v1` `proofs/checks_cartridge.py:128`、`ely-eye-{text,visual}-vectors-v1`、`ely-eye-kivi-replay-v1` `cartridge_assets.py:100,127,158`）、迁移阶梯（`migrations.py:185,190,243`）、矛盾语料 fixture 名（`proofs/contradictions.py:114-135`）、第三方名字（MiniLM-L12-v2、ScreenSpot-v2、LongBench v2）、OpenAI 兼容的 `/v1` URL、缓存键里的 `compiler-v2` salt。没有废弃端口、别名或双代码路径
+  - [x] p1-6.4 注释压到 ≤1 行
+    - 口径：`tokenize` 找连续 `#` 行块。全仓 **39 块 / 86 行 → 0 块**，每块压成一行，压的时候留承重那句，实测数字与错误原文不删（`Unable to allocate 582. MiB for an array with shape (5632, 9024, 3)`、`288,266 rows for 165,973 atoms`、`[^[^\W\s]` 在 3.14 会吃掉 CJK）
+    - docstring 不动（全仓多行 docstring 114 条，与父提交同数）：docstring 是模块与函数的契约，不是注释；p1-4 review 用的口径也是「新增多行 docstring 数不得增加」
+  - 门禁：`pytest -q` **269 passed**；`ruff check backend/src/ely_eye backend/tests bench` All checks passed；mypy 冷缓存 **24 errors / 9 files**（基线 24/6，training.py 那 6 条随拆分落到 4 个新文件，净新增 0）；`pyright` 查 46 个改动文件 → **4 errors**，与 HEAD 单个 `training.py` 在包副本里量到的 4 条同源（qwen_vl_utils 元组返回、两处 `save_pretrained(Path)`、`bitsandbytes` 未解析）；go build/vet/test + gofmt 干净；`npm run build` + eslint 干净
 
 ---
 

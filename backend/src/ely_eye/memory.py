@@ -29,8 +29,7 @@ from .schemas import (
 from .storage import token_equivalent
 from .visual_index import VisualIndex
 
-# Trust scores describe extraction fidelity, not truthfulness: a remembered sentence is
-# stored verbatim, so the parser is fully trusted and origin carries the epistemic weight.
+# Trust scores describe extraction fidelity, not truthfulness: a remembered sentence is stored verbatim, so origin carries the epistemic weight.
 MEMORY_TRUST = TrustScores(parser=1.0, ocr=0.0, model=0.0)
 
 
@@ -135,8 +134,7 @@ class MemoryService:
                 f"{atom_id} was already closed at {previous[0].valid_to.isoformat()}; "
                 "superseding a closed memory hides which replacement is current"
             )
-        # A correction takes effect when it is asserted: the old memory stops being current
-        # and the new one starts there, so the pair never claims to be true at the same time.
+        # A correction takes effect when asserted: the old memory stops being current where the new one starts, so the pair is never true at the same instant.
         moment = event_time or utc_now()
         replacement = self.remember(
             text,

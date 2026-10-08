@@ -124,8 +124,7 @@ def build_functions() -> tuple[list, list[dict[str, Any]], dict]:
         if not stripped.strip():
             skipped["empty_after_strip"] += 1
             continue
-        # One dataset row is one function; its index is the only thing that makes the
-        # identity unique, because a file may define the same name twice.
+        # One dataset row is one function; its index is the only unique identity, because a file may define the same name twice.
         tag = hashlib.sha256(f"{func_path}#{func_name}#{index}".encode()).hexdigest()[:10]
         relative = function_path(repository, func_path, func_name, tag)
         target = DATA_ROOT / relative
