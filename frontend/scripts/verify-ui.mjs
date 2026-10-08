@@ -8,6 +8,8 @@ await mkdir(outputDir, { recursive: true });
 
 const apiBase = process.env.ELY_EYE_API ?? 'http://127.0.0.1:8765';
 const uiUrl = process.env.ELY_EYE_UI_URL ?? 'http://127.0.0.1:5173/';
+// Mirrors PAGE_SIZE in frontend/src/components/MemoryPanel.tsx; the pager is only provable against a known page size.
+const PAGE_SIZE = 12;
 
 async function api(route, body) {
   const response = await fetch(`${apiBase}${route}`, {
@@ -134,13 +136,51 @@ try {
   throw error;
 }
 await page.getByLabel('Modality').selectOption('');
-const firstPageRows = await page.locator('.atom-list .atom-row').count();
-await page.getByTitle('Next page').click();
+// Paging is proved by row identity, not row count: the search list above uses the same row class,
+// so a count that "changes" can be the search hit appearing and going away.
 await page.waitForFunction(
-  (count) => document.querySelectorAll('.atom-list .atom-row').length !== count,
-  firstPageRows,
+  (size) =>
+    document.querySelectorAll('[data-testid="browse-list"] .atom-row').length === size,
+  PAGE_SIZE,
+  { timeout: 15_000 },
 );
+const firstIds = await page.locator('[data-testid="browse-list"] .atom-row').evaluateAll((rows) =>
+  rows.map((row) => row.getAttribute('data-atom') ?? ''),
+);
+await page.getByTitle('Next page').click();
+try {
+  await page.waitForFunction((previous) => {
+    const ids = Array.from(document.querySelectorAll('[data-testid="browse-list"] .atom-row')).map(
+      (row) => row.getAttribute('data-atom') ?? '',
+    );
+    return ids.length > 0 && ids.join(',') !== previous.join(',');
+  }, firstIds, { timeout: 15_000 });
+} catch {
+  await evidence('the next page showed the same atoms as the first');
+  throw new Error('Next page did not swap the page: the pager is not paging');
+}
+const secondIds = await page.locator('[data-testid="browse-list"] .atom-row').evaluateAll((rows) =>
+  rows.map((row) => row.getAttribute('data-atom') ?? ''),
+);
+const repeated = secondIds.filter((id) => firstIds.includes(id));
+if (repeated.length > 0) {
+  throw new Error(`the next page repeated ${repeated.length} of ${firstIds.length} atoms from the first page`);
+}
+const behind = await apiGet('/api/atoms?limit=1');
+if (secondIds.length !== behind.total - PAGE_SIZE) {
+  throw new Error(
+    `the second page held ${secondIds.length} rows, expected ${behind.total - PAGE_SIZE} of ${behind.total} atoms`,
+  );
+}
 await page.getByTitle('Previous page').click();
+await page.waitForFunction(
+  (expected) =>
+    Array.from(document.querySelectorAll('[data-testid="browse-list"] .atom-row'))
+      .map((row) => row.getAttribute('data-atom') ?? '')
+      .join(',') === expected.join(','),
+  firstIds,
+  { timeout: 15_000 },
+);
 
 // 3. forget: remove a memory and watch it leave the store.
 await page.getByPlaceholder('where are the keys').fill('spare glasses');
@@ -168,7 +208,7 @@ if (await mountedPill.isVisible().catch(() => false)) {
   await page.getByText(/unmount ui-smoke/).waitFor();
 } else {
   await refusal.waitFor();
-  observed.mount = `refused: ${(await refusal.innerText()).slice(0, 120)}`;
+  observed.mount = `refused: ${(await refusal.innerText()).slice(0, 200)}`;
   const cartridges = await apiGet('/api/cartridges');
   const cartridge = cartridges.find((entry) => entry.name === 'ui-smoke');
   if (!cartridge) {

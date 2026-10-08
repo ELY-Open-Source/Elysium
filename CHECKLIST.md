@@ -291,7 +291,7 @@
   - [x] p1-5.1 搜索端点接上前端
     - 验收写的是 `GET /api/search`，实际是 p0-3 就有的 `POST /api/search`：查询体带 holder / scenario / modality / image，GET 塞不下这些。前端 `search()` 调它
   - [x] p1-5.2 前端：搜索、浏览、forget、挂载卡带、时间显示、图像渲染
-    - `App.tsx` 517 行拆成 130 行的壳 + `components/{MemoryPanel,CartridgePanel,SensesPanel,AdapterPanel,ProofPanel,IngestPanel,CompilerPanel,ui}.tsx` + `lib/format.ts`，每个面板自己取数，没有一个文件超 500 行
+    - `App.tsx` 517 行拆成 131 行的壳 + `components/{MemoryPanel,CartridgePanel,SensesPanel,AdapterPanel,ProofPanel,IngestPanel,CompilerPanel,ui}.tsx` + `lib/format.ts`，每个面板自己取数，前端没有一个文件超 500 行
     - 为此新增的后端能力在 `backend/src/ely_eye/browse.py`：`GET /api/atoms`（游标翻页 + modality / holder / source 过滤，读 `v_atoms_current`）与 `GET /api/atoms/{atom_id}/image`（`FileResponse`；没图 → 404 点名那颗 atom）
     - 时间显示：`formatAgo`（just now / 5m / 2h / 3d / 1y）与 `formatStamp`（写死 UTC，`2026-10-08 09:03Z`）；每行是 `holder · origin · scenario · 时间 · trust`
     - 图像渲染：`<img class="thumb" src=/api/atoms/{id}/image>`，E2E 断言 `naturalWidth > 0`——真解码出像素，不是有个标签就算
@@ -304,8 +304,8 @@
     - 反漂移门禁：`backend/tests/test_product_api.py::test_the_http_surface_is_exactly_what_someone_uses` 把 30 条路由钉成集合，多一条少一条都红
   - [x] p1-5.5 E2E 五项
     - `scripts/ui_smoke.sh`：`mktemp -d` 起一个干净 home（`ELY_EYE_DEFAULT_HOLDER=wife`、`ELY_EYE_UI_DIR=frontend/dist`），API 自己用 `StaticFiles(html=True)` 同源挂 UI，浏览器只对一个 origin 说话，收尾删 home
-    - 五项都在真浏览器里做：① 搜 `spare glasses` + scenario `home` → 那行必须同时写 `wife` 和 `home`（「谁在什么场景下知道」就是这个意思）② 按 modality 过滤 → 无字图片渲染出真像素，翻页换掉整页 ③ Forget → 提示 `forgotten: N atoms`，再搜同一句返回「Nothing in the store answers」④ Mount → 状态真的变了 ⑤ Adapter Matrix 每个 kind 一行，状态落在 `loaded|available|deferred|missing` 内且**必须带原因**
-    - 实测：`mount: refused: cannot verify ui_smoke_26f91b8f3a22 on this machine: model_hash, tokenizer_hash, chat_template_hash, rope are unknown`（p0-4 那条「没有 model_dir 就拒绝挂载」的偏差在 UI 里看得见）；`adapters: 6 kinds: missing ×6`，每条原因是「no adapter of kind X is on disk」；KPI 显示 `Runtime ready`、`Qwen/Qwen3.5-9B`、`NVIDIA GeForce RTX 4090 20914/23028 MiB`、`Cartridges 1`
+    - 五项都在真浏览器里做：① 搜 `spare glasses` + scenario `home` → 那行必须同时写 `wife` 和 `home`（「谁在什么场景下知道」就是这个意思）② 按 modality 过滤 → 无字图片渲染出真像素；翻页用行的 `data-atom` 身份证明，不用行数——搜索列表和浏览列表共用 `.atom-row`，「行数变了」可以只是上面那条搜索命中在闪。断言：第一页正好 `PAGE_SIZE=12` 行（与 `MemoryPanel.tsx:10` 同值）、下一页与第一页**零重叠**、末页行数 = `total − 12`（API 报的 total）、Prev 回到原来那串 id ③ Forget → 提示 `forgotten: N atoms`，再搜同一句返回「Nothing in the store answers」④ Mount → 状态真的变了 ⑤ Adapter Matrix 每个 kind 一行，状态落在 `loaded|available|deferred|missing` 内且**必须带原因**
+    - 实测：拒绝挂载的原文是 `cannot verify <cartridge_id> on this machine: model_hash, tokenizer_hash, chat_template_hash, rope are unknown; set ELY_EYE_MODEL_DIR to the model snapshot`（`cartridge.py:169-173`，p0-4 那条「没有 model_dir 就拒绝挂载」的偏差在 UI 里看得见；smoke 打印前 200 字符，所以整句都在）；`adapters: 6 kinds: missing ×6`，每条原因是「no adapter of kind X is on disk」；KPI 显示 `Runtime ready`、`Qwen/Qwen3.5-9B`、`NVIDIA GeForce RTX 4090 20901/23028 MiB`、`Cartridges 1`
     - 失败留证据：截图 `ui-failure.png` + Memory 面板文本 + 那一刻 `/api/atoms?modality=…` 返回的 JSON
     - 网络噪声分开判：`404 /api/proof-suite/latest`（没跑过证明的库就该 404，面板写 pending）和被拒的挂载 400 算预期，其余 ≥400 一律红；JS 未捕获异常一律红
   - 三条是 E2E 逼出来的真缺陷，都不是样式问题：
@@ -314,6 +314,9 @@
     - playwright 1.60 在 Ubuntu 26.04 上没有 chromium 构建（`Playwright does not support chromium on ubuntu26.04-x64`），`npm i -D playwright@1.64.0` 才有；而且它的 npm 包不自动下浏览器，要 `npx playwright install chromium`
   - 顺手挖掉的产品根因：`/api/status` 与 `doctor` 各算一遍「这台机器能感知什么」，两份真相。抽成 `backend/src/ely_eye/senses.py::sense_facts()`，两边只渲染它。图片计数从 modality 改成「有没有 `image_ref`」：按 modality 数会漏掉 pdf_region 的截图裁块，也看不见字节已被删走的 atom。现在 `picture_bytes_missing` 会让 doctor 说「N picture atoms with no bytes behind them; re-ingest the source they came from」，而 CLIP 那条警告只数还能编码的
   - 验收：`bash scripts/ui_smoke.sh` → `PASS: the console searches, pages, forgets, mounts and reports adapter states`；`pytest -q` **263 passed**；`ruff check` 8 个改动文件 All checks passed；mypy 冷缓存查这 8 个文件 `Success: no issues found`，全仓仍是 **24 错 / 6 文件**（与 p1-4 记的基线相同，净新增 0）；`pyright` 这 8 个文件 **0 errors, 0 warnings**；go build/vet/test + gofmt 干净；`npm run build` + `eslint .` 干净；`scripts/mcp_write_smoke.sh` 仍 PASS
+  - 独立 review（herdr 里的 pi，模型 `strata/qwen3.8-flash-next-abliterated-iq3_s:high`）。第 1 轮 FAIL 两条，都在我那条提交里：`schemas.py` 被我从 498 顶到 534 行，破了「单文件 ≤500 行」；同一提交净增 3 条多行 docstring（114→117）。修在 `6df713d`：自报家族（`CacheLayerStatus`/`MemoryStatus`/`RuntimeStatus`/三个 state 别名/`SenseStatus`/`SystemStatus`）搬进 `backend/src/ely_eye/status_schemas.py`（它只需要 `schemas.py` 的 `TrainingAdapterKind`，反向不依赖），schemas.py 回到 469；三条 docstring 各压成一行，全仓多行 docstring 回到 114，与父提交同数。
+  - 第 2 轮 FAIL 三条：① **翻页其实没被测到**——E2E 等的是「行数变化」，而搜索列表与浏览列表共用 `.atom-row`，那一刻的 13 行里有一条是搜索命中；把 `nextPage()` 里的 `setCursor`+`loadBrowse` 删掉、或把翻页改成追加而不是替换，E2E 都还 PASS。改成 `data-testid="browse-list"` + 每行 `data-atom`，断言第一页正好 12 行、下一页零重叠、末页 = `total−12`、Prev 复原；两个变异现在各自红：`Next page did not swap the page: the pager is not paging` 与 `the next page repeated 12 of 12 atoms from the first page` ② CHECKLIST 写 `App.tsx`「130 行的壳」，`wc -l` 是 131 ③ CHECKLIST 引的拒绝挂载原文被 smoke 的 `.slice(0,120)` 砍掉了后半句 `; set ELY_EYE_MODEL_DIR to the model snapshot`，改成 slice 200 并照原文记。
+  - 同一轮实测为真：263 passed；ruff 干净；全仓 mypy 24 错/6 文件（净新增 0）；go build/vet/test+gofmt 干净；`npm run build`+`eslint .` 干净；`ui_smoke.sh` PASS（4.0s）；`mcp_write_smoke.sh` PASS（3.2s）；30 条路由与 `HTTP_SURFACE` 一致；senses 单一真相（`api.py:52/:105` 与 `maintenance.py:238` 都只渲染 `sense_facts()`）；26 个 `types.ts` 接口对着 pydantic 模型逐个 diff 零编造字段；8 条被删路由无人引用，它们背后的函数都还从 CLI/proof 可达。pyright 在那 8 个文件：reviewer 的工作树 **0 errors**，我这棵树多两条 `runtime.py:283` 的 tuple 告警——它只在 `qwen_vl_utils` 那个无类型导入被解析时出现，HEAD 的副本同样有，不是本轮引入；两边都不是新增。
 - [ ] **p1-6** 代码卫生
   - [ ] p1-6.1 `evals.py` 2413 行拆到 ≤500 行/文件
   - [ ] p1-6.2 删 dead code 与未调用函数

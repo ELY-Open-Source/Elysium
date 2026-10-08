@@ -173,7 +173,7 @@ export function MemoryPanel({ onChanged }: { onChanged: () => void }) {
       </form>
 
       {result && (
-        <div className="atom-list">
+        <div className="atom-list" data-testid="search-list">
           {result.status === 'no_match' && <Quiet>Nothing in the store answers “{result.query}”.</Quiet>}
           {result.hits.map((hit) => (
             <AtomRow
@@ -198,7 +198,7 @@ export function MemoryPanel({ onChanged }: { onChanged: () => void }) {
         </button>
       </form>
 
-      <div className="atom-list">
+      <div className="atom-list" data-testid="browse-list">
         {(page?.atoms ?? []).map((atom) => (
           <AtomRow
             key={atom.atom_id}
@@ -241,7 +241,7 @@ function AtomRow({
   onForget: () => void;
 }): ReactNode {
   return (
-    <article className="atom-row">
+    <article className="atom-row" data-atom={atom.atom_id}>
       {atom.image_ref && <img className="thumb" src={atomImageUrl(atom.atom_id)} alt={atom.atom_id} loading="lazy" />}
       <div className="atom-body">
         <header>
