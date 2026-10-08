@@ -214,6 +214,11 @@
     - 全仓 mypy：干净树上冷缓存实测 parent `03ca357` **26** 个错 → 本任务 **24**（净修 2 个，
       没新增；之前写的 29 是在半成品工作树上量的，不算）；改动文件 pyright **0 错**、
       ruff 干净、**212** 个测试绿（裸 `pytest` 与 `python -m pytest` 都是 212）。
+  - 独立 review（`herdr` 里的 `pi`，模型 `strata/qwen3.8-flash-next-abliterated-iq3_s:high`）：
+      第一轮 FAIL 11 条 → 第二轮 FAIL 4 条 → **第三轮 PASS**。reviewer 不是读我的话，而是自己
+      重跑 `bench.asr_check`（新进程）、重跑门禁、逐项核对 stamp 链与 18 条 CHECKLIST 断言，
+      并确认旧数字（1.7 秒 / 3.55 / 61.6 / 31 段 / 210.5 / 51×）零残留。三轮都是同一个 reviewer，
+      没有换人放水。
 - [ ] **p1-3** adapter 加载
   - [ ] p1-3.1 按卡带/场景解析 6 个 adapter，不再只有 `runtime.py:317`
   - [ ] p1-3.2 加载结果可观测：日志 + `GET /api/runtime/adapters`
