@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
@@ -338,6 +339,15 @@ def create_app() -> FastAPI:
             "layers": CacheFabric(settings, db).statuses(),
             "cartridges": CartridgeService(settings, db).list_manifests(),
         }
+
+    mounted_ui = get_settings().ui_dir
+    if mounted_ui is not None:
+        if not mounted_ui.is_dir():
+            raise SystemExit(
+                f"ui_dir {mounted_ui} is set but holds no built interface; "
+                "run `npm run build` in frontend/ or unset ELY_EYE_UI_DIR"
+            )
+        app.mount("/", StaticFiles(directory=mounted_ui, html=True), name="ui")
 
     return app
 
