@@ -1,5 +1,5 @@
 {
-  "commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
+  "commit": "71733d86d6d27d1f1ebb75205d5e0599f253f791",
   "database": "bench/runs/dense_scale/data/ely_eye.sqlite",
   "atoms": 165973,
   "memories_with_words": 153857,
@@ -7,17 +7,17 @@
   "pending": 0,
   "dim": 384,
   "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-  "copy_seconds": 0.665644496002642,
-  "build_seconds": 1421.0276969089973,
-  "texts_per_second": 108.2716405420302,
-  "repair_seconds": 1.2946931579936063,
+  "copy_seconds": 4.653337935000309,
+  "build_seconds": 1444.851663221998,
+  "texts_per_second": 106.48636390596745,
+  "repair_seconds": 1.2708722250099527,
   "writes": 50,
   "write_latency": {
     "queries": 50,
-    "mean": 0.5204645371803781,
-    "p50": 0.5183807220018934,
-    "p95": 0.5429989652060613,
-    "max": 0.5760761429992272
+    "mean": 0.5132235406010295,
+    "p50": 0.50813193799695,
+    "p95": 0.5353954541016719,
+    "max": 0.5569016869994812
   },
   "probes": 300,
   "probe_modalities": [
@@ -29,17 +29,17 @@
   ],
   "latency": {
     "queries": 300,
-    "mean": 0.07861847096656371,
-    "p50": 0.07557305500085931,
-    "p95": 0.09303550984986941,
-    "max": 0.123588470989489
+    "mean": 0.07290171435301697,
+    "p50": 0.07302105800044956,
+    "p95": 0.07570205154406721,
+    "max": 0.08561979999649338
   },
   "encode_latency": {
     "queries": 300,
-    "mean": 0.014255492710411393,
-    "p50": 0.012439899503078777,
-    "p95": 0.025788354348333098,
-    "max": 0.0513256230042316
+    "mean": 0.012841759066456385,
+    "p50": 0.011289245005173143,
+    "p95": 0.024048260039126034,
+    "max": 0.02614720400015358
   },
   "correctness": {
     "probes": 40,
@@ -52,12 +52,13 @@
   "bytes_method": "dbstat page sizes over the vec0 shadow tables",
   "extrapolation": {
     "to": 1000000,
-    "assumption": "sqlite-vec 0.1.9 scans every vector, so latency and bytes grow linearly with the count; the model, the machine and the thread budget stay the same",
-    "p50_seconds": 0.45533342773137386,
-    "p95_seconds": 0.5605460517666694,
-    "write_p50_seconds": 3.1232834376789804,
+    "basis": 153857,
+    "assumption": "sqlite-vec 0.1.9 scans every vector, so latency and bytes grow linearly with the vector count; every row here is scaled by 1000000 / 153857 vectors, and the model, the machine and the thread budget stay the same",
+    "p50_seconds": 0.47460341746199103,
+    "p95_seconds": 0.49202864701682225,
+    "write_p50_seconds": 3.3026247619344584,
     "gibibytes": 1.6105050507025191,
-    "build_seconds": 9236.028889871746
+    "build_seconds": 9390.873754343305
   },
   "machine": {
     "system": "Linux",
@@ -65,9 +66,9 @@
     "cpus": 32,
     "threads_per_query": 4,
     "load_average_1_5_15": [
-      3.18,
-      4.58,
-      5.42
+      3.53,
+      4.63,
+      4.85
     ]
   }
 }

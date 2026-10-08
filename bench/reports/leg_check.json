@@ -1,7 +1,20 @@
 {
-  "commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
+  "commit": "71733d86d6d27d1f1ebb75205d5e0599f253f791",
   "schema_version": 8,
   "store": "bench/runs/leg_check/data/ely_eye.sqlite",
+  "source_store": "bench/runs/dense_scale",
+  "dense_vectors": 153857,
+  "picture_index": {
+    "path": "bench/runs/leg_check_index",
+    "atoms": 53668,
+    "dim": 512,
+    "bytes": 109912192
+  },
+  "encode_rate": {
+    "pictures": 200,
+    "seconds": 11.912494190008147,
+    "per_second": 16.7890952818054
+  },
   "probes": 300,
   "arms": [
     {
@@ -13,8 +26,8 @@
       "mrr": 0.6832447089947089,
       "hit_at_10": 0.8333333333333334,
       "wilson_lower": 0.7870033503873167,
-      "p50_seconds": 0.0654734540003119,
-      "p95_seconds": 0.13490134734311146,
+      "p50_seconds": 0.0674771249978221,
+      "p95_seconds": 0.14665940315098855,
       "median_distinct_sources": 4.0,
       "by_modality": {
         "code": 0.953125,
@@ -40,8 +53,8 @@
       "mrr": 0.6875571326821327,
       "hit_at_10": 0.85,
       "wilson_lower": 0.8051823888546709,
-      "p50_seconds": 0.07251374649786158,
-      "p95_seconds": 0.15588207065375176,
+      "p50_seconds": 0.0675995074925595,
+      "p95_seconds": 0.12988004180151622,
       "median_distinct_sources": 6.0,
       "by_modality": {
         "code": 0.953125,
@@ -67,8 +80,8 @@
       "mrr": 0.6895710215710216,
       "hit_at_10": 0.8566666666666667,
       "wilson_lower": 0.8124994228503402,
-      "p50_seconds": 0.06468957299512113,
-      "p95_seconds": 0.1297007056004077,
+      "p50_seconds": 0.07200110949634109,
+      "p95_seconds": 0.15601039270331973,
       "median_distinct_sources": 6.0,
       "by_modality": {
         "code": 0.953125,
@@ -94,8 +107,8 @@
       "mrr": 0.6632195767195768,
       "hit_at_10": 0.8466666666666667,
       "wilson_lower": 0.8015339429418983,
-      "p50_seconds": 0.4729458744986914,
-      "p95_seconds": 0.5775450093562541,
+      "p50_seconds": 0.4748052095019375,
+      "p95_seconds": 0.5791264187995694,
       "median_distinct_sources": 5.0,
       "by_modality": {
         "code": 0.9375,
@@ -121,8 +134,8 @@
       "mrr": 0.6686637344137344,
       "hit_at_10": 0.86,
       "wilson_lower": 0.8161683876490509,
-      "p50_seconds": 0.41367531901050825,
-      "p95_seconds": 0.5258364057008293,
+      "p50_seconds": 0.41600067100080196,
+      "p95_seconds": 0.5433694835548523,
       "median_distinct_sources": 7.0,
       "by_modality": {
         "code": 0.9375,
@@ -148,8 +161,8 @@
       "mrr": 0.5525886243386243,
       "hit_at_10": 0.8166666666666667,
       "wilson_lower": 0.7689713823226987,
-      "p50_seconds": 0.13248339149868116,
-      "p95_seconds": 0.2713221473451995,
+      "p50_seconds": 0.1381109430003562,
+      "p95_seconds": 0.3035783412473393,
       "median_distinct_sources": 8.0,
       "by_modality": {
         "code": 0.9296875,
@@ -175,8 +188,8 @@
       "mrr": 0.5507809648412589,
       "hit_at_10": 0.8266666666666667,
       "wilson_lower": 0.7797738592974309,
-      "p50_seconds": 0.16283495400421089,
-      "p95_seconds": 0.2837207488548302,
+      "p50_seconds": 0.16669872149941511,
+      "p95_seconds": 0.3142305556466454,
       "median_distinct_sources": 20.0,
       "by_modality": {
         "code": 0.8984375,
@@ -200,9 +213,9 @@
     "cpus": 32,
     "threads_per_query": 4,
     "load_average_1_5_15": [
-      25.51,
-      9.62,
-      5.7
+      22.19,
+      9.9,
+      6.39
     ]
   }
 }
