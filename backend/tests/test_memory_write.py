@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -18,6 +20,7 @@ from ely_eye.schemas import (
     TimePrecision,
     TrustScores,
 )
+from ely_eye.vector_index import VectorIndex
 
 KEYS = "我们的钥匙放在玄关抽屉里"
 NOW = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
@@ -124,8 +127,8 @@ def test_time_travel_reads_the_memory_that_was_true_then(service: MemoryService)
     }
 
 
-def test_forget_reaches_the_row_the_index_the_edges_the_cache_and_the_vectors(
-    service: MemoryService,
+def test_forget_reaches_every_copy_of_a_memory(
+    service: MemoryService, fake_embeddings: Callable[[], Any]
 ) -> None:
     atom = _seed_atom("seed-1:text", "seed-1")
     _seed(service.db, atom)
@@ -133,23 +136,21 @@ def test_forget_reaches_the_row_the_index_the_edges_the_cache_and_the_vectors(
         [{"from_atom_id": "seed-1:text", "to_atom_id": "other", "relation": "cites", "confidence": 1.0}]
     )
     service.db.log_cache_event(layer="compiler", cache_key="k", event="hit", bytes_estimate=10)
-    vectors = service.settings.cache_dir / "dense_index.npy"
-    vectors.write_bytes(b"stale")
-    (service.settings.cache_dir / "dense_index_atoms.json").write_text("[]", encoding="utf-8")
+    VectorIndex(service.settings, service.db, fake_embeddings()).sync()
 
     report = service.forget(atom_id="seed-1:text", reason="the drawer is empty")
 
     assert report.atoms_deleted == 1
     assert report.edges_deleted == 1
     assert report.cache_entries_cleared == 1
-    assert report.vector_index_dropped is True
+    assert report.vectors_dropped == 1
+    assert VectorIndex(service.settings, service.db, fake_embeddings()).stats()["vectors"] == 0
     assert service.db.atom_count() == 0
     with service.db.connect() as connection:
         assert connection.execute("SELECT COUNT(*) FROM atom_fts").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM evidence_edges").fetchone()[0] == 0
         trace = connection.execute("SELECT layer, event FROM cache_events").fetchall()
     assert [(row["layer"], row["event"]) for row in trace] == [("memory", "invalidated")]
-    assert not vectors.exists()
 
 
 def test_forget_names_the_cartridge_that_exported_the_source(service: MemoryService) -> None:

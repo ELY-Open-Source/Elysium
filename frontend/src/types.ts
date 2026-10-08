@@ -35,7 +35,7 @@ export interface MemoryStatus {
 export interface SenseStatus {
   dense: 'off' | 'missing' | 'behind' | 'current';
   dense_covered: number;
-  store_atoms: number;
+  dense_expected: number;
   picture_atoms: number;
   picture_bytes_missing: number;
   visual: 'absent' | 'stale' | 'ready';
@@ -309,7 +309,8 @@ export interface ForgetReport {
   atoms_deleted: number;
   edges_deleted: number;
   cache_entries_cleared: number;
-  vector_index_dropped: boolean;
+  vectors_dropped: number;
+  visual_index_dropped: boolean;
   affected_cartridges: Array<Record<string, unknown>>;
   reason: string;
 }

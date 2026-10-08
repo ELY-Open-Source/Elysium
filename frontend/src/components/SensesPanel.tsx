@@ -13,7 +13,7 @@ export function SensesPanel({ senses }: { senses: SenseStatus | null }) {
             <SenseRow
               label="dense vectors"
               state={senses.dense}
-              detail={`${formatNumber(senses.dense_covered)} of ${formatNumber(senses.store_atoms)} atoms indexed`}
+              detail={`${formatNumber(senses.dense_covered)} of ${formatNumber(senses.dense_expected)} memories with words indexed`}
             />
             <SenseRow
               label="picture embeddings"

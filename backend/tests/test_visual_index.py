@@ -180,7 +180,7 @@ def test_forgetting_a_picture_voids_the_picture_index(tmp_path: Path) -> None:
 
     report = MemoryService(settings, database).forget(source_id=atom.source_id)
 
-    assert report.vector_index_dropped
+    assert report.visual_index_dropped
     assert not index.index_path.exists() and not index.map_path.exists()
     assert index.load() is None, "a forgotten picture must not keep answering from memory"
 

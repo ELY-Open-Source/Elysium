@@ -37,6 +37,7 @@ from .storage import (
     sha256_file,
     token_equivalent,
 )
+from .vector_index import VectorIndex
 
 
 class IngestionService(MediaIngest, RepositoryIngest):
@@ -45,12 +46,14 @@ class IngestionService(MediaIngest, RepositoryIngest):
         settings: Settings | None = None,
         database: Database | None = None,
         object_store: ObjectStore | None = None,
+        vectors: VectorIndex | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
         self.objects = object_store or ObjectStore(self.settings)
         self.describer = VisionDescriber(self.settings)
         self.transcriber = SpeechTranscriber(self.settings)
+        self.vectors = vectors or VectorIndex(self.settings, self.db)
 
     def ingest_path(self, path: Path, cartridge_name: str | None = None) -> IngestResponse:
         path = path.expanduser().resolve()
@@ -77,6 +80,7 @@ class IngestionService(MediaIngest, RepositoryIngest):
 
         self.db.upsert_sources(batch.sources)
         self.db.upsert_atoms(batch.atoms)
+        self.vectors.sync_atoms([atom.atom_id for atom in batch.atoms])
 
         cartridge_id = None
         if cartridge_name:

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     kv_cache_dtype: str = "auto"
     planner_model_id: str = "Qwen/Qwen3.5-0.8B"
     embedding_model_id: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    embedding_model_dir: Path | None = None
     clip_model_dir: Path | None = None
     vlm_model_dir: Path | None = None
     vlm_max_new_tokens: int = 96

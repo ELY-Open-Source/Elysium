@@ -18,7 +18,7 @@ from .cli_common import json_dump
 from .config import Settings
 from .db import Database
 from .describe import DEFERRED, VisionDescriber
-from .embeddings import EmbeddingService
+from .vector_index import VectorIndex
 from .visual_index import VisualIndex
 
 
@@ -73,7 +73,5 @@ def register(app: typer.Typer, settings: Callable[[], Settings]) -> None:
 
     @app.command("build-dense-index")
     def build_dense_index() -> None:
-        """Encode every atom into the dense index the text retriever falls back to."""
-        index = EmbeddingService(settings()).build_index()
-        dimensions = int(index.vectors.shape[1]) if index.vectors.size else 0
-        typer.echo(json_dump({"atoms": len(index.atom_ids), "dimensions": dimensions}))
+        """Encode the memories the dense index is missing; its vectors live beside the atoms."""
+        typer.echo(json_dump(VectorIndex(settings()).sync()))

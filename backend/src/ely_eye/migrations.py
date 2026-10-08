@@ -16,7 +16,7 @@ import sqlite3
 from .storage import token_equivalent, visual_token_equivalent
 from .text_index import index_text
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -123,6 +123,14 @@ _BASE_TABLES = """
     CREATE TABLE IF NOT EXISTS term_df (
         term TEXT PRIMARY KEY,
         documents INTEGER NOT NULL
+    );
+
+    -- What the dense vector table was built from. vec0 cannot be altered in place, so when the
+    -- model or the width changes the table is dropped and re-encoded; these three values are
+    -- how the next start notices it has to.
+    CREATE TABLE IF NOT EXISTS vector_index_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
     );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS atom_fts USING fts5(

@@ -6,8 +6,8 @@ from pathlib import Path
 
 from .config import Settings
 from .db import Database
-from .embeddings import EmbeddingService
 from .status_schemas import DenseState, SenseState, SenseStatus, VisualState
+from .vector_index import VectorIndex, expected_vectors
 from .visual_index import VisualIndex
 
 
@@ -20,7 +20,7 @@ def sense_facts(settings: Settings, database: Database, visual: VisualIndex | No
     return SenseStatus(
         dense=dense,
         dense_covered=covered,
-        store_atoms=total,
+        dense_expected=total,
         picture_atoms=claimed,
         picture_bytes_missing=max(0, claimed - len(on_disk)),
         visual=_visual_state(index, on_disk),
@@ -34,14 +34,15 @@ def sense_facts(settings: Settings, database: Database, visual: VisualIndex | No
 
 
 def _dense_facts(settings: Settings, database: Database) -> tuple[DenseState, int, int]:
-    total = database.atom_count()
+    expected = expected_vectors(database)
     if not settings.dense_embeddings_enabled:
-        return "off", 0, total
-    loaded = EmbeddingService(settings, database).load_index()
-    if loaded is None:
-        return "missing", 0, total
-    covered = len(loaded.atom_ids)
-    return ("current" if covered == total else "behind"), covered, total
+        return "off", 0, expected
+    facts = VectorIndex(settings, database).stats()
+    if not facts["built"]:
+        return "missing", 0, expected
+    # A memory with no words belongs to the picture index, so the honest denominator is the
+    # memories this index is meant to hold, not every row in the store.
+    return ("current" if facts["pending"] == 0 else "behind"), int(facts["vectors"]), expected
 
 
 def _visual_state(visual: VisualIndex, pictures: set[str]) -> VisualState:

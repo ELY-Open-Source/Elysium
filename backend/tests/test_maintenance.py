@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -20,6 +22,7 @@ from ely_eye.memory import MemoryService
 from ely_eye.migrations import SCHEMA_VERSION
 from ely_eye.schemas import EvidenceAtom, MemoryOrigin, Modality, SourceRecord, TrustScores, utc_now
 from ely_eye.storage import ObjectStore
+from ely_eye.vector_index import VectorIndex
 
 KEYS = "the keys are on the shelf by the door"
 PASSPORT = "the passport is in the blue box"
@@ -83,6 +86,29 @@ def test_a_restore_brings_the_memories_back(tmp_path: Path) -> None:
     database = Database(destination)
     assert database.atom_count() == 2
     assert {atom.text for atom in database.list_atoms()} == {KEYS, PASSPORT}
+
+
+def test_a_backup_carries_the_vector_index_and_a_restore_answers_from_it(
+    tmp_path: Path, fake_embeddings: Callable[[], Any]
+) -> None:
+    source = Settings(home=tmp_path / "home", default_holder="wife", dense_embeddings_enabled=True)
+    database = Database(source)
+    database.init()
+    index = VectorIndex(source, database, fake_embeddings())
+    memory = MemoryService(source, database, vectors=index)
+    for statement in (KEYS, PASSPORT):
+        memory.remember(statement, holder_id="wife", origin=MemoryOrigin.self_)
+    assert index.stats()["vectors"] == 2
+
+    maintenance.backup(source, tmp_path / "backup")
+    destination = Settings(home=tmp_path / "elsewhere", default_holder="wife", dense_embeddings_enabled=True)
+    maintenance.restore(destination, tmp_path / "backup")
+
+    restored = VectorIndex(destination, Database(destination), fake_embeddings())
+    assert restored.stats()["vectors"] == 2, "the vectors are data, not a cache to redo"
+    hits = restored.search(restored.embeddings.embed_query(KEYS), 10)
+    best = next(iter(hits))
+    assert Database(destination).get_atoms([best])[0].text == KEYS
 
 
 def test_a_restore_keeps_the_store_it_replaces(tmp_path: Path) -> None:

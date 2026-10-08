@@ -431,7 +431,8 @@ class ForgetReport(BaseModel):
     atoms_deleted: int
     edges_deleted: int
     cache_entries_cleared: int
-    vector_index_dropped: bool
+    vectors_dropped: int
+    visual_index_dropped: bool
     affected_cartridges: list[dict[str, Any]]
     reason: str
 

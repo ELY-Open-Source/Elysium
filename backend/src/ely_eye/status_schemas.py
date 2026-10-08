@@ -52,7 +52,7 @@ class SenseStatus(BaseModel):
 
     dense: DenseState
     dense_covered: int
-    store_atoms: int
+    dense_expected: int
     picture_atoms: int
     picture_bytes_missing: int
     visual: VisualState

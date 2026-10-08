@@ -27,7 +27,8 @@ type ForgetReport struct {
 	AtomsDeleted        int      `json:"atoms_deleted"`
 	EdgesDeleted        int      `json:"edges_deleted"`
 	CacheEntriesCleared int      `json:"cache_entries_cleared"`
-	VectorIndexDropped  bool     `json:"vector_index_dropped"`
+	VectorsDropped      int      `json:"vectors_dropped"`
+	VisualIndexDropped  bool     `json:"visual_index_dropped"`
 	AffectedCartridges  []any    `json:"affected_cartridges"`
 	Reason              string   `json:"reason"`
 }

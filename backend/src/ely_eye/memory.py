@@ -27,6 +27,7 @@ from .schemas import (
     utc_now,
 )
 from .storage import token_equivalent
+from .vector_index import VectorIndex
 from .visual_index import VisualIndex
 
 # Trust scores describe extraction fidelity, not truthfulness: a remembered sentence is stored verbatim, so origin carries the epistemic weight.
@@ -34,9 +35,16 @@ MEMORY_TRUST = TrustScores(parser=1.0, ocr=0.0, model=0.0)
 
 
 class MemoryService:
-    def __init__(self, settings: Settings | None = None, database: Database | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        database: Database | None = None,
+        vectors: VectorIndex | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
+        self.vectors = vectors or VectorIndex(self.settings, self.db)
+        self.pictures = VisualIndex(self.settings, self.db)
 
     def remember(
         self,
@@ -107,6 +115,7 @@ class MemoryService:
             retention_until=retention_until,
         )
         self.db.upsert_atoms([atom])
+        self.vectors.sync_atoms([atom.atom_id])
         return atom
 
     def supersede(
@@ -148,6 +157,7 @@ class MemoryService:
             valid_from=moment,
         )
         self.db.close_atoms([atom_id], moment)
+        self.vectors.sync_atoms([atom_id])
         return replacement
 
     def forget(
@@ -175,26 +185,27 @@ class MemoryService:
         edges_deleted = self.db.delete_edges_touching(doomed_ids)
         atoms_deleted = self.db.delete_atoms(doomed_ids)
         cache_cleared = self.db.clear_cache_events(f"forget:{target_source}")
-        vectors_dropped = self._drop_vector_index()
+        vectors_dropped, visual_dropped = self._drop_derived_vectors(doomed_ids)
         return ForgetReport(
             source_id=target_source,
             atom_ids=doomed_ids,
             atoms_deleted=atoms_deleted,
             edges_deleted=edges_deleted,
             cache_entries_cleared=cache_cleared,
-            vector_index_dropped=vectors_dropped,
+            vectors_dropped=vectors_dropped,
+            visual_index_dropped=visual_dropped,
             affected_cartridges=self._cartridges_holding(target_source),
             reason=reason,
         )
 
-    def _drop_vector_index(self) -> bool:
-        """The text and picture indexes are derived data; a stale one keeps answering with deleted memories."""
-        dropped = False
-        for path in (self.settings.cache_dir / "dense_index.npy", self.settings.cache_dir / "dense_index_atoms.json"):
-            if path.exists():
-                path.unlink()
-                dropped = True
-        return VisualIndex(self.settings, self.db).drop() or dropped
+    def _drop_derived_vectors(self, atom_ids: list[str]) -> tuple[int, bool]:
+        """A forgotten memory must stop answering from the derived indexes too.
+
+        The dense vectors live in the database beside the atoms, so they go one memory at a
+        time. The picture index is one file for the whole store, so it is dropped and rebuilt.
+        """
+        dropped = self.vectors.drop_atoms(atom_ids)
+        return dropped, self.pictures.drop()
 
     def _cartridges_holding(self, source_id: str) -> list[dict[str, Any]]:
         """Name the cartridges that exported this source, so they can be rebuilt.

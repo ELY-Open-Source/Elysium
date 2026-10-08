@@ -201,7 +201,7 @@ def _check_indexes(facts: SenseStatus, warnings: list[str]) -> None:
         warnings.append("dense embeddings are on but no index exists; run `ely-eye build-dense-index`")
     elif facts.dense == "behind":
         warnings.append(
-            f"the dense index covers {facts.dense_covered} atoms while the store holds {facts.store_atoms}; "
+            f"the dense index holds {facts.dense_covered} of the {facts.dense_expected} memories with words; "
             "run `ely-eye build-dense-index`"
         )
 

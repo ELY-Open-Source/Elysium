@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import base64
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from . import cartridge_store
 from .config import Settings, get_settings
@@ -18,6 +20,7 @@ from .db import Database
 from .embeddings import EmbeddingService
 from .schemas import EvidenceAtom, RetrievalHit, SearchFilters, SearchResult
 from .store_search import FtsPage, search_atoms
+from .vector_index import VectorIndex
 from .visual_index import VisualIndex
 
 RRF_K = 60
@@ -31,6 +34,7 @@ class RetrievalService:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
         self.embeddings = EmbeddingService(self.settings, self.db)
+        self.vectors = VectorIndex(self.settings, self.db, self.embeddings)
         self.visual = VisualIndex(self.settings, self.db)
 
     def search(
@@ -70,10 +74,7 @@ class RetrievalService:
         for atom_id, bm25 in page.rows:
             scores[atom_id]["sparse_score"] = bm25
         if self.embeddings.enabled():
-            dense = self._dense_search(query, limit * CANDIDATE_WINDOW)
-            if scope:
-                allowed = cartridge_store.atoms_of_cartridges(self.db, scope)
-                dense = {atom_id: score for atom_id, score in dense.items() if atom_id in allowed}
+            dense = self._dense_search(query, limit * CANDIDATE_WINDOW, criteria)
             rankings.append(list(dense))
             for atom_id, cosine in dense.items():
                 scores[atom_id]["dense_score"] = cosine
@@ -97,12 +98,26 @@ class RetrievalService:
             next_cursor=encode_cursor(offset + limit) if hits and more else None,
         )
 
-    def _dense_search(self, query: str, limit: int) -> dict[str, float]:
-        index = self.embeddings.load_index()
-        if index is None:
-            index = self.embeddings.build_index()
+    def _dense_search(self, query: str, limit: int, criteria: dict[str, Any]) -> dict[str, float]:
+        """The vectors sit beside the atoms, so a memory written a moment ago is findable.
+
+        Every filter is applied inside the engine, in the same statement as the nearest-neighbour
+        walk, so a scoped search cannot return a memory the caller was never allowed to see. The
+        index catches up inside `search`, so nothing here has to rebuild it first.
+        """
         query_vector = self.embeddings.embed_query(query)
-        return dict(index.search(query_vector, limit))
+        return self.vectors.search(
+            query_vector,
+            limit,
+            holder=criteria.get("holder"),
+            scenario=criteria.get("scenario"),
+            source_id=criteria.get("source_id"),
+            modality=criteria.get("modality"),
+            since=_text(criteria.get("since")),
+            until=_text(criteria.get("until")),
+            cartridge_ids=criteria.get("cartridge_ids"),
+            as_holder=criteria.get("as_holder"),
+        )
 
     def _visual_search(
         self,
@@ -183,3 +198,8 @@ def decode_cursor(cursor: str | None) -> int:
     if offset < 0:
         raise ValueError(f"search cursor is unreadable: {cursor!r}")
     return offset
+
+
+def _text(moment: datetime | None) -> str | None:
+    """A time bound reaches SQLite as the same ISO text the atoms table stores."""
+    return None if moment is None else moment.isoformat()
