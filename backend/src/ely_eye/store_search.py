@@ -12,14 +12,15 @@ from .text_index import fts_expression, fts_terms, rare_terms
 
 @dataclass(frozen=True)
 class FtsPage:
-    """A page of (atom_id, score) plus whether more matches exist."""
+    """One page of BM25 hits plus whether the corpus holds more: the cursor is an offset, and a
+    ranking this small re-reads rather than keeps a server-side position."""
 
     rows: list[tuple[str, float]]
     has_more: bool
 
 
 def search_fts(database: Database, query: str, limit: int) -> list[tuple[str, float]]:
-    """Best BM25 matches over the whole corpus, no filters."""
+    """Best BM25 matches over the whole corpus, no filters: the ranking the product needs most days."""
     return search_atoms(database, query, limit=limit).rows
 
 
@@ -39,7 +40,16 @@ def search_atoms(
     cartridge_ids: list[str] | None = None,
     as_holder: str | None = None,
 ) -> FtsPage:
-    """BM25 over the FTS index joined to memories that are open right now and readable by the asker."""
+    """BM25 over the FTS index joined to memories that are open right now and readable by the asker.
+
+    Every filter is a `? IS NULL OR` predicate in one literal statement: the ranking never
+    depends on string-built SQL, and the planner sees one shape. A memory with no event time
+    cannot answer a time filter, so it drops out when one is asked for.
+
+    `as_holder` applies the sharing rule: a memory is readable by its owner, by anyone named
+    in its visible_to list, by everyone when it is public, and by anyone when nobody owns it.
+    A memory with no holder cannot be private to a holder that does not exist. Without an
+    asker the query runs over the whole library, which is what an operator debugging wants."""
     with database.connect() as connection:
         expression = fts_expression(rare_terms(connection, fts_terms(query)))
         rows = connection.execute(

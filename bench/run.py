@@ -1,4 +1,11 @@
-"""Run the retrieval ablation over the frozen corpus and write the report: python -m bench.run [--arms bm25_only] [--limit 200] [--no-live]."""
+"""Run the retrieval ablation over the frozen corpus and write the baseline report.
+
+Five arms, one database: sparse only, dense only, graph only, the product's weighted
+fusion, and fusion plus a cross-encoder reranker. Every number in the report is either
+measured or explicitly marked as chance.
+
+Run: python -m bench.run [--arms bm25_only] [--limit 200] [--no-live] [--out bench/reports]
+"""
 
 from __future__ import annotations
 
