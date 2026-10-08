@@ -329,7 +329,7 @@
     - 两个为什么是死的：`memory.py` 靠读每颗卡带自己的 `sources.json` 回答归属（导出的卡带可以不在库里）；`set_mounts(database, [], stamp)` 换集合本来就能清空挂载表
     - 顺手删 `backend/build/`（712KB 的 `python -m build` 残留，gitignore 内，0 个跟踪文件）——它让 grep 撒谎
   - [x] p1-6.3 删 v1/v2/v3 废弃端口
-    - 量完的结论是**没有可删的**，不是没做：每个 `v1/v2/v3` 都承重——磁盘格式标签（`ely-eye-memory-capsule-v1` `proofs/checks_cartridge.py:128`、`ely-eye-{text,visual}-vectors-v1`、`ely-eye-kivi-replay-v1` `cartridge_assets.py:100,127,158`）、迁移阶梯（`migrations.py:181,186,248,250`）、矛盾语料 fixture 名（`proofs/contradictions.py:114-135`）、第三方名字（MiniLM-L12-v2、ScreenSpot-v2、LongBench v2）、OpenAI 兼容的 `/v1` URL、缓存键里的 `compiler-v2` salt。没有废弃端口、别名或双代码路径
+    - 量完的结论是**没有可删的**，不是没做：每个 `v1/v2/v3` 都承重——磁盘格式标签（`ely-eye-memory-capsule-v1` `proofs/checks_cartridge.py:128`、`ely-eye-{text,visual}-vectors-v1`、`ely-eye-kivi-replay-v1` `cartridge_assets.py:100,127,158`）、迁移阶梯（`migrations.py:181,186,239,241,243`，行号从 commit 本身量：`git show <sha>:path | grep -n`，工作区会被 pi-lens 重排而漂 9 行）、矛盾语料 fixture 名（`proofs/contradictions.py:114-135`）、第三方名字（MiniLM-L12-v2、ScreenSpot-v2、LongBench v2）、OpenAI 兼容的 `/v1` URL、缓存键里的 `compiler-v2` salt。没有废弃端口、别名或双代码路径
   - [x] p1-6.4 注释压到 ≤1 行
     - 口径：`tokenize` 找连续 `#` 行块。全仓 **39 块 / 86 行 → 0 块**，每块压成一行，压的时候留承重那句，实测数字与错误原文不删（`Unable to allocate 582. MiB for an array with shape (5632, 9024, 3)`、`288,266 rows for 165,973 atoms`、`[^[^\W\s]` 在 3.14 会吃掉 CJK）
     - docstring 不动（全仓多行 docstring 114 条，与父提交同数）：docstring 是模块与函数的契约，不是注释；p1-4 review 用的口径也是「新增多行 docstring 数不得增加」。第一轮 review 抓到搬家途中塌了 3 条——`store_search.py` 的 `search_atoms`（那条「每个过滤条件都是同一条字面 SQL 里的 `? IS NULL OR` 谓词」规则和 `as_holder` 的共享规则）和 `FtsPage`、`bench/run.py` 的模块 docstring——已按原文补回，行数仍全部在 500 以内
