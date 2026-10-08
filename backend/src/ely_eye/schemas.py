@@ -149,6 +149,7 @@ class RetrievalHit(BaseModel):
     atom: EvidenceAtom
     sparse_score: float
     dense_score: float = 0.0
+    visual_score: float = 0.0
     graph_score: float = 0.0
     final_score: float
 
@@ -183,6 +184,7 @@ class SearchRequest(BaseModel):
     top_k: int | None = Field(default=None, gt=0)
     filters: SearchFilters | None = None
     cursor: str | None = None
+    image: Path | None = None
 
 
 class SearchResult(BaseModel):

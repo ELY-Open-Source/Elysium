@@ -10,11 +10,13 @@ upgraded in place rather than rebuilt, because the only copy of the memory is th
 
 from __future__ import annotations
 
+import json
 import sqlite3
 
+from .storage import token_equivalent, visual_token_equivalent
 from .text_index import index_text
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -204,6 +206,29 @@ def _upgrade_v1_to_v2(connection: sqlite3.Connection) -> None:
             connection.execute(f"ALTER TABLE atoms ADD COLUMN {name} {definition}")
 
 
+def _recount_visual_tokens(connection: sqlite3.Connection) -> None:
+    """Re-price raster atoms at 32x32 patches; a 1280x720 frame cost 18 tokens under the old rule.
+
+    An atom whose layout carries no size keeps its stored number: there is no region to price,
+    and inventing one would move a figure we cannot verify.
+    """
+    rows = connection.execute(
+        "SELECT atom_id, text, layout_json FROM atoms WHERE modality IN ('image', 'video_frame', 'ui_screenshot')"
+    ).fetchall()
+    updates: list[tuple[int, str]] = []
+    for row in rows:
+        try:
+            layout = json.loads(row["layout_json"] or "{}")
+        except json.JSONDecodeError as error:
+            raise SystemExit(f"atom {row['atom_id']}: its stored layout is unreadable ({error})") from error
+        width = float(layout.get("w") or 0)
+        height = float(layout.get("h") or 0)
+        if width <= 0 or height <= 0:
+            continue
+        updates.append((token_equivalent(row["text"]) + visual_token_equivalent(width, height), str(row["atom_id"])))
+    connection.executemany("UPDATE atoms SET token_equivalent = ? WHERE atom_id = ?", updates)
+
+
 def apply(connection: sqlite3.Connection) -> None:
     """Bring the schema to SCHEMA_VERSION, in place, without losing rows."""
     version = int(connection.execute("PRAGMA user_version").fetchone()[0])
@@ -220,6 +245,8 @@ def apply(connection: sqlite3.Connection) -> None:
         _create_v2(connection)
     if version < 3:
         _rebuild_fts(connection)
+    if version < 7:
+        _recount_visual_tokens(connection)
 
     connection.executescript(VIEWS)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")

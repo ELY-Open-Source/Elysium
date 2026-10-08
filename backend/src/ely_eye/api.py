@@ -197,7 +197,11 @@ def create_app() -> FastAPI:
     def search(request: SearchRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> SearchResult:
         try:
             return RetrievalService(settings).search(
-                request.query, request.top_k, filters=request.filters, cursor=request.cursor
+                request.query,
+                request.top_k,
+                filters=request.filters,
+                cursor=request.cursor,
+                image=request.image,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -27,6 +27,7 @@ from .schemas import (
     utc_now,
 )
 from .storage import token_equivalent
+from .visual_index import VisualIndex
 
 # Trust scores describe extraction fidelity, not truthfulness: a remembered sentence is
 # stored verbatim, so the parser is fully trusted and origin carries the epistemic weight.
@@ -189,13 +190,13 @@ class MemoryService:
         )
 
     def _drop_vector_index(self) -> bool:
-        """The dense index is derived data; a stale one keeps answering with deleted text."""
+        """The text and picture indexes are derived data; a stale one keeps answering with deleted memories."""
         dropped = False
         for path in (self.settings.cache_dir / "dense_index.npy", self.settings.cache_dir / "dense_index_atoms.json"):
             if path.exists():
                 path.unlink()
                 dropped = True
-        return dropped
+        return VisualIndex(self.settings, self.db).drop() or dropped
 
     def _cartridges_holding(self, source_id: str) -> list[dict[str, Any]]:
         """Name the cartridges that exported this source, so they can be rebuilt.

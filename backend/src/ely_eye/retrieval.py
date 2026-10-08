@@ -10,15 +10,19 @@ from __future__ import annotations
 
 import base64
 from collections import defaultdict
+from pathlib import Path
 
 from . import cartridge_store
 from .config import Settings, get_settings
-from .db import Database
+from .db import Database, FtsPage
 from .embeddings import EmbeddingService
 from .schemas import EvidenceAtom, RetrievalHit, SearchFilters, SearchResult
+from .visual_index import VisualIndex
 
 RRF_K = 60
 CANDIDATE_WINDOW = 10
+# Words decide most searches; a picture vector is only worth its encoding cost when words fell short.
+THIN_SPARSE_PAGE = 2
 
 
 class RetrievalService:
@@ -26,6 +30,7 @@ class RetrievalService:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
         self.embeddings = EmbeddingService(self.settings, self.db)
+        self.visual = VisualIndex(self.settings, self.db)
 
     def search(
         self,
@@ -34,6 +39,7 @@ class RetrievalService:
         *,
         filters: SearchFilters | None = None,
         cursor: str | None = None,
+        image: Path | None = None,
     ) -> SearchResult:
         """Answer one query against the memories that are open right now.
 
@@ -44,17 +50,20 @@ class RetrievalService:
         limit = top_k or self.settings.retrieval_top_k
         if limit <= 0:
             raise ValueError(f"search needs a positive limit, got {limit}")
+        if not query.strip() and image is None:
+            raise ValueError("search needs words or a picture to ask with, and got neither")
         offset = decode_cursor(cursor)
         criteria = (filters or SearchFilters()).model_dump(exclude_none=True)
         scope = criteria.get("cartridge_ids")
         if scope is None:
             scope = cartridge_store.mounted_ids(self.db) or None
         criteria["cartridge_ids"] = scope
-        page = self.db.search_atoms(
-            query,
-            limit=limit * CANDIDATE_WINDOW,
-            offset=offset,
-            **criteria,
+        # A picture-only question has no words for BM25, so the word ranking is skipped rather
+        # than asked to match an empty expression, which would answer nothing for the wrong reason.
+        page = (
+            self.db.search_atoms(query, limit=limit * CANDIDATE_WINDOW, offset=offset, **criteria)
+            if query.strip()
+            else FtsPage(rows=[], has_more=False)
         )
         rankings: list[list[str]] = [[atom_id for atom_id, _ in page.rows]]
         scores: dict[str, dict[str, float]] = defaultdict(dict)
@@ -68,6 +77,17 @@ class RetrievalService:
             rankings.append(list(dense))
             for atom_id, cosine in dense.items():
                 scores[atom_id]["dense_score"] = cosine
+        visual = self._visual_search(
+            query,
+            image,
+            limit * CANDIDATE_WINDOW,
+            scope,
+            thin=len(rankings[0]) < limit * THIN_SPARSE_PAGE,
+        )
+        if visual:
+            rankings.append(list(visual))
+            for atom_id, cosine in visual.items():
+                scores[atom_id]["visual_score"] = cosine
         hits = self._rank(rankings, scores, limit)
         more = page.has_more or len(rankings[0]) > limit
         return SearchResult(
@@ -83,6 +103,36 @@ class RetrievalService:
             index = self.embeddings.build_index()
         query_vector = self.embeddings.embed_query(query)
         return dict(index.search(query_vector, limit))
+
+    def _visual_search(
+        self,
+        query: str,
+        image: Path | None,
+        limit: int,
+        scope: list[str] | None,
+        *,
+        thin: bool,
+    ) -> dict[str, float]:
+        """Ask the picture index when words are not enough.
+
+        A screenshot with no text on it has nothing for FTS to match, so the sparse page comes
+        back short; that is the signal to spend the encoding. An image query always asks for it.
+        """
+        if image is None and not thin:
+            return {}
+        if not self.visual.available() or self.visual.load() is None:
+            return {}
+        if image is not None:
+            try:
+                ranked = self.visual.search_image(image, limit)
+            except (OSError, ValueError) as error:
+                raise ValueError(f"the query image {image} cannot be read: {error}") from error
+        else:
+            ranked = self.visual.search_text(query, limit)
+        if scope:
+            allowed = cartridge_store.atoms_of_cartridges(self.db, scope)
+            ranked = [(atom_id, score) for atom_id, score in ranked if atom_id in allowed]
+        return dict(ranked)
 
     def _rank(self, rankings: list[list[str]], scores: dict[str, dict[str, float]], limit: int) -> list[RetrievalHit]:
         """Reciprocal rank fusion: rank position is comparable across signals, raw scores are not.
@@ -108,6 +158,7 @@ class RetrievalService:
                     atom=atom,
                     sparse_score=signal.get("sparse_score", 0.0),
                     dense_score=signal.get("dense_score", 0.0),
+                    visual_score=signal.get("visual_score", 0.0),
                     final_score=fused[atom_id],
                 )
             )

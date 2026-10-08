@@ -134,11 +134,24 @@
 
 ## 阶段 2 — P1：让它成为产品
 
-- [ ] **p1-1** 图像进 dense
-  - [ ] p1-1.1 选 embedding ≤500MB，双语 + 图像；记录模型 SHA 与体积
-  - [ ] p1-1.2 图像 atom 入索引；query 侧支持图像
-  - [ ] p1-1.3 视觉 token 计数改 32×32 口径（1280×720 ≈ 900）
-  - [ ] p1-1.4 VLM 描述：代码路径就绪，标 `DEFERRED`
+- [x] **p1-1** 图像进 dense
+  - [x] p1-1.1 选 embedding ≤500MB，双语 + 图像；记录模型 SHA 与体积
+    - `Xenova/chinese-clip-vit-base-patch16` fp16 ONNX，361MB，`onnx/model_fp16.onnx` sha256 `0fad978faa89b85fda53a83a4c202116a9eb87c8f9723fb4d85e4483efbce4b2`；CPU 可跑（仓库已有 onnxruntime）；文本塔 76ms、图像塔 29ms/张（batch 8）
+    - 契约是量出来的不是猜的：输入 `input_ids`/`attention_mask`/`pixel_values (N,3,224,224)`，输出 `image_embeds`/`text_embeds (N,512)`；这是融合对比图，未用的塔必须喂占位行；分词器用 `BertTokenizer`（按 CLIP 分词器加载会得到超出 vocab 的 id，Gather 直接炸）
+  - [x] p1-1.2 图像 atom 入索引；query 侧支持图像
+    - `backend/src/ely_eye/visual_index.py`（独立文件，retrieval.py 停在 499 行没有膨胀）；`ely-eye index-visual`；`search --image`；API `SearchRequest.image`
+    - 开关规则：`clip_model_dir` 指向含 `onnx/model_fp16.onnx` 的目录才算可用，不再多一个 bool
+    - 14 个测试：句子找到图、图找到图、新图一到索引即失效、缺快照点名、map/vector 不一致点名、词够多时不付 encoder、forget 之后图片不再从内存回答
+  - [x] p1-1.3 视觉 token 计数改 32×32 口径（1280×720 ≈ 900）
+    - `visual_token_equivalent = ⌈w/32⌉·⌈h/32⌉`；migration v7 重算存量：21,325 个图像 atom 从 5,331 → 34,618 tokens；整库 29.9M → **84.2M**，于是「100M 胶囊」在这份 50,278 文件语料上刚好装得下、再大就装不下——这才是那句 claim 的真实含义
+  - [x] p1-1.4 VLM 描述：代码路径就绪，标 `DEFERRED`
+    - `describe.py`；ingestion 只在 OCR 没找到字时才调用（图上已有字是免费的）；无快照 → atom metadata `deferred: no vision-language model snapshot`；模型报错 → `failed: …` 且 ingest 不死（策略在调用方，不在 describer）；`status` 显示两个视觉开关；5 个测试
+- p1-1 证据（我额外加的六臂基准，不是验收项）：`bench/visual_recall.py`，ScreenSpot-v2 的 554 个图标 crop + 408 张整屏，报告 `bench/reports/VISUAL.md`
+  - 图标池：picture 0.208 vs words 0.175 vs chance 0.018 —— 图片空间比瞎猜高 11.5 倍，并且在 427 个 OCR 没字的 crop 上超过了词
+  - 整屏池：words 0.384 > picture 0.215 —— 整屏的身份主要是文字，OCR 词在这里赢
+  - 整屏 → 图标：0.108 —— CLIP 不会在截图里定位小图标，它是整图相似模型，不是 grounding 模型
+  - 单屏内：MRR 0.908（recall@10 是 1.000 但 chance 也是 1.000，所以那一行只有 MRR 有意义）
+  - 本轮没测双语：ScreenSpot-v2 的指令全是英文，报告里写明了
   - 验收：无文字图像被图像查询召回有 recall 数字；`pytest tests/test_visual_tokens.py` 绿
 - [ ] **p1-2** 音频摄入
   - [ ] p1-2.1 `Modality` 加 audio/transcript；未知扩展名不再静默跳过

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import mimetypes
 import shutil
 from pathlib import Path
@@ -32,11 +33,22 @@ def safe_source_id(path: Path, content_hash: str) -> str:
 
 
 def token_equivalent(text: str) -> int:
+    """A cheap stand-in for a tokenizer: four ascii characters or two wide ones per token."""
     if not text:
         return 0
     ascii_chars = sum(1 for char in text if ord(char) < 128)
     non_ascii_chars = len(text) - ascii_chars
     return max(1, ascii_chars // 4 + non_ascii_chars // 2)
+
+
+VISUAL_PATCH = 32
+
+
+def visual_token_equivalent(width: float, height: float) -> int:
+    """Tokens a picture costs a vision model: one per 32x32 patch, so 1280x720 is 920."""
+    if width <= 0 or height <= 0:
+        raise ValueError(f"a visual region needs a positive size, got {width}x{height}")
+    return max(1, math.ceil(width / VISUAL_PATCH) * math.ceil(height / VISUAL_PATCH))
 
 
 class ObjectStore:

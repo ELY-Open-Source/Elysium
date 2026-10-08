@@ -16,6 +16,7 @@ from PIL import Image
 
 from .config import Settings, get_settings
 from .db import Database
+from .describe import DEFERRED, VisionDescriber
 from .ocr import read_text_from_image
 from .schemas import (
     EvidenceAtom,
@@ -32,6 +33,7 @@ from .storage import (
     sha256_bytes,
     sha256_file,
     token_equivalent,
+    visual_token_equivalent,
 )
 
 SUPPORTED_TEXT_EXTENSIONS = {
@@ -93,6 +95,7 @@ class IngestionService:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
         self.objects = object_store or ObjectStore(self.settings)
+        self.describer = VisionDescriber(self.settings)
 
     def ingest_path(self, path: Path, cartridge_name: str | None = None) -> IngestResponse:
         path = path.expanduser().resolve()
@@ -208,18 +211,33 @@ class IngestionService:
         source = self._source_record(path, self._image_kind(path), metadata=image_metadata(path))
         image_ref = self.objects.put_file(path, "images")
         ocr = read_text_from_image(path)
+        caption = ""
+        caption_note = ""
+        if not ocr.text.strip():
+            # Words already on the picture are free; only a wordless one is worth a model call.
+            try:
+                caption = self.describer.describe_or_none(path) or ""
+            except (OSError, RuntimeError, ValueError) as error:
+                caption, caption_note = "", f"failed: {error}"
+            else:
+                caption_note = "vlm" if caption else DEFERRED
+        text = caption or ocr.text
         width, height = image_size(path)
         atom = EvidenceAtom(
             atom_id=f"{source.source_id}:image",
             modality=Modality.ui_screenshot if source.kind == "ui_screenshot" else Modality.image,
             source_id=source.source_id,
             source=str(path),
-            text=ocr.text,
+            text=text,
             image_ref=image_ref,
             layout=LayoutBox(x=0, y=0, w=width, h=height),
-            trust=TrustScores(parser=1.0, ocr=ocr.confidence, model=0.0),
-            token_equivalent=token_equivalent(ocr.text) + max(1, (width * height) // (224 * 224)),
-            metadata={"ocr_regions": ocr.regions, **image_metadata(path)},
+            trust=TrustScores(parser=1.0, ocr=ocr.confidence, model=0.6 if caption else 0.0),
+            token_equivalent=token_equivalent(text) + visual_token_equivalent(width, height),
+            metadata={
+                "ocr_regions": ocr.regions,
+                "caption": caption_note,
+                **image_metadata(path),
+            },
         )
         return IngestBatch(sources=[source], atoms=[atom])
 
@@ -334,7 +352,7 @@ class IngestionService:
                     image_ref=image_ref,
                     layout=LayoutBox(x=0, y=0, w=float(width), h=float(height), frame_second=second),
                     trust=TrustScores(parser=1.0, ocr=ocr.confidence, model=0.0),
-                    token_equivalent=token_equivalent(ocr.text) + max(1, (width * height) // (224 * 224)),
+                    token_equivalent=token_equivalent(ocr.text) + visual_token_equivalent(width, height),
                     metadata={"frame_index": frame_index, "second": second, "ocr_regions": ocr.regions},
                 )
             )

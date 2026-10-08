@@ -1,0 +1,166 @@
+{
+  "generated_at": "2026-10-08T00:37:50.278445+00:00",
+  "commit": "7e1fe649f68bcb25108e2781d912c8a80e3bbfc8",
+  "dataset": "OS-Copilot/ScreenSpot-v2 (icon instructions)",
+  "model": {
+    "repo": "Xenova/chinese-clip-vit-base-patch16",
+    "sha256": "0fad978faa89b85fda53a83a4c202116a9eb87c8f9723fb4d85e4483efbce4b2"
+  },
+  "targets": 554,
+  "screenshots": 408,
+  "crops_without_ocr_text": 427,
+  "instruction_languages": {
+    "cjk_instructions": 0
+  },
+  "machine": {
+    "system": "Linux",
+    "release": "6.18.40.1-microsoft-standard-WSL2",
+    "cpus": 32,
+    "threads_per_query": 4,
+    "load_average_1_5_15": [
+      46.81,
+      44.0,
+      33.68
+    ]
+  },
+  "arms": [
+    {
+      "label": "words → icon crops",
+      "key": "words->crops",
+      "n_answerable": 554,
+      "n_unanswerable": 0,
+      "recall_at_1": 0.09025270758122744,
+      "recall_at_5": 0.15162454873646208,
+      "recall_at_10": 0.17509025270758122,
+      "ndcg_at_10": 0.13173348831922826,
+      "mrr": 0.11802403873703514,
+      "hit_at_10": 0.17509025270758122,
+      "hit_at_10_wilson_lower": 0.1457109350541202,
+      "abstention_rate_answerable": 0.04512635379061372,
+      "abstention_rate_unanswerable": 0.0,
+      "top_hit_from_holder_unanswerable": 0.0,
+      "latency": {
+        "queries": 554,
+        "p50": 0.1716,
+        "p95": 0.2096
+      },
+      "chance_recall_at_10": 0.0181,
+      "pool": "crops"
+    },
+    {
+      "label": "a sentence → icon crops (picture space)",
+      "key": "picture_words->crops",
+      "n_answerable": 554,
+      "n_unanswerable": 0,
+      "recall_at_1": 0.0812274368231047,
+      "recall_at_5": 0.1552346570397112,
+      "recall_at_10": 0.2075812274368231,
+      "ndcg_at_10": 0.13734530518050886,
+      "mrr": 0.1158894905736061,
+      "hit_at_10": 0.2075812274368231,
+      "hit_at_10_wilson_lower": 0.1758785967641179,
+      "abstention_rate_answerable": 0.0,
+      "abstention_rate_unanswerable": 0.0,
+      "top_hit_from_holder_unanswerable": 0.0,
+      "latency": {
+        "queries": 554,
+        "p50": 0.1399,
+        "p95": 0.1998
+      },
+      "chance_recall_at_10": 0.0181,
+      "pool": "crops"
+    },
+    {
+      "label": "the whole screenshot → icon crops",
+      "key": "picture->crops",
+      "n_answerable": 554,
+      "n_unanswerable": 0,
+      "recall_at_1": 0.03790613718411552,
+      "recall_at_5": 0.08303249097472924,
+      "recall_at_10": 0.10830324909747292,
+      "ndcg_at_10": 0.069893811531563,
+      "mrr": 0.058046100509999435,
+      "hit_at_10": 0.10830324909747292,
+      "hit_at_10_wilson_lower": 0.08507164644767994,
+      "abstention_rate_answerable": 0.0,
+      "abstention_rate_unanswerable": 0.0,
+      "top_hit_from_holder_unanswerable": 0.0,
+      "latency": {
+        "queries": 554,
+        "p50": 0.1599,
+        "p95": 0.22
+      },
+      "chance_recall_at_10": 0.0181,
+      "pool": "crops"
+    },
+    {
+      "label": "words → whole screenshots",
+      "key": "words->shots",
+      "n_answerable": 554,
+      "n_unanswerable": 0,
+      "recall_at_1": 0.12093862815884476,
+      "recall_at_5": 0.296028880866426,
+      "recall_at_10": 0.3844765342960289,
+      "ndcg_at_10": 0.24046684872963128,
+      "mrr": 0.1959028135923443,
+      "hit_at_10": 0.3844765342960289,
+      "hit_at_10_wilson_lower": 0.34489504523476483,
+      "abstention_rate_answerable": 0.0,
+      "abstention_rate_unanswerable": 0.0,
+      "top_hit_from_holder_unanswerable": 0.0,
+      "latency": {
+        "queries": 554,
+        "p50": 0.1362,
+        "p95": 0.2038
+      },
+      "chance_recall_at_10": 0.0245,
+      "pool": "shots"
+    },
+    {
+      "label": "a sentence → whole screenshots (picture space)",
+      "key": "picture_words->shots",
+      "n_answerable": 554,
+      "n_unanswerable": 0,
+      "recall_at_1": 0.048736462093862815,
+      "recall_at_5": 0.14620938628158844,
+      "recall_at_10": 0.2148014440433213,
+      "ndcg_at_10": 0.11948802140007041,
+      "mrr": 0.09050126067274082,
+      "hit_at_10": 0.2148014440433213,
+      "hit_at_10_wilson_lower": 0.18262874778266808,
+      "abstention_rate_answerable": 0.0,
+      "abstention_rate_unanswerable": 0.0,
+      "top_hit_from_holder_unanswerable": 0.0,
+      "latency": {
+        "queries": 554,
+        "p50": 0.136,
+        "p95": 0.204
+      },
+      "chance_recall_at_10": 0.0245,
+      "pool": "shots"
+    },
+    {
+      "label": "a sentence → the icons of that one screen",
+      "key": "picture_words->own_screen",
+      "n_answerable": 554,
+      "n_unanswerable": 0,
+      "recall_at_1": 0.8267148014440433,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "ndcg_at_10": 0.9318097223990938,
+      "mrr": 0.9080024067388689,
+      "hit_at_10": 1.0,
+      "hit_at_10_wilson_lower": 0.9931137086353976,
+      "abstention_rate_answerable": 0.0,
+      "abstention_rate_unanswerable": 0.0,
+      "top_hit_from_holder_unanswerable": 0.0,
+      "latency": {
+        "queries": 554,
+        "p50": 0.1358,
+        "p95": 0.1959
+      },
+      "chance_recall_at_10": 1.0,
+      "pool": "own_screen"
+    }
+  ]
+}

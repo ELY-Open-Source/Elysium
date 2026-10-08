@@ -44,7 +44,8 @@ class Database:
             connection.close()
 
     def init(self) -> None:
-        with sqlite3.connect(self.path) as connection:
+        # connect(), not a bare sqlite3.connect: the migrations read rows by name.
+        with self.connect() as connection:
             apply_migrations(connection)
 
     def upsert_sources(self, sources: list[SourceRecord]) -> None:

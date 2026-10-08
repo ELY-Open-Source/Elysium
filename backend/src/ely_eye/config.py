@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     kv_cache_dtype: str = "auto"
     planner_model_id: str = "Qwen/Qwen3.5-0.8B"
     embedding_model_id: str = "Qwen/Qwen3-VL-Embedding-8B"
+    clip_model_dir: Path | None = None
+    vlm_model_dir: Path | None = None
+    vlm_max_new_tokens: int = 96
     adapter_dir: Path | None = None
     runtime_backend: Literal["sglang", "transformers"] = "transformers"
     sglang_base_url: str = "http://127.0.0.1:8000/v1"
