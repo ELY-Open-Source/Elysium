@@ -64,5 +64,5 @@ class EvidenceGraphService:
 
 
 def claim_node_id(question: str, answer: str) -> str:
-    digest = hashlib.sha256(f"{question}\n{answer}".encode("utf-8")).hexdigest()[:20]
+    digest = hashlib.sha256(f"{question}\n{answer}".encode()).hexdigest()[:20]
     return f"claim_{digest}"

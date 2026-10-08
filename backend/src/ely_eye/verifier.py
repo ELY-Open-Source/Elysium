@@ -7,7 +7,6 @@ from typing import Any
 
 from .schemas import CitationReport, CompiledContext
 
-
 ATOM_PATTERN = re.compile(r"[A-Za-z0-9_./\\:-]+:(?:text|image|page|frame|region)[A-Za-z0-9_./\\:#=-]*")
 
 

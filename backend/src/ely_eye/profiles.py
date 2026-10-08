@@ -6,8 +6,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .config import Settings
 from .schemas import RuntimeLaunchProfile, RuntimeProfileReport, RuntimeProfileValidation
-
 
 EXTREME_YARN_OVERRIDE = {
     "text_config": {
@@ -24,7 +24,7 @@ EXTREME_YARN_OVERRIDE = {
 }
 
 
-def runtime_profile_report(project_root: Path | None = None) -> RuntimeProfileReport:
+def runtime_profile_report(settings: Settings, project_root: Path | None = None) -> RuntimeProfileReport:
     root = project_root or Path.cwd()
     profiles = [
         RuntimeLaunchProfile(
@@ -185,29 +185,55 @@ def runtime_profile_report(project_root: Path | None = None) -> RuntimeProfileRe
             required_features=["GGUF", "offline demo", "quantized KV"],
         ),
     ]
-    validations = validate_runtime_profiles(root, profiles)
+    validations = validate_runtime_profiles(root, profiles, settings)
     ready = all(validation.status == "ready" for validation in validations)
     return RuntimeProfileReport(
         status="ready" if ready else "incomplete",
-        profiles=profiles,
+        profiles=[profile.model_copy(update={"script": launch_script(profile.script)}) for profile in profiles],
         validations=validations,
     )
+
+
+def uses_wsl() -> bool:
+    """A Windows process reaches Linux through wsl.exe; inside WSL the local shell already is Linux."""
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return False
+    return shutil.which("wsl.exe") is not None
+
+
+def launch_script(script: str) -> str:
+    """A Windows host runs the .ps1; a Linux host, WSL included, runs the .sh twin."""
+    return script if uses_wsl() else str(Path(script).with_suffix(".sh"))
+
+
+def host_shell(command: str, settings: Settings) -> list[str]:
+    """Run a shell command where the launch environments live."""
+    if uses_wsl():
+        return ["wsl.exe", "-d", settings.wsl_distro, "bash", "-lc", command]
+    return ["bash", "-lc", command]
+
+
+def host_path(root: Path) -> str:
+    """The path the host shell can cd into; a Windows path is reached through the WSL mount."""
+    resolved = root.resolve()
+    return windows_path_to_wsl(resolved) if uses_wsl() else str(resolved)
 
 
 def validate_runtime_profiles(
     root: Path,
     profiles: list[RuntimeLaunchProfile],
+    settings: Settings,
 ) -> list[RuntimeProfileValidation]:
-    wsl_gpu = wsl_gpu_available()
+    gpu = gpu_available(settings)
     package_cache = {
-        ".venv-linux": linux_package_versions(root, ".venv-linux"),
-        ".venv-linux-vllm": linux_package_versions(root, ".venv-linux-vllm"),
+        ".venv-linux": linux_package_versions(root, ".venv-linux", settings),
+        ".venv-linux-vllm": linux_package_versions(root, ".venv-linux-vllm", settings),
     }
     probe_cache: dict[tuple[str, str, str | None], dict[str, object]] = {}
     llama_server = resolve_llama_server()
     validations: list[RuntimeProfileValidation] = []
     for profile in profiles:
-        script_exists = (root / profile.script).exists()
+        script_exists = (root / launch_script(profile.script)).exists()
         package = package_for_runtime(profile.runtime)
         env_name = linux_env_for_runtime(profile.runtime)
         linux_packages = package_cache.get(env_name, {})
@@ -216,24 +242,24 @@ def validate_runtime_profiles(
         executable = llama_server if profile.runtime == "llama.cpp" else None
         probe_key = (profile.runtime, env_name, executable)
         if probe_key not in probe_cache:
-            probe_cache[probe_key] = runtime_launcher_probe(root, profile.runtime, env_name, executable)
+            probe_cache[probe_key] = runtime_launcher_probe(root, profile.runtime, env_name, executable, settings)
         probe = probe_cache[probe_key]
         probe_status = str(probe.get("status", "skipped"))
         probe_passed = probe_status == "passed"
         if profile.runtime in {"SGLang", "vLLM", "KTransformers"}:
-            ready = script_exists and bool(package_version) and wsl_gpu and probe_passed
+            ready = script_exists and bool(package_version) and gpu and probe_passed
             if profile.runtime == "KTransformers":
                 ready = ready and bool(kt_sglang_version)
             detail = (
                 (
-                    f"WSL GPU ready; {package} {package_version}; "
+                    f"GPU ready; {package} {package_version}; "
                     f"sglang-kt entry {kt_sglang_version}"
                 )
                 if profile.runtime == "KTransformers" and ready
-                else f"WSL GPU ready; {package} {package_version}; env {env_name}"
+                else f"GPU ready; {package} {package_version}; env {env_name}"
                 if ready
                 else (
-                    f"script={script_exists}, wsl_gpu={wsl_gpu}, env={env_name}, "
+                    f"script={script_exists}, gpu={gpu}, env={env_name}, "
                     f"{package}={package_version}, sglang={kt_sglang_version}"
                 )
             )
@@ -253,7 +279,7 @@ def validate_runtime_profiles(
                 package=package,
                 package_version=package_version,
                 executable=executable,
-                wsl_gpu=wsl_gpu,
+                gpu_available=gpu,
                 probe_command=[str(item) for item in probe.get("command", [])],
                 probe_status=probe_status,
                 probe_exit_code=probe.get("exit_code") if isinstance(probe.get("exit_code"), int) else None,
@@ -278,7 +304,7 @@ def linux_env_for_runtime(runtime: str) -> str:
     return ".venv-linux"
 
 
-def linux_package_versions(root: Path, env_name: str) -> dict[str, str]:
+def linux_package_versions(root: Path, env_name: str, settings: Settings) -> dict[str, str]:
     script = (
         "import importlib.metadata as md, json;"
         "names=['sglang','vllm','ktransformers','torch','torchvision','qwen-vl-utils'];"
@@ -290,25 +316,21 @@ def linux_package_versions(root: Path, env_name: str) -> dict[str, str]:
     )
     try:
         output = subprocess.check_output(
-            [
-                "wsl.exe",
-                "-d",
-                "Ubuntu",
-                "bash",
-                "-lc",
-                (
-                    f"cd {wsl_quote(windows_path_to_wsl(root))} "
-                    f"&& test -x {env_name}/bin/python "
-                    f"&& {env_name}/bin/python -c {wsl_quote(script)}"
-                ),
-            ],
+            host_shell(
+                f"cd {wsl_quote(host_path(root))} "
+                f"&& test -x {env_name}/bin/python "
+                f"&& {env_name}/bin/python -c {wsl_quote(script)}",
+                settings,
+            ),
             text=True,
             stderr=subprocess.DEVNULL,
             timeout=20,
         )
-        data = json.loads(output.strip())
-        return {str(key): str(value) for key, value in data.items()}
-    except Exception:
+        payload = json.loads(output.strip())
+        if not isinstance(payload, dict):
+            return {}
+        return {str(key): str(value) for key, value in payload.items()}
+    except (OSError, subprocess.SubprocessError, ValueError):
         return {}
 
 
@@ -317,6 +339,7 @@ def runtime_launcher_probe(
     runtime: str,
     env_name: str,
     executable: str | None,
+    settings: Settings,
 ) -> dict[str, object]:
     if runtime == "SGLang":
         probe_script = (
@@ -325,7 +348,7 @@ def runtime_launcher_probe(
             "print(spec.origin if spec else 'missing'); "
             "sys.exit(0 if spec else 1)"
         )
-        command = wsl_python_command(root, env_name, f"-c {wsl_quote(probe_script)}")
+        command = host_python_command(root, env_name, f"-c {wsl_quote(probe_script)}", settings)
     elif runtime == "vLLM":
         probe_script = (
             "import importlib.util, sys; "
@@ -333,10 +356,10 @@ def runtime_launcher_probe(
             "print(spec.origin if spec else 'missing'); "
             "sys.exit(0 if spec else 1)"
         )
-        command = wsl_python_command(root, env_name, f"-c {wsl_quote(probe_script)}")
+        command = host_python_command(root, env_name, f"-c {wsl_quote(probe_script)}", settings)
     elif runtime == "KTransformers":
         probe_script = "import ktransformers, sglang; print('ktransformers and sglang import ok')"
-        command = wsl_python_command(root, env_name, f"-c {wsl_quote(probe_script)}")
+        command = host_python_command(root, env_name, f"-c {wsl_quote(probe_script)}", settings)
     elif runtime == "llama.cpp" and executable:
         command = [executable, "--help"]
     else:
@@ -349,7 +372,7 @@ def runtime_launcher_probe(
             timeout=30,
             check=False,
         )
-    except Exception as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         return {
             "status": "failed",
             "command": command,
@@ -365,13 +388,13 @@ def runtime_launcher_probe(
     }
 
 
-def wsl_python_command(root: Path, env_name: str, python_args: str) -> list[str]:
+def host_python_command(root: Path, env_name: str, python_args: str, settings: Settings) -> list[str]:
     shell_command = (
-        f"cd {wsl_quote(windows_path_to_wsl(root))} "
+        f"cd {wsl_quote(host_path(root))} "
         f"&& test -x {env_name}/bin/python "
         f"&& {env_name}/bin/python {python_args}"
     )
-    return ["wsl.exe", "-d", "Ubuntu", "bash", "-lc", shell_command]
+    return host_shell(shell_command, settings)
 
 
 def compact_output(stdout: str, stderr: str, limit: int = 800) -> str:
@@ -379,18 +402,17 @@ def compact_output(stdout: str, stderr: str, limit: int = 800) -> str:
     return text[:limit]
 
 
-def wsl_gpu_available() -> bool:
-    if shutil.which("wsl.exe") is None:
-        return False
+def gpu_available(settings: Settings) -> bool:
+    """Ask the host for a CUDA-capable GPU without naming a card: any GPU the driver lists will do."""
     try:
         output = subprocess.check_output(
-            ["wsl.exe", "-d", "Ubuntu", "nvidia-smi", "-L"],
+            host_shell("nvidia-smi -L", settings),
             text=True,
             stderr=subprocess.DEVNULL,
             timeout=10,
         )
         return "GPU" in output
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return False
 
 

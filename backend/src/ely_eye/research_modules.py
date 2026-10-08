@@ -155,7 +155,7 @@ class ResearchModuleService:
                     "entries": layer.entries,
                     "hit_rate": hit_rate,
                     "evict": hit_rate < 0.25 and layer.entries > 0,
-                    "replay_token": hashlib.sha256(f"{layer.layer}:{layer.entries}".encode("utf-8")).hexdigest()[:16],
+                    "replay_token": hashlib.sha256(f"{layer.layer}:{layer.entries}".encode()).hexdigest()[:16],
                 }
             )
         return {"policy": "hit-rate weighted replay buffer", "layers": rows}

@@ -1,13 +1,14 @@
 $ErrorActionPreference = "Stop"
 
 Set-Location (Split-Path -Parent $PSScriptRoot)
+$distro = if ($env:ELY_EYE_WSL_DISTRO) { $env:ELY_EYE_WSL_DISTRO } else { "Ubuntu" }
 
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
   throw "WSL is required for the SGLang Linux runtime."
 }
 
 $override = '{"text_config":{"rope_parameters":{"mrope_interleaved":true,"mrope_section":[11,11,10],"rope_type":"yarn","rope_theta":10000000,"partial_rotary_factor":0.25,"factor":4.0,"original_max_position_embeddings":262144}}}'
-$wslRoot = (wsl.exe -d Ubuntu wslpath -a (Get-Location).Path).Trim()
+$wslRoot = (wsl.exe -d $distro wslpath -a (Get-Location).Path).Trim()
 $command = @"
 set -euo pipefail
 cd "$wslRoot"
@@ -22,4 +23,4 @@ python -m sglang.launch_server \
   --json-model-override-args '$override'
 "@
 
-wsl.exe -d Ubuntu -- bash -lc $command
+wsl.exe -d $distro -- bash -lc $command

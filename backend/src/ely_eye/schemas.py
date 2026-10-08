@@ -439,7 +439,7 @@ class RuntimeProfileValidation(BaseModel):
     package: str | None = None
     package_version: str | None = None
     executable: str | None = None
-    wsl_gpu: bool = False
+    gpu_available: bool = False
     probe_command: list[str] = Field(default_factory=list)
     probe_status: Literal["passed", "failed", "skipped"] = "skipped"
     probe_exit_code: int | None = None

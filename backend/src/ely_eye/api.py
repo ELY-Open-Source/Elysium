@@ -277,8 +277,10 @@ def create_app() -> FastAPI:
         return benchmark_prediction_report(settings, settings.data_dir / "benchmark_predictions")
 
     @app.get("/api/runtime/profiles", response_model=RuntimeProfileReport)
-    def runtime_profiles() -> RuntimeProfileReport:
-        return runtime_profile_report()
+    def runtime_profiles(
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> RuntimeProfileReport:
+        return runtime_profile_report(settings)
 
     @app.get("/api/runtime/adapters", response_model=AdapterLoadReport)
     def runtime_adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> AdapterLoadReport:

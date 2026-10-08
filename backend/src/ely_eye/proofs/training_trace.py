@@ -24,6 +24,11 @@ from ..training import (
 )
 
 
+def cuda_bf16_training(environment: dict[str, Any]) -> bool:
+    """The requirement is CUDA plus BF16 support, not one card name written down in 2025."""
+    return bool(environment.get("cuda_available")) and bool(environment.get("bf16_supported"))
+
+
 def count_safetensor_keys(path: Path) -> int:
     return int(safetensor_weight_stats(path)["tensor_count"])
 
@@ -173,8 +178,7 @@ def validate_training_trace(manifest: AdapterManifest, adapter_root: Path) -> di
         }
     )
     environment = summary.get("environment") if isinstance(summary.get("environment"), dict) else {}
-    device_name = str(environment.get("device_name") or "")
-    report["cuda_training"] = bool(environment.get("cuda_available")) and "RTX 4090" in device_name
+    report["cuda_training"] = cuda_bf16_training(environment)
     report["bf16_supported"] = bool(environment.get("bf16_supported"))
     report["valid"] = (
         report["trace_sha256_ok"]
@@ -282,11 +286,7 @@ def validate_training_proof(manifest: AdapterManifest, adapter_root: Path) -> di
                 and int(proof_weight_stats.get("nonzero_elements") or 0) > 0
                 and bool(proof_weight_stats.get("all_finite"))
             ),
-            "proof_cuda_bf16": (
-                bool(proof.get("bf16"))
-                and bool(proof_environment.get("cuda_available"))
-                and "RTX 4090" in str(proof_environment.get("device_name") or "")
-            ),
+            "proof_cuda_bf16": bool(proof.get("bf16")) and cuda_bf16_training(proof_environment),
             "proof_bf16_supported": bool(proof_environment.get("bf16_supported")),
             "proof_contract_ok": training_payload_contract_ok(proof, manifest),
             "proof_optimizer_ok": proof.get("optimizer") == "paged_adamw_8bit",

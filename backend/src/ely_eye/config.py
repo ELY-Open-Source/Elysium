@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     sglang_base_url: str = "http://127.0.0.1:8000/v1"
     sglang_api_key: str = "ely-eye-local"
     ui_dir: Path | None = None
+    wsl_distro: str = "Ubuntu"
     dense_embeddings_enabled: bool = False
     live_context_tokens: int = 262_144
     extreme_context_tokens: int = 1_010_000

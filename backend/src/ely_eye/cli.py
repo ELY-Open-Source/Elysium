@@ -325,7 +325,7 @@ def run_benchmark(
 
 @app.command("runtime-profiles")
 def runtime_profiles() -> None:
-    typer.echo(runtime_profile_report().model_dump_json(indent=2))
+    typer.echo(runtime_profile_report(get_settings()).model_dump_json(indent=2))
 
 
 @app.command("research-modules")

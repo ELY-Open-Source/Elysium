@@ -1,12 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 Set-Location (Split-Path -Parent $PSScriptRoot)
+$distro = if ($env:ELY_EYE_WSL_DISTRO) { $env:ELY_EYE_WSL_DISTRO } else { "Ubuntu" }
 
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
   throw "WSL is required for the vLLM Linux runtime."
 }
 
-$wslRoot = (wsl.exe -d Ubuntu wslpath -a (Get-Location).Path).Trim()
+$wslRoot = (wsl.exe -d $distro wslpath -a (Get-Location).Path).Trim()
 $ropeScaling = '{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":262144}'
 $command = @"
 set -euo pipefail
@@ -23,4 +24,4 @@ python -m vllm.entrypoints.openai.api_server \
   --rope-scaling '$ropeScaling'
 "@
 
-wsl.exe -d Ubuntu -- bash -lc $command
+wsl.exe -d $distro -- bash -lc $command

@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, TextIO
@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field
 from .config import Settings, get_settings
 from .db import Database
 from .schemas import AdapterManifest, EvidenceAtom, TrainingAdapterKind
-
 
 SYSTEM_PROMPT = (
     "You are Ely-Eye. Answer from supplied evidence, return compact JSON, "
@@ -433,7 +432,7 @@ class TrainingService:
             gradient_accumulation_steps or self.settings.train_gradient_accumulation_steps
         )
         learning_rate = learning_rate or self.settings.train_learning_rate
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         wall_start = time.perf_counter()
         trace_path = output_dir / "training_trace.jsonl"
 
@@ -575,7 +574,7 @@ class TrainingService:
         processor.save_pretrained(output_dir)
         self.write_lora_config(output_dir, kind, rank, alpha, model_id)
         weight_stats = safetensor_weight_stats(output_dir / "adapter_model.safetensors")
-        finished_at = datetime.now(timezone.utc)
+        finished_at = datetime.now(UTC)
         wall_seconds = time.perf_counter() - wall_start
         summary_path = output_dir / "training_summary.json"
         proof_path = output_dir / "training_proof.json"
@@ -671,7 +670,7 @@ class TrainingService:
         manifest = AdapterManifest(
             adapter_id=adapter_id(kind, dataset_path, model_id),
             kind=kind,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             proof_version=TRAINING_PROOF_VERSION,
             training_method=TRAINING_METHOD,
             precision=TRAINING_PRECISION,
@@ -756,7 +755,7 @@ class TrainingService:
         output_dir.mkdir(parents=True, exist_ok=True)
         max_length = max_length or self.settings.train_max_length
         learning_rate = learning_rate or self.settings.train_learning_rate
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         wall_start = time.perf_counter()
         trace_path = output_dir / "training_trace.jsonl"
 
@@ -882,7 +881,7 @@ class TrainingService:
         processor.save_pretrained(output_dir)
         self.write_lora_config(output_dir, TrainingAdapterKind.hme_retrieval, rank, alpha, model_id)
         weight_stats = safetensor_weight_stats(output_dir / "adapter_model.safetensors")
-        finished_at = datetime.now(timezone.utc)
+        finished_at = datetime.now(UTC)
         wall_seconds = time.perf_counter() - wall_start
         summary_path = output_dir / "training_summary.json"
         proof_path = output_dir / "training_proof.json"
@@ -977,7 +976,7 @@ class TrainingService:
         manifest = AdapterManifest(
             adapter_id=adapter_id(TrainingAdapterKind.hme_retrieval, dataset_path, model_id),
             kind=TrainingAdapterKind.hme_retrieval,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             proof_version=TRAINING_PROOF_VERSION,
             training_method=TRAINING_METHOD,
             precision=TRAINING_PRECISION,
@@ -1269,7 +1268,7 @@ def trainable_update_l2(before_update: dict[str, Any], named_parameters: list[tu
 
 def require_cuda_bf16(torch_module: Any) -> None:
     if not torch_module.cuda.is_available():
-        raise RuntimeError("PRD 12.2 training requires CUDA BF16 on the local RTX 4090.")
+        raise RuntimeError("training needs a CUDA device; none is available.")
     bf16_supported = getattr(torch_module.cuda, "is_bf16_supported", lambda: False)
     if not bool(bf16_supported()):
         raise RuntimeError("PRD 12.2 training requires BF16-capable CUDA hardware.")
@@ -1598,7 +1597,7 @@ def slugify(value: str) -> str:
 
 
 def adapter_id(kind: TrainingAdapterKind, dataset_path: Path, model_id: str) -> str:
-    raw = f"{kind.value}:{model_id}:{dataset_path.resolve()}:{datetime.now(timezone.utc).isoformat()}"
+    raw = f"{kind.value}:{model_id}:{dataset_path.resolve()}:{datetime.now(UTC).isoformat()}"
     return f"{kind.value}_{sha256_bytes(raw.encode('utf-8'))[:12]}"
 
 
@@ -1632,7 +1631,7 @@ def sha256_bytes(data: bytes) -> str:
 
 
 class _DigestWriter:
-    def __init__(self, digest: "hashlib._Hash") -> None:
+    def __init__(self, digest: hashlib._Hash) -> None:
         self.digest = digest
 
     def write(self, data: bytes) -> int:

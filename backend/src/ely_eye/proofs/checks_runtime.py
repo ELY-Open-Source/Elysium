@@ -232,7 +232,7 @@ class RuntimeChecks:
             runtime.unload()
 
     def _runtime_profile_check(self, proof_root: Path) -> ProofCheck:
-        report = runtime_profile_report()
+        report = runtime_profile_report(self.settings)
         artifact = proof_root / "runtime_profiles.json"
         artifact.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         required_runtimes = {"SGLang", "vLLM", "KTransformers", "llama.cpp"}
