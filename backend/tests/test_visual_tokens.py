@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-import ely_eye.ingestion as ingestion_module
+import ely_eye.ingestion_media as media_module
 from ely_eye.config import Settings
 from ely_eye.db import Database
 from ely_eye.ingestion import IngestionService
@@ -48,7 +48,7 @@ def test_a_region_without_a_size_is_refused_rather_than_guessed() -> None:
 
 def test_an_ingested_image_carries_its_text_and_its_patches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     settings = Settings(home=tmp_path)
-    monkeypatch.setattr(ingestion_module, "read_text_from_image", lambda path: OcrResult("购物车", 0.9, []))
+    monkeypatch.setattr(media_module, "read_text_from_image", lambda path: OcrResult("购物车", 0.9, []))
 
     database = _ingest(tmp_path, settings)
     atom = database.list_atoms()[0]
@@ -58,7 +58,7 @@ def test_an_ingested_image_carries_its_text_and_its_patches(tmp_path: Path, monk
 
 def test_an_existing_store_is_repriced_by_the_migration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     settings = Settings(home=tmp_path)
-    monkeypatch.setattr(ingestion_module, "read_text_from_image", lambda path: OcrResult("", 0.0, []))
+    monkeypatch.setattr(media_module, "read_text_from_image", lambda path: OcrResult("", 0.0, []))
     database = _ingest(tmp_path, settings)
     note = tmp_path / "notes.md"
     note.write_text("# 钥匙放在玄关抽屉里\n", encoding="utf-8")

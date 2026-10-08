@@ -21,7 +21,8 @@ from ..db import Database
 from ..evaluation_schemas import (
     ProofCheck,
 )
-from ..ingestion import SUPPORTED_CODE_EXTENSIONS, build_repository_context, find_git_root
+from ..ingestion_common import SUPPORTED_CODE_EXTENSIONS
+from ..ingestion_repository import build_repository_context, find_git_root
 from ..schemas import (
     CartridgeManifest,
     RuntimeProfile,

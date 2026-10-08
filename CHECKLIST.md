@@ -153,10 +153,35 @@
   - 单屏内：MRR 0.908（recall@10 是 1.000 但 chance 也是 1.000，所以那一行只有 MRR 有意义）
   - 本轮没测双语：ScreenSpot-v2 的指令全是英文，报告里写明了
   - 验收：无文字图像被图像查询召回有 recall 数字；`pytest tests/test_visual_tokens.py` 绿
-- [ ] **p1-2** 音频摄入
-  - [ ] p1-2.1 `Modality` 加 audio/transcript；未知扩展名不再静默跳过
-  - [ ] p1-2.2 ASR 接入，转写 atom 带词级时间戳
-  - 验收：`pytest tests/test_audio_ingest.py` 绿；ASR 跑通或明确 `DEFERRED`
+- [x] **p1-2** 音频摄入
+  - [x] p1-2.1 `Modality` 加 audio；未知扩展名不再静默跳过
+  - [x] p1-2.2 ASR 接入，转写 atom 带词级时间戳
+  - 验收：`pytest backend/tests/test_asr.py` 绿（8 个测试）；ASR **实跑**，不是 DEFERRED
+  - 实测证据（`bench/reports/ASR.md`，commit 03ca357）：3 段 Video-MME 真视频 210.5 秒音频，
+    对着第三方字幕 WER **0.242**，CPU int8 **51× 实时**，产出 66 个 speech atom、550 个词级时间戳，
+    0 个词时序倒错、0 个词早于自己所属片段。模型 `Systran/faster-whisper-tiny`（78.2MB，
+    model.bin sha256 dcb76c6586fc06cb…），远低于 500MB 上限。字幕不是逐字稿，所以 WER 是上界。
+  - 偏差与根因：
+    - 验收路径 `tests/test_audio_ingest.py` 不存在，实际是 `backend/tests/test_asr.py`。
+    - `Modality` 只加 `audio`，没加 `transcript`：一份转写就是带时间戳的 audio atom，
+      两个成员是同一件事的两个名字。
+    - faster-whisper 自带的音频加载器在 PyAV 19 上是坏的（`av.open(..., metadata_errors=)` →
+      `TypeError`），而它声明 `av` 时没写版本界。所以 `asr.decode_audio()` 自己用 PyAV 解码成
+      float32/16kHz 单声道再喂给 `model.transcribe()`，不降级 pin 一个没有 cp314 wheel 的旧 av。
+    - PyAV 19 的异常面是量出来的不是猜的：`av.Error` 不存在（第一版会死在 except 里），
+      真实基类是 `av.error.FFmpegError`；只 catch 它，我自己的 `ValueError` 消息才不会被吞。
+    - 未知扩展名：显式给路径 → 抛 `UnsupportedFile`（“no reader for .xyz”）；目录扫描 →
+      记进 `IngestResponse.skipped` 带原因，继续摄入能读的。以前是返回空 batch，无声无息。
+    - 视频现在除了帧 atom 还会产出 speech atom（同一个 mp4：18 帧 + 31 段语音）。
+    - 顺手把 p2-4 提前做了：`ingestion.py` 748 行超了 500 规则，拆成
+      `ingestion_common.py`(99) / `ingestion_media.py`(ABC mixin, 285) / `ingestion_repository.py`(346) /
+      `ingestion.py`(193)；`cli.py` 544 行也超了，按已有的 `cli_transactive.register` 模式拆出
+      `cli_senses.py`(84) 和 `cli_common.py`(json_dump)，`cli.py` 现在 479 行。
+    - 拆完顺手修掉搬过来的旧类型债：`MediaIngest._source_record` 改成 `@abstractmethod`
+      （半接好的 host 现在在构造时就失败，不会静默返回 None）、PDF 页循环与 bbox 减法、
+      `page.get_text` 的 union 收窄；`pyproject.toml` 里失效的 `fitz.*` mypy override 换成 `faster_whisper.*`。
+    - 全仓 mypy 从 29 个错降到 **24**（本任务净修 5 个，没新增）；改动文件 pyright **0 错**、
+      ruff 干净、207 个测试绿。
 - [ ] **p1-3** adapter 加载
   - [ ] p1-3.1 按卡带/场景解析 6 个 adapter，不再只有 `runtime.py:317`
   - [ ] p1-3.2 加载结果可观测：日志 + `GET /api/runtime/adapters`

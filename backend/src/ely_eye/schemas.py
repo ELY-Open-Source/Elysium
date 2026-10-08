@@ -34,6 +34,7 @@ class Modality(StrEnum):
     pdf_page = "pdf_page"
     pdf_region = "pdf_region"
     video_frame = "video_frame"
+    audio = "audio"
     ui_screenshot = "ui_screenshot"
     mixed = "mixed"
 
@@ -138,12 +139,17 @@ class SourceRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+class SkippedFile(BaseModel):
+    path: str
+    reason: str
+
 class IngestResponse(BaseModel):
     source_count: int
     atom_count: int
     cartridge_id: str | None
     token_equivalent: int
     sources: list[SourceRecord]
+    skipped: list[SkippedFile] = []
 
 class RetrievalHit(BaseModel):
     atom: EvidenceAtom

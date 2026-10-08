@@ -1,0 +1,80 @@
+{
+  "generated_utc": "2026-10-08T01:05:45+00:00",
+  "commit": "03ca35763fd63eb8d8f0d2c721d02c6c3ded90a7",
+  "model": {
+    "id": "Systran/faster-whisper-tiny",
+    "sha256_model_bin": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1",
+    "compute": "cpu int8"
+  },
+  "reference": "Video-MME community subtitles (third-party captions, not verbatim transcripts)",
+  "machine": {
+    "system": "Linux",
+    "release": "6.18.40.1-microsoft-standard-WSL2",
+    "cpus": 32,
+    "threads_per_query": 4,
+    "load_average_1_5_15": [
+      1.84,
+      1.85,
+      6.99
+    ]
+  },
+  "totals": {
+    "videos": 3,
+    "audio_seconds": 210.5,
+    "word_error_rate": 0.242,
+    "speech_atoms": 66,
+    "words": 550,
+    "out_of_order": 0,
+    "before_their_segment": 0
+  },
+  "videos": [
+    {
+      "video": "0IdYJGBmguM",
+      "seconds": 88.9,
+      "transcribe_seconds": 1.73,
+      "real_time_factor": 51.3,
+      "segments": 31,
+      "speech_atoms": 31,
+      "modality": "audio",
+      "hypothesis_words": 218,
+      "reference_words": 201,
+      "word_error_rate": 0.179,
+      "mean_word_confidence": 0.879,
+      "words": 218,
+      "out_of_order": 0,
+      "before_their_segment": 0
+    },
+    {
+      "video": "1q-5IIyZL20",
+      "seconds": 99.9,
+      "transcribe_seconds": 1.94,
+      "real_time_factor": 51.6,
+      "segments": 32,
+      "speech_atoms": 32,
+      "modality": "audio",
+      "hypothesis_words": 300,
+      "reference_words": 296,
+      "word_error_rate": 0.28,
+      "mean_word_confidence": 0.83,
+      "words": 300,
+      "out_of_order": 0,
+      "before_their_segment": 0
+    },
+    {
+      "video": "1tidNDIpKSY",
+      "seconds": 21.7,
+      "transcribe_seconds": 1.34,
+      "real_time_factor": 16.1,
+      "segments": 3,
+      "speech_atoms": 3,
+      "modality": "audio",
+      "hypothesis_words": 32,
+      "reference_words": 36,
+      "word_error_rate": 0.278,
+      "mean_word_confidence": 0.852,
+      "words": 32,
+      "out_of_order": 0,
+      "before_their_segment": 0
+    }
+  ]
+}

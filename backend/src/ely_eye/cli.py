@@ -16,11 +16,12 @@ from .benchmarks import (
 )
 from .cartridge import CartridgeService
 from .cartridge_assets import CartridgeAssetService
+from .cli_common import json_dump
+from .cli_senses import register as register_sense_commands
+from .cli_senses import senses_report
 from .cli_transactive import register as register_transactive_commands
-from .config import Settings, get_settings
+from .config import get_settings
 from .db import Database
-from .describe import DEFERRED, VisionDescriber
-from .embeddings import EmbeddingService
 from .ingestion import IngestionService
 from .memory import MemoryService
 from .profiles import runtime_profile_report
@@ -32,46 +33,17 @@ from .retrieval import RetrievalService
 from .runtime import QwenRuntime
 from .schemas import MemoryOrigin, SearchFilters, TimePrecision, TrainingAdapterKind
 from .training import TrainingService
-from .visual_index import VisualIndex
 
 app = typer.Typer(no_args_is_help=True)
 
 
-def json_dump(value: object) -> str:
-    import json
-
-    return json.dumps(value, ensure_ascii=False, indent=2)
-
-
 register_transactive_commands(app, lambda: get_settings())
+register_sense_commands(app, lambda: get_settings())
 
 
 @app.command()
 def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
     uvicorn.run(create_app(), host=host, port=port)
-
-
-def _senses(settings: Settings, db: Database) -> dict[str, dict[str, object]]:
-    """What this machine can see, and what it has to pretend about.
-
-    A missing snapshot is reported, not hidden: an unrun capability is a plan, and the status
-    output is where an operator learns which claims about this install are real today.
-    """
-    visual = VisualIndex(settings, db)
-    describer = VisionDescriber(settings)
-    index_present = visual.index_path.exists() and visual.map_path.exists()
-    return {
-        "picture_search": {
-            "model_dir": str(visual.model_dir() or ""),
-            "model_ready": visual.available(),
-            "index": "present" if index_present else "absent",
-        },
-        "picture_description": {
-            "model_dir": str(describer.model_dir() or ""),
-            "model_ready": describer.available(),
-            "note": "" if describer.available() else DEFERRED,
-        },
-    }
 
 
 @app.command()
@@ -91,7 +63,7 @@ def status() -> None:
                 ),
                 "cartridges": db.cartridge_count(),
                 "data_home": str(settings.home),
-                "senses": _senses(settings, db),
+                "senses": senses_report(settings, db),
             }
         )
     )
@@ -142,21 +114,6 @@ def search(
         image=Path(image) if image else None,
     )
     typer.echo(result.model_dump_json(indent=2))
-
-
-@app.command()
-def describe_image(path: Path) -> None:
-    """Say what a picture shows; names the setup step when no vision model is installed."""
-    settings = get_settings()
-    typer.echo(json_dump({"image": str(path), "caption": VisionDescriber(settings).describe(path)}))
-
-
-@app.command()
-def index_visual() -> None:
-    """Encode every image atom so a picture or a sentence can find it."""
-    settings = get_settings()
-    database = Database(settings)
-    typer.echo(json_dump(VisualIndex(settings, database).build()))
 
 
 @app.command()
@@ -211,13 +168,6 @@ def forget(atom_id: str = "", source_id: str = "", reason: str = "") -> None:
         reason=reason,
     )
     typer.echo(report.model_dump_json(indent=2))
-
-
-@app.command("build-dense-index")
-def build_dense_index() -> None:
-    index = EmbeddingService(get_settings()).build_index()
-    dimensions = int(index.vectors.shape[1]) if index.vectors.size else 0
-    typer.echo(json_dump({"atoms": len(index.atom_ids), "dimensions": dimensions}))
 
 
 @app.command("list-cartridges")

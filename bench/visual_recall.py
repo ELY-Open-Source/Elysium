@@ -19,14 +19,11 @@ import json
 import re
 import statistics
 import subprocess
-import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from ely_eye.config import Settings
 from ely_eye.db import Database
@@ -44,8 +41,9 @@ from ely_eye.storage import (
     visual_token_equivalent,
 )
 from ely_eye.visual_index import VisualIndex
-from metrics import aggregate, chance_recall_at_k, score_query
-from systems import machine_facts
+
+from bench.metrics import aggregate, chance_recall_at_k, score_query
+from bench.systems import machine_facts
 
 ROOT = Path(__file__).resolve().parent
 CORPUS = ROOT / "corpus" / "OS-Copilot" / "ScreenSpot-v2"

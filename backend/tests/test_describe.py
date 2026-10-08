@@ -13,7 +13,7 @@ from typing import cast
 import pytest
 from PIL import Image
 
-import ely_eye.ingestion as ingestion_module
+import ely_eye.ingestion_media as media_module
 from ely_eye.config import Settings
 from ely_eye.db import Database
 from ely_eye.describe import DEFERRED, VisionDescriber
@@ -49,7 +49,7 @@ def _ingest(tmp_path: Path, describer: object, ocr_text: str = "") -> tuple[Sett
     database = Database(settings)
     service = IngestionService(settings=settings, database=database)
     service.describer = cast(VisionDescriber, describer)
-    ingestion_module.read_text_from_image = lambda path: OcrResult(ocr_text, 0.9, [])
+    media_module.read_text_from_image = lambda path: OcrResult(ocr_text, 0.9, [])
     service.ingest_path(_picture(tmp_path))
     return settings, database
 

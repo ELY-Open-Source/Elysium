@@ -17,6 +17,6 @@ module = [
     "rank_bm25",
     "sentence_transformers.*",
     "onnxruntime.*",
-    "fitz.*",
+    "faster_whisper.*",
 ]
 ignore_missing_imports = true
