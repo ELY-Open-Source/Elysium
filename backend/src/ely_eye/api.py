@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import __version__
+from .adapters import plan as adapter_plan
 from .api_cartridges import register as register_cartridge_routes
 from .api_holders import register as register_holder_routes
 from .benchmarks import (
@@ -41,6 +42,7 @@ from .proofs import HashHopEvaluator, PRDProofSuite
 from .research_modules import ResearchModuleService
 from .retrieval import RetrievalService
 from .runtime import QwenRuntime, RuntimeUnavailableError
+from .runtime_schemas import AdapterLoadReport
 from .schemas import (
     AdapterManifest,
     AdapterStatus,
@@ -276,6 +278,10 @@ def create_app() -> FastAPI:
     @app.get("/api/runtime/profiles", response_model=RuntimeProfileReport)
     def runtime_profiles() -> RuntimeProfileReport:
         return runtime_profile_report()
+
+    @app.get("/api/runtime/adapters", response_model=AdapterLoadReport)
+    def runtime_adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> AdapterLoadReport:
+        return adapter_plan(settings, Database(settings))
 
     @app.get("/api/research/modules")
     def research_modules(settings: Annotated[Settings, Depends(settings_dep)]):

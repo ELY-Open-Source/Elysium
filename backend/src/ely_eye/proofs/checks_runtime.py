@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .. import adapters
 from ..compiler import ContextCompiler
 from ..config import Settings
 from ..db import Database
@@ -17,7 +18,7 @@ from ..evaluation_schemas import (
 )
 from ..evidence_graph import EvidenceGraphService
 from ..profiles import runtime_profile_report
-from ..runtime import QwenRuntime, resolve_runtime_adapter
+from ..runtime import QwenRuntime
 from ..schemas import (
     RuntimeProfile,
     TrainingAdapterKind,
@@ -58,7 +59,7 @@ class RuntimeChecks:
             return deferred
         runtime = QwenRuntime(self.settings)
         status = runtime.status()
-        adapter = resolve_runtime_adapter(self.settings)
+        adapter, _adapter_state, _adapter_reason = adapters.resolve_library_adapter(self.settings)
         weight_path = adapter.path / "adapter_model.safetensors" if adapter else None
         payload = {
             "runtime_status": status.model_dump(mode="json"),
@@ -133,7 +134,7 @@ class RuntimeChecks:
             )
             payload["generation_question"] = generation_question
             status = runtime.status()
-            adapter = resolve_runtime_adapter(proof_settings)
+            adapter, _adapter_state, _adapter_reason = adapters.resolve_library_adapter(proof_settings)
             generation = runtime.generate(generation_question, context)
             answer, citations, citation_report = Verifier().verify_answer(generation.text, context)
             claim_id = EvidenceGraphService(proof_settings, self.db).record_answer(

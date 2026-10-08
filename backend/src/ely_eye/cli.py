@@ -6,6 +6,7 @@ from pathlib import Path
 import typer
 import uvicorn
 
+from .adapters import plan as adapter_plan
 from .api import create_app
 from .benchmarks import (
     benchmark_prediction_report,
@@ -473,6 +474,14 @@ def train_retrieval_lora(
 def attach_adapter(cartridge_id: str, adapter_dir: Path) -> None:
     manifest = CartridgeService(get_settings()).attach_adapter(cartridge_id, adapter_dir)
     typer.echo(manifest.model_dump_json(indent=2))
+
+
+@app.command("adapters")
+def adapter_status() -> None:
+    """Which adapter the runtime would load, and why each other kind would not."""
+    settings = get_settings()
+    report = adapter_plan(settings, Database(settings))
+    typer.echo(json_dump(report.model_dump(mode="json")))
 
 
 if __name__ == "__main__":

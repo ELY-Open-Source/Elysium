@@ -219,10 +219,19 @@
       重跑 `bench.asr_check`（新进程）、重跑门禁、逐项核对 stamp 链与 18 条 CHECKLIST 断言，
       并确认旧数字（1.7 秒 / 3.55 / 61.6 / 31 段 / 210.5 / 51×）零残留。三轮都是同一个 reviewer，
       没有换人放水。
-- [ ] **p1-3** adapter 加载
-  - [ ] p1-3.1 按卡带/场景解析 6 个 adapter，不再只有 `runtime.py:317`
-  - [ ] p1-3.2 加载结果可观测：日志 + `GET /api/runtime/adapters`
+- [x] **p1-3** adapter 加载
+  - [x] p1-3.1 按卡带/场景解析 6 个 adapter，不再只有 `runtime.py:317`
+  - [x] p1-3.2 加载结果可观测：日志 + `GET /api/runtime/adapters`
   - 验收：状态端点列每个 adapter 的 loaded/deferred + 原因；桩权重测试证明加载分支执行
+  - `backend/src/ely_eye/adapters.py` 是唯一的 adapter 解析处。`runtime.py` 原先在 7 处调 `resolve_runtime_adapter`，现在统一走 `_generation_adapter_fields()`；`peft` 只在 `adapters.load_into_model` 里懒加载，`RuntimeAdapter` 与 `resolve_runtime_adapter` 已删除。
+  - 「场景」= 挂载的卡带：`AdapterManifest` 和 `CartridgeManifest` 都没有 scenario 字段（读出来的事实），所以解析按 `cartridge_store.mounted_ids` 选，报告写明来自哪个卡带，没有新造字段。
+  - 修掉的真 bug：`CartridgeService.attach_adapter`（`cartridge.py:230`）把 adapter 拷进 `<卡带>/adapters/{kind}/`，但解析从来不看卡带目录，挂上去的东西运行时根本不加载。现在挂载卡带里的副本优先于库里的同名 adapter。
+  - 测试写出来才发现的第二个 bug：`ready.sort(key=_preference)` 丢了原来的 `reverse=True`，库里的 adapter 反而赢了挂载副本。
+  - 状态只由事实支撑：loaded（有 LoadRecord）/ available（manifest 与 `adapter_model.safetensors` 都在）/ deferred（base_model 不匹配或缺权重文件，原因里写两个模型名）/ missing（磁盘上没有该 kind）。落选者单独一行 `shadowed=True`。
+  - 验收命令：`pytest backend/tests/test_adapters.py -q` → 10 passed。`test_stub_weights_prove_the_load_branch_runs` 用桩权重断言 `attached == [(ANY, 路径)]`、`model.evalled is True`、LoadRecord 存在、端点该行 `state == "loaded"`；`test_unload_clears_the_loaded_state` 断言 unload 后回到 available。
+  - 新文件 `backend/src/ely_eye/runtime_schemas.py`（30 行）：`schemas.py` 已 498 行，离 500 行红线 2 行，报告类型不放进去。
+  - 门禁：`pytest -q` 222 passed；ruff 干净；mypy 冷缓存查 7 个改动文件 → 2 errors，与 HEAD 的 `runtime.py` 逐条相同（`qwen_vl_utils` 无 stubs、`model_class` 重赋值），净新增 0；pyright 同 7 文件 → 2 errors，HEAD 也是 2 条，都是 `process_vision_info` 的双返回（`vision_process.py:532-534` 由 `return_video_kwargs` 决定返回 2 或 3 元组，产品用默认值取 2 个，运行时正确）。
+  - CLI 面：`ely-eye adapters` 打印同一份报告。
 - [ ] **p1-4** 工程地基
   - [ ] p1-4.1 pytest 从零到有（后端）
   - [ ] p1-4.2 go test 从零到有（MCP）

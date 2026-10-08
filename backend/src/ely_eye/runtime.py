@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,9 +10,13 @@ from typing import Any
 
 import httpx
 
+from . import adapters
 from .config import Settings, get_settings
-from .schemas import AdapterManifest, CompiledContext, RuntimeStatus, TrainingAdapterKind
+from .db import Database
+from .schemas import CompiledContext, RuntimeStatus, TrainingAdapterKind
 from .storage import ObjectStore
+
+logger = logging.getLogger("ely_eye.runtime")
 
 
 class RuntimeUnavailableError(RuntimeError):
@@ -34,12 +39,41 @@ class QwenRuntime:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.objects = ObjectStore(self.settings)
+        self.database = Database(self.settings)
         self._processor: Any | None = None
         self._model: Any | None = None
 
+    def _adapter_choice(self) -> tuple[adapters.AdapterSource | None, str]:
+        """The adapter this runtime would attach, plus the reason if it would not attach one."""
+        sources, _ = adapters.discover(self.settings, self.database)
+        source, _state, reason = adapters.resolve(sources, self.settings, TrainingAdapterKind.hme_core_lora)
+        return source, reason
+
+    def _loaded_adapter(self) -> adapters.LoadRecord | None:
+        return next((item for item in adapters.load_records() if item.kind == TrainingAdapterKind.hme_core_lora), None)
+
+    def _generation_adapter_fields(self) -> dict[str, str | None]:
+        record = self._loaded_adapter()
+        if record is not None:
+            return {
+                "adapter_path": record.path,
+                "adapter_kind": record.kind.value,
+                "adapter_id": record.adapter_id,
+                "adapter_sha256": record.sha256,
+            }
+        source, _ = self._adapter_choice()
+        if source is None:
+            return {"adapter_path": None, "adapter_kind": None, "adapter_id": None, "adapter_sha256": None}
+        return {
+            "adapter_path": str(source.path),
+            "adapter_kind": source.manifest.kind.value,
+            "adapter_id": source.manifest.adapter_id,
+            "adapter_sha256": source.manifest.sha256,
+        }
+
     def status(self) -> RuntimeStatus:
         gpu = gpu_status()
-        adapter = resolve_runtime_adapter(self.settings)
+        fields = self._generation_adapter_fields()
         if self.settings.runtime_backend == "sglang":
             available, detail = self._sglang_status()
         else:
@@ -49,10 +83,10 @@ class QwenRuntime:
             model_id=self.settings.model_id,
             available=available,
             detail=detail,
-            adapter_path=str(adapter.path) if adapter else None,
-            adapter_kind=adapter.manifest.kind if adapter else None,
-            adapter_id=adapter.manifest.adapter_id if adapter else None,
-            adapter_sha256=adapter.manifest.sha256 if adapter else None,
+            adapter_path=fields["adapter_path"],
+            adapter_kind=TrainingAdapterKind(fields["adapter_kind"]) if fields["adapter_kind"] else None,
+            adapter_id=fields["adapter_id"],
+            adapter_sha256=fields["adapter_sha256"],
             gpu_name=gpu.get("name"),
             cuda=gpu.get("cuda"),
             vram_total_mb=gpu.get("total_mb"),
@@ -84,15 +118,17 @@ class QwenRuntime:
             import torch
 
             adapter_detail = ""
-            adapter = resolve_runtime_adapter(self.settings)
-            if adapter is not None:
-                adapter_detail = f" Adapter selected: {adapter.path}."
+            source, reason = self._adapter_choice()
+            if source is not None:
+                adapter_detail = f" Adapter selected: {source.path}."
             elif self.settings.adapter_dir is not None:
                 return False, f"Configured adapter path is missing: {self.settings.adapter_dir}"
+            if source is None:
+                adapter_detail = f" No adapter: {reason}."
             if torch.cuda.is_available():
                 return True, f"Transformers backend can use CUDA.{adapter_detail}"
             return True, f"Transformers backend is available on CPU.{adapter_detail}"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # a status probe reports why the backend is unusable
             return False, f"Transformers backend import failed: {exc}"
 
     def _generate_sglang(self, question: str, context: CompiledContext) -> RuntimeGeneration:
@@ -122,15 +158,11 @@ class QwenRuntime:
         except httpx.HTTPError as exc:
             raise RuntimeUnavailableError(f"SGLang generation failed: {exc}") from exc
         data = response.json()
-        adapter = resolve_runtime_adapter(self.settings)
         usage = data.get("usage") if isinstance(data, dict) else None
         return RuntimeGeneration(
             text=data["choices"][0]["message"]["content"],
             backend="sglang",
-            adapter_path=str(adapter.path) if adapter else None,
-            adapter_kind=adapter.manifest.kind.value if adapter else None,
-            adapter_id=adapter.manifest.adapter_id if adapter else None,
-            adapter_sha256=adapter.manifest.sha256 if adapter else None,
+            **self._generation_adapter_fields(),
             input_tokens=usage.get("prompt_tokens") if isinstance(usage, dict) else None,
             output_tokens=usage.get("completion_tokens") if isinstance(usage, dict) else None,
         )
@@ -161,15 +193,11 @@ class QwenRuntime:
         except httpx.HTTPError as exc:
             raise RuntimeUnavailableError(f"SGLang generation failed: {exc}") from exc
         data = response.json()
-        adapter = resolve_runtime_adapter(self.settings)
         usage = data.get("usage") if isinstance(data, dict) else None
         return RuntimeGeneration(
             text=data["choices"][0]["message"]["content"],
             backend="sglang",
-            adapter_path=str(adapter.path) if adapter else None,
-            adapter_kind=adapter.manifest.kind.value if adapter else None,
-            adapter_id=adapter.manifest.adapter_id if adapter else None,
-            adapter_sha256=adapter.manifest.sha256 if adapter else None,
+            **self._generation_adapter_fields(),
             input_tokens=usage.get("prompt_tokens") if isinstance(usage, dict) else None,
             output_tokens=usage.get("completion_tokens") if isinstance(usage, dict) else None,
         )
@@ -218,14 +246,10 @@ class QwenRuntime:
         input_length = int(inputs["input_ids"].shape[-1])
         generated = generated[:, input_length:]
         decoded = processor.batch_decode(generated, skip_special_tokens=True)[0]
-        adapter = resolve_runtime_adapter(self.settings)
         return RuntimeGeneration(
             text=decoded,
             backend="transformers",
-            adapter_path=str(adapter.path) if adapter else None,
-            adapter_kind=adapter.manifest.kind.value if adapter else None,
-            adapter_id=adapter.manifest.adapter_id if adapter else None,
-            adapter_sha256=adapter.manifest.sha256 if adapter else None,
+            **self._generation_adapter_fields(),
             input_tokens=input_length,
             output_tokens=int(generated.shape[-1]),
         )
@@ -273,14 +297,10 @@ class QwenRuntime:
         input_length = int(inputs["input_ids"].shape[-1])
         generated = generated[:, input_length:]
         decoded = processor.batch_decode(generated, skip_special_tokens=True)[0]
-        adapter = resolve_runtime_adapter(self.settings)
         return RuntimeGeneration(
             text=decoded,
             backend="transformers",
-            adapter_path=str(adapter.path) if adapter else None,
-            adapter_kind=adapter.manifest.kind.value if adapter else None,
-            adapter_id=adapter.manifest.adapter_id if adapter else None,
-            adapter_sha256=adapter.manifest.sha256 if adapter else None,
+            **self._generation_adapter_fields(),
             input_tokens=input_length,
             output_tokens=int(generated.shape[-1]),
         )
@@ -288,6 +308,19 @@ class QwenRuntime:
     def _load_transformers(self) -> tuple[Any, Any]:
         if self._model is not None and self._processor is not None:
             return self._model, self._processor
+        model, processor = self._load_base_model()
+        source, reason = self._adapter_choice()
+        if source is None:
+            logger.info("generating without an adapter: %s", reason)
+        else:
+            model = adapters.load_into_model(model, source.path)
+            adapters.record_load(source)
+        model.eval()
+        self._model, self._processor = model, processor
+        return model, processor
+
+    def _load_base_model(self) -> tuple[Any, Any]:
+        """Load the chat model; tests replace this so the adapter branch runs without a 9B download."""
         import torch
         from transformers import AutoProcessor
 
@@ -300,33 +333,25 @@ class QwenRuntime:
 
             model_cls = AutoModelForCausalLM
 
-        self._processor = AutoProcessor.from_pretrained(self.settings.model_id, trust_remote_code=True)
-        self._model = model_cls.from_pretrained(
+        processor = AutoProcessor.from_pretrained(self.settings.model_id, trust_remote_code=True)
+        model = model_cls.from_pretrained(
             self.settings.model_id,
             dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
             device_map="auto",
             trust_remote_code=True,
         )
-        adapter = resolve_runtime_adapter(self.settings)
-        if adapter is not None:
-            from .training import bitsandbytes_gaudi_probe_guard
-
-            with bitsandbytes_gaudi_probe_guard():
-                from peft import PeftModel
-
-                self._model = PeftModel.from_pretrained(self._model, adapter.path)
-        self._model.eval()
-        return self._model, self._processor
+        return model, processor
 
     def unload(self) -> None:
         self._model = None
         self._processor = None
+        adapters.clear_loads()
         try:
             import torch
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-        except Exception:
+        except Exception:  # noqa: BLE001  # freeing the cache is best-effort, unloading must not raise
             return
 
     def _context_images(self, context: CompiledContext) -> list[Path]:
@@ -336,43 +361,6 @@ class QwenRuntime:
             if image_ref:
                 paths.append(self.objects.resolve(image_ref))
         return paths
-
-
-@dataclass(frozen=True)
-class RuntimeAdapter:
-    path: Path
-    manifest: AdapterManifest
-
-
-def resolve_runtime_adapter(
-    settings: Settings,
-    kind: TrainingAdapterKind = TrainingAdapterKind.hme_core_lora,
-) -> RuntimeAdapter | None:
-    if settings.adapter_dir is not None:
-        path = settings.adapter_dir.expanduser().resolve()
-        manifest_path = path / "adapter_manifest.json"
-        if path.exists() and manifest_path.exists():
-            return RuntimeAdapter(
-                path=path,
-                manifest=AdapterManifest.model_validate_json(manifest_path.read_text(encoding="utf-8")),
-            )
-        return None
-
-    candidates: list[RuntimeAdapter] = []
-    for manifest_path in settings.adapters_dir.glob("*/adapter_manifest.json"):
-        manifest = AdapterManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
-        if manifest.kind == kind and manifest.base_model == settings.model_id:
-            candidates.append(RuntimeAdapter(path=manifest_path.parent.resolve(), manifest=manifest))
-    candidates.sort(
-        key=lambda item: (
-            item.manifest.cartridge_id is not None,
-            (item.path / "adapter_model.safetensors").stat().st_mtime
-            if (item.path / "adapter_model.safetensors").exists()
-            else 0.0,
-        ),
-        reverse=True,
-    )
-    return candidates[0] if candidates else None
 
 
 def build_prompt(question: str, context: CompiledContext) -> str:
