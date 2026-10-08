@@ -256,7 +256,7 @@
     - 为了让 CI 真能当门禁，先清了仓库既有的 lint 债：`ruff check backend/src bench` 在 HEAD 上是 **17 errors**，现在 All checks passed（14 条机械 `--fix`，加 `profiles.py` 三个探针收窄异常面：`linux_package_versions` 是 `(OSError, subprocess.SubprocessError, ValueError)`——`json.loads` 需要 `ValueError`；`runtime_launcher_probe` 与 `gpu_available` 是 `(OSError, subprocess.SubprocessError)`；并显式挡住 `json.loads` 返回 dict 的假设）
     - 第二跑 run **37738221392** 仍红：`bench/tests/test_joint.py` 四条挂在 `SystemExit: bench/models/paraphrase-multilingual-MiniLM-L12-v2: model not downloaded`。那四条断言的是「联合跑与单臂跑排序一致」「三个需要 BM25 的臂只算一次稀疏信号」——这是**harness 的等价性**，不是 embedding 的好坏，所以不该要求先下 470MB。修法是在两条路径共用的接缝注入确定性的 384 维替身模型与替身 reranker（`_TinyDense` / `_TinyReranker` / `_stub_models`），报告里的测量仍由真模型承担
     - 本地按 CI 的条件验过：把 `paraphrase-multilingual-MiniLM-L12-v2` 和 `bge-reranker-base` 两个目录移出仓库，全套 **253 passed**；移回来后门禁数字不变
-    - 绿：**run 37741248855 @ 4b367cb** `conclusion=success`，四个 job（backend / mcp / interface / image）全绿
+    - 绿：**run 37741248855 @ 4b367cb** 与 **run 37744547992 @ 20c0416** 都是 `conclusion=success`，四个 job（backend / mcp / interface / image）全绿；之后每个 push 都跑同一套
   - [x] p1-4.4 `Dockerfile` 不再 COPY 缺失的 `PRD.md`
     - 干净克隆实测：`git clone` 之后 `ls PRD.md` → `No such file or directory`（PRD 一直没进 git），旧镜像在 `COPY README.md PRD.md ./` 那一步就建不出来
     - 改两阶段：`node:22-bookworm-slim AS ui` 跑 `npm ci && npm run build`（Ubuntu 24.04 自带的 node 18 建不了 Vite 8，`frontend/package.json` 是 `vite ^8.0.0`），运行阶段 `pip install ./backend`（不再 `-e`）+ `COPY --from=ui /ui/dist /srv/ely-eye/ui`，node/npm 从运行阶段去掉

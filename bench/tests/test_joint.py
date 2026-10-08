@@ -37,8 +37,7 @@ def _queries() -> list[str]:
 
 
 class _TinyDense:
-    """Stand-in embedding model: these tests ask whether two harness paths agree, not
-    whether embeddings are good, so they must run without a 470MB download."""
+    """Stand-in embedding model: these tests compare two harness paths, not embedding quality."""
 
     def encode(self, texts: Sequence[str], **_: Any) -> np.ndarray:
         return np.stack([_unit_vector(str(text)) for text in texts]).astype(np.float32)
