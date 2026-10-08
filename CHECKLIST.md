@@ -245,7 +245,7 @@
   - 第三轮 **FAIL 2 条**（都是措辞与重复字段，reviewer 用三个活 runtime 实测）：`adapters.py` 的 `plan()` 在三个以上模型同时持有时写「another live model still holds adapter-a and adapter-b」，单数主语把多个 adapter 塞给了一个模型；`LoadRecord.sha256` 仍是 `source.manifest.sha256` 的存储副本，正是这次刚清掉的「第二个真相来源」。修法：主语按数量分单复数，`sha256` 改成 property。两条都有变异检验：去掉复数分支 → 两个测试 FAILED；换回存储副本 → 生成路径测试 FAILED。reviewer 另记三条它判定不算缺陷的，这里补记：`base_model` 在「磁盘上没有该 kind」的行上从「运行时的模型 id」改成 `null`（更诚实：那一行根本没有 adapter）；同一 adapter id 可能同时出现在 loaded 行与 shadowed 行（它自已被挂着，但挂载里另有副本胜出，两行都真）；被加载的 adapter 从磁盘删掉且无解析结果时不再说「that model is gone」（`missing` 行身份为 null，没有假断言）。
   - 第四轮 **PASS**（同一个 reviewer，39 条命令、15分44秒，不读我的话只跑东西）：它自己写探针复现了三个场景（挂 X 后写更新的 Y → 行说 adapter-x；两个 runtime 一个 unload → 仍 loaded/adapter-y 且不说 gone；两个都 unload → available + gone），自己跑变异测试（行身份改回解析结果 → 3 个测试 FAILED；`live_attachments()` 忽略存活 → 2 个 FAILED；去掉复数主语 → 2 个 FAILED），并逐项核了仓库规则（无文件 >500 行、新增 `#` 注释 0 行、4 个单行 docstring、无新造 scenario 字段、无新依赖、无 v1/v2、无死代码）。它另记一条有界陈旧：`live_attachments()` 只在下次 `record_load` 时清理，所以刚被回收的模型在下一次加载前仍可能显示 loaded（docstring 写了）。它还提了一条「挂载是按连接的」——**这条我实测推翻**：`mounts` 是表，同一个 home 上换一个 `Database` 对象读 `mounted_ids` 仍返回 `['cart-a']`；那个测试断言 `mounted == []` 只是因为那个测试本身没挂任何东西。
   - CLI 面：`ely-eye adapters` 打印同一份报告。
-- [ ] **p1-4** 工程地基
+- [x] **p1-4** 工程地基
   - [x] p1-4.1 pytest 从零到有（后端）
     - 验收写的路径是 `tests/`，实际在 `backend/tests/`（19 个文件：18 个 `test_*.py` + `conftest.py`）；`pytest -q` 全仓 **253 passed**（`922d012` 上是 239，maintenance 那 14 个测试把它推到 253）
   - [x] p1-4.2 go test 从零到有（MCP）
@@ -285,6 +285,7 @@
     - doctor 第一版是假健康：它只对「路径设了但目录不在」报警，对「库里有 21,362 个图片 atom 却压根没配 CLIP」报 ok=true。现在按库里的 modality 计数判，`test_doctor_names_the_senses_a_store_holds_but_cannot_use` 钉住这条
     - 测试写出来才发现的两条：`Database.__init__` 每次构造都跑迁移，所以 doctor 永远看不到旧 schema，我原先那句 remediation「run `ely-eye status` to migrate」是编的 → 改成 catch `SystemExit` 报「the store cannot be opened by this build: …」；另一条是 fixture 假设错（`_store()` 往已有库里加，被替换的库确实有 3 个 atom），改测试不改产品
   - 验收：CI 绿；干净 clone 上 `docker build` 成功（已实测 `09803cd49add` + 容器 curl 通）；桩 `nvidia-smi` 打印 RTX 5090 证明设备名不再致命（已实测）
+  - 独立 review（同一个 `p1review` 里的 pi，模型 `strata/qwen3.8-flash-next-abliterated-iq3_s:high`，三轮，不读我的话只跑东西）：第一轮 **FAIL 9 条**（全是 CHECKLIST 里的数字与断言不重现：测试文件数、套件规模、构建上下文体积、`profiles.py` 异常元组、`training.py` 行号、`cli.py` 行数、把 4090 说成不支持 BF16、备份摘要不可复现、秒数写死）→ 第二轮 **FAIL 1 条**（`_TinyDense` 那两行 docstring 是 p1-4 唯一新增的多行注释，跟 p1-6.4 的「≤1 行」相冲）→ **第三轮 PASS**。reviewer 自己跑 `gh run view`、`pytest`、`ruff`、`mypy`（冷缓存逐文件比对 `908157f` 与 HEAD → 两边都是 24 错/6 文件，逐条同消息）、`pyright`、go 全套、`bash -n` 15 个 `.sh`、`pip wheel`、`sha256sum LICENSE` 与 gnu.org 逐字节比对、拉起 22.4GB 容器 curl 三个 URL，并在真 worktree 里做变异测试（去掉 reranker 桩 → 2 failed；去掉 dense 桩 → 正好复现 CI 那 4 条；只翻 `bench/systems.py:414` 的排序键 → 正好 `fusion_rerank` 那条挂）。它还量了全仓多行 docstring 数 `114 → 114`，确认 p1-4 现在新增 0 条。三轮同一个人，没换人放水。
   - 门禁：`pytest -q` **253 passed**；`ruff check backend/src bench` All checks passed（HEAD 是 17 errors）；mypy 冷缓存查改动文件与 HEAD 同错、净新增 0；`pyright` 查 maintenance 三个文件 → **0 errors, 0 warnings**；go build/vet/test + gofmt 干净；`bash -n` 15 个 `.sh` 干净；`pip wheel ./backend` 能建且元数据带 license 表达式
 - [ ] **p1-5** 产品面
   - [ ] p1-5.1 `GET /api/search`
