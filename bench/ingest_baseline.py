@@ -236,11 +236,6 @@ def ledger_outcomes() -> tuple[set[str], set[str]]:
     return ingested, failed
 
 
-def ingested_paths() -> set[str]:
-    """Every file a shard ledger recorded as ingested, excluding the files it recorded as failed."""
-    return ledger_outcomes()[0]
-
-
 def retry_failed() -> int:
     """Drop failed ledger entries so those files are attempted again, archiving what was dropped."""
     archive = RUNS / "failures.jsonl"

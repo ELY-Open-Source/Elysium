@@ -1313,15 +1313,6 @@ def model_type_for_proof(model: Any) -> str | None:
     return None
 
 
-def gradient_checkpointing_enabled(model: Any) -> bool:
-    if bool(getattr(model, "is_gradient_checkpointing", False)):
-        return True
-    config = getattr(model, "config", None)
-    if bool(getattr(config, "gradient_checkpointing", False)):
-        return True
-    return bool(getattr(model, "_gradient_checkpointing_func", None))
-
-
 def make_optimizer(model: Any, learning_rate: float) -> tuple[Any, str]:
     params = [param for param in model.parameters() if param.requires_grad]
     try:

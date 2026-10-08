@@ -80,10 +80,6 @@ def format_scores(scores: dict[str, Any]) -> str:
     return ", ".join(parts) or "none"
 
 
-def is_finite_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and math.isfinite(float(value))
-
-
 def compact_generation_context(context: Any, section_hint: str, max_chars: int = 2400) -> Any:
     text_hits = [hit for hit in context.hits if hit.atom.modality.value == "text"]
     hits = (text_hits or context.hits)[:1]

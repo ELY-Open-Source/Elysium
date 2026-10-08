@@ -44,15 +44,6 @@ def membership_count(database: Database, cartridge_id: str) -> int:
         return _count(connection, cartridge_id)
 
 
-def cartridges_holding_atom(database: Database, atom_id: str) -> list[str]:
-    with database.connect() as connection:
-        rows = connection.execute(
-            "SELECT cartridge_id FROM cartridge_atoms WHERE atom_id = ? ORDER BY cartridge_id",
-            (atom_id,),
-        ).fetchall()
-    return [str(row["cartridge_id"]) for row in rows]
-
-
 def atoms_of_cartridge(database: Database, cartridge_id: str) -> list[str]:
     with database.connect() as connection:
         rows = connection.execute(
@@ -92,11 +83,6 @@ def set_mounts(database: Database, cartridge_ids: list[str], mounted_at: datetim
             "INSERT INTO mounts(cartridge_id, mounted_at) VALUES (?, ?)",
             [(cartridge_id, stamp) for cartridge_id in cartridge_ids],
         )
-
-
-def clear_mounts(database: Database) -> None:
-    with database.connect() as connection:
-        connection.execute("DELETE FROM mounts")
 
 
 def _count(connection: sqlite3.Connection, cartridge_id: str) -> int:

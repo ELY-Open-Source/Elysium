@@ -169,13 +169,6 @@ class RetrievalService:
         return [hit.atom for hit in self.search(query, top_k, filters=filters).hits]
 
 
-def group_hits_by_source(hits: list[RetrievalHit]) -> dict[str, list[RetrievalHit]]:
-    grouped: dict[str, list[RetrievalHit]] = defaultdict(list)
-    for hit in hits:
-        grouped[hit.atom.source].append(hit)
-    return dict(grouped)
-
-
 def encode_cursor(offset: int) -> str:
     return base64.urlsafe_b64encode(str(offset).encode()).decode()
 

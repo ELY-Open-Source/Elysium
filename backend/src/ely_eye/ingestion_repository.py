@@ -314,8 +314,3 @@ def extract_generic_calls(text: str) -> list[dict[str, str]]:
     return calls
 
 
-def write_sources_json(path: Path, sources: list[SourceRecord]) -> None:
-    path.write_text(
-        json.dumps([source.model_dump(mode="json") for source in sources], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
