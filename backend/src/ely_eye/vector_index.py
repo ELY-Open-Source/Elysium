@@ -22,8 +22,7 @@ from .db import Database
 from .embeddings import EmbeddingService
 from .row_codec import to_json
 
-# The vec0 schema cannot be altered in place, so the format tag is load-bearing: changing the
-# vector width or the model means dropping the table and re-encoding, not migrating it.
+# vec0 cannot be altered in place, so the format tag is load-bearing: a new width or model drops the table and re-encodes.
 FORMAT = "ely-eye-dense-vectors-v1"
 TABLE = "vec_atoms"
 META_TABLE = "vector_index_meta"
@@ -183,8 +182,7 @@ class VectorIndex:
                     as_holder=as_holder,
                 )
                 hits = {atom_id: 1.0 - distance for atom_id, distance in ranked if atom_id in allowed}
-                # A filter that keeps little of the wide ask means there are more answers further
-                # out; one wider round buys them, and the ceiling keeps the round bounded.
+                # A filter that keeps little of the ask means more answers sit further out; one wider round buys them, bounded by the ceiling.
                 if len(hits) >= limit or len(ranked) < asked or asked >= CANDIDATE_CEILING:
                     break
                 asked = min(asked * 4, CANDIDATE_CEILING)

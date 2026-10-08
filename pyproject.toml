@@ -24,5 +24,6 @@ module = [
     "sentence_transformers.*",
     "onnxruntime.*",
     "faster_whisper.*",
+    "sqlite_vec",
 ]
 ignore_missing_imports = true

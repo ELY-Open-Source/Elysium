@@ -40,8 +40,7 @@ def _dense_facts(settings: Settings, database: Database) -> tuple[DenseState, in
     facts = VectorIndex(settings, database).stats()
     if not facts["built"]:
         return "missing", 0, expected
-    # A memory with no words belongs to the picture index, so the honest denominator is the
-    # memories this index is meant to hold, not every row in the store.
+    # A wordless memory belongs to the picture index, so the denominator is what this index holds, not every row.
     return ("current" if facts["pending"] == 0 else "behind"), int(facts["vectors"]), expected
 
 

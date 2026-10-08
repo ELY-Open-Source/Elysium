@@ -192,13 +192,16 @@ def measure(home: Path, scratch: Path, probes: int, model_dir: Path) -> dict[str
         "bytes_method": bytes_method,
         "extrapolation": {
             "to": EXTRAPOLATE_TO,
+            "basis": encoded,
             "assumption": (
                 "sqlite-vec 0.1.9 scans every vector, so latency and bytes grow linearly with the "
-                "count; the model, the machine and the thread budget stay the same"
+                "vector count; every row here is scaled by "
+                f"{EXTRAPOLATE_TO} / {encoded} vectors, and the model, the machine and the thread "
+                "budget stay the same"
             ),
-            "p50_seconds": timing["p50"] * EXTRAPOLATE_TO / atoms,
-            "p95_seconds": timing["p95"] * EXTRAPOLATE_TO / atoms,
-            "write_p50_seconds": writes["p50"] * EXTRAPOLATE_TO / atoms,
+            "p50_seconds": timing["p50"] * EXTRAPOLATE_TO / encoded,
+            "p95_seconds": timing["p95"] * EXTRAPOLATE_TO / encoded,
+            "write_p50_seconds": writes["p50"] * EXTRAPOLATE_TO / encoded,
             "gibibytes": per_vector * EXTRAPOLATE_TO / 1024**3,
             "build_seconds": EXTRAPOLATE_TO / texts_per_second if texts_per_second else None,
         },
@@ -254,12 +257,12 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                     f"{machine['threads_per_query']} threads per query, load {machine['load_average_1_5_15']}"
                 ),
                 "",
-                "## One million memories on this machine",
+                "## One million vectors on this machine",
                 "",
                 f"- p50 {future['p50_seconds'] * 1000:.0f}ms · p95 {future['p95_seconds'] * 1000:.0f}ms",
                 f"- vector table: {future['gibibytes']:.1f} GiB",
                 f"- first build: {future['build_seconds'] / 60:.1f} minutes",
-                f"- writing one memory: {future['write_p50_seconds'] * 1000:.0f}ms — a vec0 delete by id scans the table, so this grows with the count too",
+                f"- writing one vector: {future['write_p50_seconds'] * 1000:.0f}ms — a vec0 delete by id scans the table, so this grows with the count too",
                 f"- assumption: {future['assumption']}",
                 "",
                 (

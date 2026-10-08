@@ -37,6 +37,10 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "commit": "abcdef123456",
         "schema_version": 8,
         "store": "bench/runs/leg_check/data/ely_eye.sqlite",
+        "source_store": "bench/runs/dense_scale",
+        "dense_vectors": 153857,
+        "picture_index": {"path": "bench/runs/leg_check_index", "atoms": 53668, "dim": 512, "bytes": 109912192},
+        "encode_rate": {"pictures": 200, "seconds": 10.0, "per_second": 20.0},
         "probes": 300,
         "arms": [arm],
         "machine": {
@@ -53,4 +57,10 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
     assert "words only" in text
     assert "0.832" in text and "63.7" in text, "recall and latency must sit in the same row"
     assert "code" in text and "0.953" in text, "per-modality recall is where the picture legs show up"
+    assert (
+        "bench/runs/dense_scale" in text and "153,857 dense vectors" in text
+    ), "a dense arm must name the store its vectors came from, not imply the frozen baseline"
+    assert (
+        "53,668 atoms at 512 dimensions" in text and "44.7" in text
+    ), "the picture index needs its shape in the report, and its build cost derived from a measured rate"
     assert "abcdef123456" in text and "load_average" not in text

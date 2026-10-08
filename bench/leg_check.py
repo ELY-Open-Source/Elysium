@@ -34,13 +34,12 @@ DEFAULT_OBJECTS = Path("bench/runs/baseline/objects")
 DEFAULT_CLIP_INDEX = Path("bench/runs/leg_check_index")
 DEFAULT_CLIP_MODEL = Path("bench/models/chinese-clip-vit-base-patch16")
 DEFAULT_EMBEDDING_MODEL = Path("bench/models/paraphrase-multilingual-MiniLM-L12-v2")
+ENCODE_SAMPLE = 200
 
-# The page size the product asks for by default. measure() checks it against the product's own
-# setting, so a config change here cannot quietly turn the "as shipped" row into a hypothetical.
+# The page the product asks for by default; measure() checks it against Settings, so "as shipped" cannot rot into a hypothesis.
 SHIPPED_TOP_K = 24
 
-# (label, atoms asked, dense leg, picture leg). The picture leg routes itself: it answers only when
-# the sparse page comes back thin, which is the product's rule, not this harness's.
+# (label, atoms asked, dense leg, picture leg); the picture leg answers only on a thin page, which is the product's rule.
 CONFIGS: list[dict[str, Any]] = [
     {"label": "words only", "top_k": 10, "dense": False, "visual": False},
     {"label": "words only (the configured 24)", "top_k": SHIPPED_TOP_K, "dense": False, "visual": False},
@@ -92,6 +91,74 @@ def prepare(
     return copy_home
 
 
+def _dense_vectors(store: Path) -> int:
+    """Vectors the source store already carries, read without opening it for write."""
+    import sqlite3
+
+    import sqlite_vec
+    from ely_eye import vector_index
+
+    if vector_index.TABLE != "vec_atoms":
+        raise SystemExit(f"the dense table is now {vector_index.TABLE}; update this harness's count")
+    if not store.is_file():
+        raise SystemExit(f"{store}: no product database")
+    with sqlite3.connect(f"file:{store}?mode=ro", uri=True) as connection:
+        connection.enable_load_extension(True)
+        sqlite_vec.load(connection)
+        connection.enable_load_extension(False)
+        if not connection.execute("SELECT 1 FROM sqlite_master WHERE name = 'vec_atoms'").fetchone():
+            return 0
+        return int(connection.execute("SELECT count(*) FROM vec_atoms").fetchone()[0])
+
+
+def picture_facts(clip_index: Path) -> dict[str, Any]:
+    """What the picture index really holds, read off the artifact instead of remembered in prose."""
+    import numpy as np
+
+    vectors_path = clip_index / "clip_image_index.npy"
+    atoms_path = clip_index / "clip_image_index_atoms.json"
+    vectors = np.load(vectors_path)
+    with atoms_path.open(encoding="utf-8") as handle:
+        try:
+            atoms = json.load(handle)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"{atoms_path}: the picture index's atom list is unreadable ({error})") from error
+    if len(atoms) != int(vectors.shape[0]):
+        raise SystemExit(
+            f"{clip_index}: the picture index disagrees with itself — {len(atoms)} atom ids for "
+            f"{vectors.shape[0]} vectors"
+        )
+    return {
+        "path": str(clip_index),
+        "atoms": len(atoms),
+        "dim": int(vectors.shape[-1]),
+        "bytes": int(vectors_path.stat().st_size),
+    }
+
+
+def encode_rate(clip_model: Path, objects: Path, count: int) -> dict[str, Any]:
+    """Pictures per second the encoder manages, measured on a sample instead of remembered."""
+    import time
+
+    from ely_eye.clip_encoder import ClipEncoder
+    from PIL import Image
+
+    suffixes = {".png", ".jpg", ".jpeg"}
+    sample = sorted(p for p in objects.rglob("*") if p.suffix.lower() in suffixes)[:count]
+    if len(sample) < count:
+        raise SystemExit(f"{objects}: only {len(sample)} pictures to time the encoder on")
+    encoder = ClipEncoder(clip_model)
+    began = time.perf_counter()
+    rows = 0
+    for start in range(0, len(sample), 8):
+        batch = [Image.open(path).convert("RGB") for path in sample[start : start + 8]]
+        rows += len(encoder.encode_images(batch))
+    seconds = time.perf_counter() - began
+    if rows != len(sample):
+        raise SystemExit(f"the encoder returned {rows} vectors for {len(sample)} pictures")
+    return {"pictures": rows, "seconds": seconds, "per_second": rows / seconds}
+
+
 def _schema(home: Path) -> int:
     import sqlite3
 
@@ -141,7 +208,17 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         raise SystemExit("the frozen suite carries no answerable query; nothing to score")
     print(f"{len(answerable)} answerable probes", flush=True)
 
+    vectors = _dense_vectors(home / "data" / "ely_eye.sqlite")
+    if vectors == 0 and any(config["dense"] for config in CONFIGS):
+        raise SystemExit(
+            f"{home}: the store carries no dense vectors, so a dense arm here would rank an empty "
+            "index and the 24-minute build would hide outside the measured latency. Build them with "
+            "python -m bench.dense_scale, or point --home at a store that already has them."
+        )
+
     arms: list[dict[str, Any]] = []
+    picture: dict[str, Any] | None = None
+    rate: dict[str, Any] | None = None
     schema = 0
     for config in CONFIGS:
         print(f"  {config['label']}: dense={config['dense']} visual={config['visual']}", flush=True)
@@ -156,6 +233,10 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
             embedding_model=models["embedding"],
         )
         schema = _schema(copy_home)
+        if config["visual"]:
+            picture = picture_facts(clip_index)
+            if rate is None:
+                rate = encode_rate(models["clip"], objects, ENCODE_SAMPLE)
         settings = Settings(
             home=copy_home,
             dense_embeddings_enabled=config["dense"],
@@ -203,6 +284,10 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         "commit": git_commit(),
         "schema_version": schema,
         "store": str(scratch / "data" / "ely_eye.sqlite"),
+        "source_store": str(home),
+        "dense_vectors": vectors,
+        "picture_index": picture,
+        "encode_rate": rate,
         "probes": len(answerable),
         "arms": arms,
         "machine": machine_facts(),
@@ -247,8 +332,32 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                 "# LEGS: what each retrieval leg is worth",
                 "",
                 f"- commit: `{report['commit']}`, schema v{report['schema_version']}",
-                f"- store: {report['store']} (a copy of {DEFAULT_HOME}; the frozen baseline is never opened)",
+                (
+                    f"- store: {report['store']} — a copy of {report['source_store']}, which carries "
+                    f"{report['dense_vectors']:,} dense vectors built by bench/dense_scale. The build "
+                    "sits outside the measured latency, and the frozen baseline itself holds no "
+                    "vectors, so a dense arm there would rank an empty index."
+                ),
                 f"- {report['probes']} answerable queries, each asked as the holder the frozen set assigns it",
+                *(
+                    []
+                    if report.get("picture_index") is None
+                    else [
+                        (
+                            f"- picture index: {report['picture_index']['atoms']:,} atoms at "
+                            f"{report['picture_index']['dim']} dimensions, "
+                            f"{report['picture_index']['bytes']:,} bytes, read from "
+                            f"{report['picture_index']['path']}"
+                        ),
+                        (
+                            f"- encoder speed: {report['encode_rate']['per_second']:.1f} pictures/s "
+                            f"measured on {report['encode_rate']['pictures']} pictures, so the "
+                            f"{report['picture_index']['atoms']:,} pictures in that index cost about "
+                            f"{report['picture_index']['atoms'] / report['encode_rate']['per_second'] / 60:.1f} "
+                            "minutes to encode"
+                        ),
+                    ]
+                ),
                 (
                     f"- machine: {machine['system']} {machine['release']}, {machine['cpus']} cores, "
                     f"{machine['threads_per_query']} threads per query, load {machine['load_average_1_5_15']}"
