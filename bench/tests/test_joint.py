@@ -6,10 +6,13 @@ drifted from the per-arm path, the baseline would silently measure a different s
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 
 from bench import systems
@@ -33,9 +36,45 @@ def _queries() -> list[str]:
     return ["alpha report", "beta invoice", "gamma", ""]
 
 
+class _TinyDense:
+    """Stand-in embedding model: these tests ask whether two harness paths agree, not
+    whether embeddings are good, so they must run without a 470MB download."""
+
+    def encode(self, texts: Sequence[str], **_: Any) -> np.ndarray:
+        return np.stack([_unit_vector(str(text)) for text in texts]).astype(np.float32)
+
+
+class _TinyReranker:
+    """Stand-in cross-encoder with the same scores(query, texts) shape as Reranker."""
+
+    def __init__(self, model_dir: Path) -> None:
+        self.model_dir = model_dir
+
+    def scores(self, query: str, texts: Sequence[str]) -> np.ndarray:
+        return np.array([_score(query, text) for text in texts], dtype=np.float64)
+
+
+def _unit_vector(text: str) -> np.ndarray:
+    seed = int(hashlib.sha256(text.encode()).hexdigest()[:8], 16)
+    vector = np.random.default_rng(seed).standard_normal(systems.DENSE_DIM)
+    return vector / np.linalg.norm(vector)
+
+
+def _score(query: str, text: str) -> float:
+    digest = hashlib.sha256(f"{query}\n{text}".encode()).hexdigest()
+    return int(digest[:8], 16) / 0xFFFFFFFF
+
+
+def _stub_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    dense_dir = systems.local_model_dir(systems.MODELS, systems.DENSE_MODEL)
+    monkeypatch.setattr(systems, "_MODELS", {str(dense_dir): _TinyDense()})
+    monkeypatch.setattr(systems, "Reranker", _TinyReranker)
+
+
 @pytest.mark.parametrize("arm", MODEL_ARMS)
 def test_joint_ranking_matches_the_per_arm_runner(arm: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(systems, "INDEX_DIR", tmp_path)
+    _stub_models(monkeypatch)
     queries = _queries()
     joint = JointRunner([arm], ATOMS, systems.MODELS)
     per_arm = ArmRunner(arm, ATOMS, systems.MODELS)
@@ -50,6 +89,7 @@ def test_joint_runner_computes_the_sparse_signal_once_per_query(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(systems, "INDEX_DIR", tmp_path)
+    _stub_models(monkeypatch)
     joint = JointRunner(["bm25_only", "no_rerank", "fusion_rerank"], ATOMS, systems.MODELS)
     calls = 0
     assert joint._sparse is not None
