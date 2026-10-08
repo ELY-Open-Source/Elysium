@@ -25,7 +25,8 @@ from bench.metrics import aggregate, score_query
 from bench.query_set import load_queries, scale_probes
 from bench.report import git_commit
 from bench.run import latency
-from bench.systems import copy_store, machine_facts
+from bench.scratch import copy_store
+from bench.systems import machine_facts
 
 DEFAULT_HOME = Path("bench/runs/dense_scale")
 DEFAULT_SCRATCH = Path("bench/runs/leg_check")

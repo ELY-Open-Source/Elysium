@@ -20,7 +20,8 @@ from bench.metrics import aggregate, score_query
 from bench.query_set import load_queries, scale_probes
 from bench.report import git_commit
 from bench.run import latency
-from bench.systems import copy_store, live_product_rankings, machine_facts
+from bench.scratch import copy_store
+from bench.systems import live_product_rankings, machine_facts
 
 FRACTIONS = [0.20, 0.10, 0.05, 0.02, 0.01, 0.005]
 TOP_K = 10

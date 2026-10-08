@@ -13,7 +13,6 @@ import json
 import os
 import platform
 import re
-import shutil
 import sqlite3
 import time
 from collections.abc import Sequence
@@ -24,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from bench.ingest_baseline import source_map
+from bench.scratch import copy_store
 
 if TYPE_CHECKING:
     from ely_eye.db import Database
@@ -444,20 +444,6 @@ def _corpus_ids(database: Database) -> dict[str, str]:
     if unknown:
         raise SystemExit(f"{database.path}: {len(unknown)} store sources are not corpus files, first {unknown[:3]}")
     return ids
-
-
-def copy_store(home: Path, scratch: Path) -> tuple[Path, float]:
-    """Work on a copy: the baseline store is frozen evidence and must not be migrated in place."""
-    source = home / "data" / "ely_eye.sqlite"
-    if not source.is_file():
-        raise SystemExit(f"{source}: no product database, build it with python -m bench.ingest_baseline")
-    data = scratch / "data"
-    data.mkdir(parents=True, exist_ok=True)
-    began = time.perf_counter()
-    for suffix in ("", "-wal", "-shm"):
-        if (path := Path(str(source) + suffix)).is_file():
-            shutil.copyfile(path, data / (source.name + suffix))
-    return scratch, time.perf_counter() - began
 
 
 def live_product_rankings(
