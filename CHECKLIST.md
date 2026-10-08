@@ -75,9 +75,9 @@
   - [x] p0-3.4 七个过滤器（holder/scenario/source/modality/since/until/min_trust）+ base64 游标；`since > until` 报 "search since must not be after until"，游标坏了报 "search cursor is unreadable"
   - [x] p0-3.5 RRF（`RRF_K = 60`）取代 `0.55/0.35/0.10`；顺手删掉无人调用的 `tokenize()` / `lexical_score()` / `_graph_score()`（graph 项恒为 0，因为证据边从不参与排序）
   - [x] p0-3.6 Go 的 `search_atoms` / `compile_context` 改走 `POST /api/search`，删掉 Go 侧第二套分词器（`store.SearchAtoms` / `ftsQuery` / `tokenPattern`）——两面不可能再漂开，因为只剩一个排序实现
-  - [x] p0-3.7 100k atom 下 p50 <100ms：`python -m bench.scale_check` → `bench/reports/SCALE.md`。实测 **165,973 atom（bar 的 1.66 倍）、300 探针、p50 57ms / p95 138ms**，机器 load 1.76 / 32 核 / 每查询 4 线程；基线 p50 20.16s ⇒ **快 354 倍**。带 holder 作用域再测一遍（n=173）：recall@10 0.870、MRR 0.740、p50 62ms / p95 117ms。
+  - [x] p0-3.7 100k atom 下 p50 <100ms：`python -m bench.scale_check` → `bench/reports/SCALE.md`。实测 **165,973 atom（bar 的 1.66 倍）、300 探针、p50 57ms / p95 138ms**，机器 load 1.76 / 32 核 / 每查询 4 线程；基线 p50 20.16s ⇒ **快 343 倍**（SCALE.md 重跑：p50 58.7ms / p95 143.0ms）。同一探针集上的质量与延迟扫描见 `bench/reports/TERMS.md`（n=173 holder 作用域，0.05 档 recall@10 0.803、MRR 0.652、p50 64.8ms / p95 121.7ms）。
     - 根因不是 SQL 慢，是 OR 表达式里那些「每个文档都有」的虚词：`"parsing"* OR "error"* OR "in"* OR "the"* …` 命中 127,145 行、305ms，而中文二元组短语查询 32 命中只要 1.0ms。bm25 必须给每条命中打分，延迟就跟着命中数走。
-    - 修法：用索引自己当 IDF 源，按文档频率丢掉虚词（`text_index.rare_terms`，`COMMON_TERM_FRACTION = 0.05`，无手写停用词表，换语料自动换答案）。0.05 是扫出来的：n=173 上 0.20→0.893/112.9ms、**0.05→0.899/58.6ms**、0.02→0.870/27.2ms、0.01→0.844/13.4ms、0.005→0.783/6.5ms —— 召回峰值就在 0.05。
+    - 修法：用索引自己当 IDF 源，按文档频率丢掉虚词（`text_index.rare_terms`，`COMMON_TERM_FRACTION = 0.05`，无手写停用词表，换语料自动换答案）。0.05 是扫出来的，扫描器已入库成证据：`bench/term_sweep.py` → `bench/reports/TERMS.md`（n=173，冻结库的副本）：0.20→0.792/385.9ms、0.10→0.792/372.9ms、**0.05→0.803/64.8ms**、0.02→0.792/30.3ms、0.01→0.775/16.8ms、0.005→0.740/9.3ms —— 召回峰值就在 0.05。早先 scratch 脚本扫出的 0.893/0.899/0.870 已被取代：那些数字没有入库的产物，且是在检索改写（候选放宽规则、向量腿入库）之前测的。为此 `rare_terms(connection, terms, *, fraction=None)` 改成调用时解析上界——def 期默认值扫不动。
     - 计数缓存 `term_df`（schema v6）：一个词只数一次，任何 atom 写入都清空它，所以缓存不会比它所描述的库更老。冷缓存 p50 73ms / 热 63ms，1,324 个词被缓存。
   - 验收：`pytest backend/tests/test_text_index.py backend/tests/test_search_api.py` 绿（18 条，真 FTS5 表 + TestClient）：「钥匙」命中「我们的钥匙放在玄关抽屉里」、`search atoms` 命中 `func SearchAtoms(ctx context.Context)`、`forg` 命中 forgotten、全角 `Ｓｅａｒｃｈ　Ａｔｏｍｓ` 命中、游标翻页无重复、supersede 后旧记忆不再应答；MCP 一致性由 `ely-eye-mcp/internal/mcpserver/search_tools_test.go`（3 条）+ `bash scripts/mcp_write_smoke.sh` PASS 证明；偏差：checklist 写的 `tests/test_retrieval_parity.py` 不存在，实际在 `backend/tests/` 与 Go 测试里
 - [x] **p0-4** 卡带变成可挂载作用域
@@ -340,11 +340,22 @@
 
 ## 阶段 3 — P2：规模化、安全、分层与共享
 
-- [ ] **p2-1** 规模
-  - [ ] p2-1.1 `sqlite-vec` `vec0` 增量索引
-  - [ ] p2-1.2 MRL 截断 + int8/binary 粗排 + reranker 精排（reranker ≤2GB）
-  - [ ] p2-1.3 100k 实测；1M 外推表 + 假设
-  - 验收：100k dense 腿 p50 <100ms 实测；新 atom 立即可查有测试
+- [x] **p2-1** 规模
+  - [x] p2-1.1 `sqlite-vec` `vec0` 增量索引（`backend/src/ely_eye/vector_index.py`，schema v8）
+    - 事实：向量与 atom 同库同事务，写路径（`memory.py` / `ingestion`）在同一提交里维护它；旧的 `dense_index.npy` + `dense_index_atoms.json` 那对会腐烂的旁文件删掉了，`build_index()` 全量重编码也没了。`sync()` 只在失配时补，`sync_atoms()` 按批补删。
+    - 实测出来的 vec0 0.1.9 坑（都是跑出来的，不是猜的）：`metadata json` 不是合法表选项（只有 `metadata text`）；KNN 是 `WHERE <列> MATCH ? AND k = ?`（匹配列不是表）；int8/bit 的插入与查询向量必须套 SQL 构造器 `vec_int8(blob)` / `vec_bit(blob)`，`sqlite_vec.serialize_int8()` 返回的裸 BLOB 会被拒（`expected to be of type int8, but a float32 vector was provided`）；float32 不需要包装，也没有 `vec_float32()`；默认距离是 L2，cosine 是表选项。
+    - 偏差：0.1.9 的 vec0 **没有 ANN，逐条扫**，所以延迟与字节随规模线性——DENSE.md 把这条假设印在外推表旁边，不假装是对数。
+  - [x] p2-1.2 量化与截断：测了，没上
+    - `python -m bench.quant_probe` → `bench/reports/QUANT.md`（165,973 向量、200 探针、top 10，tie-aware 一致度）：sqlite-vec float 40.3ms/1.0、+holder 过滤 29.3ms/0.599、int8 35.3ms/**0.977**、int8+holder 23.0/0.595、bit 2.7ms/0.728、bit+holder 4.2/0.513、numpy float32 全扫（真值）8.0ms/1.0、numpy 符号位 hamming 19.1/0.011、float32 前 192/128/64 维 4.4/0.722、4.0/0.57、4.0/0.43、**bit 粗排@200 → numpy 里 float32 精排 23.7ms/0.983**。每向量字节 f32 1536 / int8 384 / bit 48。
+    - 结论：int8 省 4× 空间几乎不掉质量（0.977）但不省时间；bit 省 32× 空间和 14× 时间、只剩 0.728，只能当粗排；两级方案必须在 vec0 **外面**精排（在库里用 `rowid IN (…)` 回捞反而更慢）。MRL 截断是在**不是 MRL 训练**的 MiniLM 上测的，所以那是真实代价不是白拿；切片必须是存下来的连续维，不是查询时切（非连续视图点集会掉速度）。
+    - 偏差：精排腿（`bge-reranker-base`）早在基线消融里就有并测过（加了它 recall@10 从 0.565 掉到 0.453），所以这里没再为它编一套故事；粗排+精排这条链测出 0.983 一致度但**没接线**，因为 dense 腿默认关（见下）。
+  - [x] p2-1.3 100k 实测 + 1M 外推：`python -m bench.dense_scale` → `bench/reports/DENSE.md`（stamp cd9851a）
+    - 实测 **165,973 atom / 153,857 向量**：建库 1599.1s（96 向量/秒）、**检索 p50 74.6ms / p95 77.5ms / max 89.0ms（300 查询）**、其中编码问题 p50 11.3ms、与暴力扫描 tie-aware 一致度 **0.998**（40 探针）、**往满索引里写一条记忆 p50 514ms / p95 536ms（50 次写）**、失配扫描 1.7s（不在检索路径上）、**每向量 1,729 字节**（dbstat 数 vec0 影子表：266,059,776 B）。
+    - 1M 外推：p50 443ms / p95 463ms、向量表 1.6 GiB、首次建库 154.2 分钟、单条写 3132ms，假设随行印出（逐条扫 ⇒ 线性）。
+    - tie-aware 的必要性：语料里有重复 atom，分数并列 ⇒ top-K 的 id 集合本身有歧义，两个都对引擎按 id 比会读出 0.827 的假召回。判定改成「返回的 atom 真实 cosine ≥ 第 K 名 cosine」。
+  - 验收：100k dense 腿 p50 <100ms → **165,973 atom（bar 的 1.66 倍）p50 74.6ms**（DENSE.md）；新 atom 立即可查 → `pytest backend/tests/test_vector_index.py`（写进去当场能搜到、视图藏起来的 dense 腿也藏、备份带走向量恢复后照样应答）。
+  - 数字逼出来的决定：**dense 腿默认关**（`config.py:32 dense_embeddings_enabled=False`）。同一 300 条 holder 作用域探针上，开腿 recall@10 0.832→0.845、MRR 0.683→0.663、p50 64ms→482ms。多 1.3 个点的召回、慢 7 倍、首位质量还降——默认值就该是关，腿留着（已增量、已入库）等更大的语料或更好的嵌入模型。
+  - 顺带修的测量缺陷：`copy_store()` 只拷 SQLite，所以任何要跑视觉腿的 harness 都得自己带上 `objects/`（25 GB，探针里用符号链接）与 `cache/clip_image_index.npy`；`bench/scale_check.py` 原本直接打开冻结基线库、把它**原地迁移**了，现改成在副本上测（`--scratch`）。
 - [ ] **p2-2** 安全与隐私
   - [ ] p2-2.1 FastAPI 鉴权 + Origin 校验
   - [ ] p2-2.2 写入信任分级与隔离：未佐证不得被引用
