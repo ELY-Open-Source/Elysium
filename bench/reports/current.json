@@ -89,12 +89,11 @@
     }
    },
    "latency_seconds": {
-    "max": 10.484337914007483,
-    "mean": 0.9426860555750318,
-    "note": "re-timed on a stride sample with warm models; recall comes from the full pass",
-    "p50": 0.63090720949549,
-    "p95": 2.7677196743439674,
-    "queries": 600
+    "max": 70.10108924399901,
+    "mean": 1.033756499582343,
+    "p50": 0.5625866459999997,
+    "p95": 3.1407018873005645,
+    "queries": 5308
    },
    "overall": {
     "abstention_rate_answerable": 0.0,
@@ -200,12 +199,11 @@
     }
    },
    "latency_seconds": {
-    "max": 1.5199895569967339,
-    "mean": 0.09428343026663545,
-    "note": "re-timed on a stride sample with warm models; recall comes from the full pass",
-    "p50": 0.08063396950092283,
-    "p95": 0.13402395970297218,
-    "queries": 600
+    "max": 5.211815150996699,
+    "mean": 1.90850240464544,
+    "p50": 1.7281245969993506,
+    "p95": 2.8826986088994087,
+    "queries": 5308
    },
    "overall": {
     "abstention_rate_answerable": 0.0,
@@ -311,12 +309,11 @@
     }
    },
    "latency_seconds": {
-    "max": 0.11273866199917393,
-    "mean": 0.06529701035842057,
-    "note": "re-timed on a stride sample with warm models; recall comes from the full pass",
-    "p50": 0.05544837899287813,
-    "p95": 0.09468995315801294,
-    "queries": 600
+    "max": 0.09835406600177521,
+    "mean": 0.044743228177486605,
+    "p50": 0.04287036849927972,
+    "p95": 0.05790443480054818,
+    "queries": 5308
    },
    "overall": {
     "abstention_rate_answerable": 0.0,
@@ -422,12 +419,11 @@
     }
    },
    "latency_seconds": {
-    "max": 10.533955075996346,
-    "mean": 0.9619427272766673,
-    "note": "re-timed on a stride sample with warm models; recall comes from the full pass",
-    "p50": 0.6425201155034301,
-    "p95": 2.786401089788338,
-    "queries": 600
+    "max": 72.48293514099714,
+    "mean": 2.882459499187649,
+    "p50": 2.40399285599824,
+    "p95": 5.168583710499833,
+    "queries": 5308
    },
    "overall": {
     "abstention_rate_answerable": 0.0,
@@ -533,12 +529,11 @@
     }
    },
    "latency_seconds": {
-    "max": 28.03755501300475,
-    "mean": 7.456139394386567,
-    "note": "re-timed on a stride sample with warm models; recall comes from the full pass",
-    "p50": 7.000474203505291,
-    "p95": 13.246865720593268,
-    "queries": 600
+    "max": 77.63319287999548,
+    "mean": 5.166508504176891,
+    "p50": 4.5375522020012795,
+    "p95": 9.042528758149817,
+    "queries": 5308
    },
    "overall": {
     "abstention_rate_answerable": 0.0,
@@ -563,32 +558,45 @@
   "recall_at_5": 9.944707426707506e-05
  },
  "live_product": {
+  "abstention_rate_answerable": 0.016666666666666666,
+  "abstention_rate_unanswerable": 0.0,
   "distinct_sources_in_top10": {
    "max": 10,
-   "mean": 7.675,
-   "min": 1
+   "mean": 5.193333333333333,
+   "min": 0
   },
+  "hit_at_10": 0.8333333333333334,
+  "hit_at_10_wilson_lower": 0.7870033503873167,
   "identical_top10": 0.0,
-  "max": 9.363575160998153,
-  "mean": 1.0766488450000906,
-  "p50": 0.6765933140050038,
-  "queries": 40,
-  "top10_overlap_with_bm25_only": 0.0,
+  "max": 0.3143954080005642,
+  "mean": 0.07851241317994816,
+  "mrr": 0.6832447089947089,
+  "n_answerable": 300,
+  "n_unanswerable": 0,
+  "ndcg_at_10": 0.7186678703708246,
+  "p50": 0.07425041199894622,
+  "p95": 0.14573381999798585,
+  "queries": 300,
+  "recall_at_1": 0.5966666666666667,
+  "recall_at_10": 0.8316666666666667,
+  "recall_at_5": 0.7816666666666666,
+  "top10_overlap_with_bm25_only": 0.13433333333333336,
+  "top_hit_from_holder_unanswerable": 0.0,
   "top_k": 10
  },
  "meta": {
   "answerable": 2928,
   "corpus_manifest_sha256": "8fc1ed861c891d778853d41107630869f9eb267a669c5d1038e389de80114347",
   "corpus_sources": 50278,
-  "generated_at": "2026-10-07T21:24:15+00:00",
-  "git_commit": "dfc6cd4c2889e872d3f7d983b18406e6ff7a622d",
+  "generated_at": "2026-10-08T20:17:12+00:00",
+  "git_commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
   "limit_per_modality": null,
   "machine": {
    "cpus": 32,
    "load_average_1_5_15": [
-    1.21,
-    1.55,
-    2.28
+    5.09,
+    4.28,
+    8.06
    ],
    "release": "6.18.40.1-microsoft-standard-WSL2",
    "system": "Linux",
@@ -608,64 +616,6 @@
    "ui_screenshot": "2269dd623e67cd851fb3f6b24a4556a8462a37db98e12ad79577c5830167c7c5",
    "video": "4973231d9f16d214b14923d79a34b85c3d2b423624dea752b1ee91ba09ff778c"
   },
-  "store_schema_version_at_start": 5
- },
- "scale": [
-  {
-   "atoms": 500,
-   "bm25_only": {
-    "p50": 0.001200532500661211,
-    "p95": 0.0033308441004919584
-   },
-   "dense_only": {
-    "p50": 0.018240716999571305,
-    "p95": 0.03141984814501483
-   },
-   "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
-   "queries": 40,
-   "sources": 500
-  },
-  {
-   "atoms": 2000,
-   "bm25_only": {
-    "p50": 0.0047556615027133375,
-    "p95": 0.009782735643602785
-   },
-   "dense_only": {
-    "p50": 0.044618372499826364,
-    "p95": 0.07758056885431869
-   },
-   "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
-   "queries": 40,
-   "sources": 2000
-  },
-  {
-   "atoms": 10000,
-   "bm25_only": {
-    "p50": 0.03480406300150207,
-    "p95": 0.11021578034851681
-   },
-   "dense_only": {
-    "p50": 0.07940824350225739,
-    "p95": 0.09990645345169469
-   },
-   "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
-   "queries": 40,
-   "sources": 10000
-  },
-  {
-   "atoms": 165695,
-   "bm25_only": {
-    "p50": 0.9441751839985955,
-    "p95": 2.3757928041479315
-   },
-   "dense_only": {
-    "p50": 0.08988298100302927,
-    "p95": 0.10847034014877863
-   },
-   "note": "latency only: a source prefix drops most gold sources, so recall at these sizes is meaningless",
-   "queries": 40,
-   "sources": 50000
-  }
- ]
+  "store_schema_version_at_start": 8
+ }
 }

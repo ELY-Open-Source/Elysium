@@ -1,0 +1,81 @@
+{
+  "commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
+  "store": "bench/runs/term_sweep/data/ely_eye.sqlite",
+  "copy_seconds": 5.062254256001324,
+  "probes": 173,
+  "shipped_fraction": 0.05,
+  "peak_fraction": 0.05,
+  "arms": [
+    {
+      "fraction": 0.2,
+      "shipped": false,
+      "recall_at_10": 0.791907514450867,
+      "mrr": 0.6286195981282686,
+      "hit_at_10": 0.791907514450867,
+      "p50_seconds": 0.4202946660007001,
+      "p95_seconds": 1.7041233958021622,
+      "median_distinct_sources": 6
+    },
+    {
+      "fraction": 0.1,
+      "shipped": false,
+      "recall_at_10": 0.791907514450867,
+      "mrr": 0.6315097715386733,
+      "hit_at_10": 0.791907514450867,
+      "p50_seconds": 0.46752902700245613,
+      "p95_seconds": 1.7474705398024528,
+      "median_distinct_sources": 6
+    },
+    {
+      "fraction": 0.05,
+      "shipped": true,
+      "recall_at_10": 0.8034682080924855,
+      "mrr": 0.6520300027525461,
+      "hit_at_10": 0.8034682080924855,
+      "p50_seconds": 0.069478709003306,
+      "p95_seconds": 0.13147423019836424,
+      "median_distinct_sources": 5
+    },
+    {
+      "fraction": 0.02,
+      "shipped": false,
+      "recall_at_10": 0.791907514450867,
+      "mrr": 0.6311244150839527,
+      "hit_at_10": 0.791907514450867,
+      "p50_seconds": 0.03335734199936269,
+      "p95_seconds": 0.08840757200086956,
+      "median_distinct_sources": 4
+    },
+    {
+      "fraction": 0.01,
+      "shipped": false,
+      "recall_at_10": 0.7745664739884393,
+      "mrr": 0.61696256537297,
+      "hit_at_10": 0.7745664739884393,
+      "p50_seconds": 0.019158394003170542,
+      "p95_seconds": 0.06302069279918217,
+      "median_distinct_sources": 4
+    },
+    {
+      "fraction": 0.005,
+      "shipped": false,
+      "recall_at_10": 0.7398843930635838,
+      "mrr": 0.5633659051289108,
+      "hit_at_10": 0.7398843930635838,
+      "p50_seconds": 0.01079572799790185,
+      "p95_seconds": 0.06986973820021376,
+      "median_distinct_sources": 3
+    }
+  ],
+  "machine": {
+    "system": "Linux",
+    "release": "6.18.40.1-microsoft-standard-WSL2",
+    "cpus": 32,
+    "threads_per_query": 4,
+    "load_average_1_5_15": [
+      2.32,
+      3.87,
+      8.09
+    ]
+  }
+}

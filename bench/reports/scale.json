@@ -1,7 +1,10 @@
 {
-  "database": "bench/runs/baseline/data/ely_eye.sqlite",
+  "commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
+  "database": "bench/runs/scale/data/ely_eye.sqlite",
   "atoms": 165973,
-  "migration_seconds": 0.00044073900062358007,
+  "copy_seconds": 4.996028091998596,
+  "schema_version": 8,
+  "migration_seconds": 0.03624351899634348,
   "dense_embeddings_enabled": false,
   "probes": 300,
   "probe_modalities": [
@@ -13,10 +16,10 @@
   ],
   "latency": {
     "queries": 300,
-    "mean": 0.06524801251696771,
-    "p50": 0.057020749500225065,
-    "p95": 0.13832052519683205,
-    "max": 0.5395459059946006
+    "mean": 0.0888331904130852,
+    "p50": 0.07169728449662216,
+    "p95": 0.21773518459958724,
+    "max": 0.7804536300027394
   },
   "machine": {
     "system": "Linux",
@@ -24,9 +27,9 @@
     "cpus": 32,
     "threads_per_query": 4,
     "load_average_1_5_15": [
-      1.77,
-      1.62,
-      1.64
+      2.31,
+      3.72,
+      7.9
     ]
   }
 }

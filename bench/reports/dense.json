@@ -1,0 +1,73 @@
+{
+  "commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
+  "database": "bench/runs/dense_scale/data/ely_eye.sqlite",
+  "atoms": 165973,
+  "memories_with_words": 153857,
+  "vectors": 153857,
+  "pending": 0,
+  "dim": 384,
+  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "copy_seconds": 0.665644496002642,
+  "build_seconds": 1421.0276969089973,
+  "texts_per_second": 108.2716405420302,
+  "repair_seconds": 1.2946931579936063,
+  "writes": 50,
+  "write_latency": {
+    "queries": 50,
+    "mean": 0.5204645371803781,
+    "p50": 0.5183807220018934,
+    "p95": 0.5429989652060613,
+    "max": 0.5760761429992272
+  },
+  "probes": 300,
+  "probe_modalities": [
+    "code",
+    "image",
+    "pdf",
+    "ui_screenshot",
+    "video"
+  ],
+  "latency": {
+    "queries": 300,
+    "mean": 0.07861847096656371,
+    "p50": 0.07557305500085931,
+    "p95": 0.09303550984986941,
+    "max": 0.123588470989489
+  },
+  "encode_latency": {
+    "queries": 300,
+    "mean": 0.014255492710411393,
+    "p50": 0.012439899503078777,
+    "p95": 0.025788354348333098,
+    "max": 0.0513256230042316
+  },
+  "correctness": {
+    "probes": 40,
+    "top_k": 10,
+    "tie_aware_agreement": 0.9975,
+    "note": "a returned atom counts when its true cosine is at least the k-th best, so ties cannot fail the check"
+  },
+  "bytes_per_vector": 1729.2666307025354,
+  "vector_bytes": 266059776,
+  "bytes_method": "dbstat page sizes over the vec0 shadow tables",
+  "extrapolation": {
+    "to": 1000000,
+    "assumption": "sqlite-vec 0.1.9 scans every vector, so latency and bytes grow linearly with the count; the model, the machine and the thread budget stay the same",
+    "p50_seconds": 0.45533342773137386,
+    "p95_seconds": 0.5605460517666694,
+    "write_p50_seconds": 3.1232834376789804,
+    "gibibytes": 1.6105050507025191,
+    "build_seconds": 9236.028889871746
+  },
+  "machine": {
+    "system": "Linux",
+    "release": "6.18.40.1-microsoft-standard-WSL2",
+    "cpus": 32,
+    "threads_per_query": 4,
+    "load_average_1_5_15": [
+      3.18,
+      4.58,
+      5.42
+    ]
+  }
+}

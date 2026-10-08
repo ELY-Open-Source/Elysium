@@ -1,0 +1,110 @@
+{
+  "commit": "cd9851a12c000199ce5c211f937ef6c1e0138efa",
+  "vectors": 165973,
+  "dimensions": 384,
+  "probes": 200,
+  "top_k": 10,
+  "recall_note": "probes are drawn from the corpus itself, so these arms are compared with each other, not quoted as retrieval quality; a hit is any returned atom whose true cosine is at least the 10-th best, because byte-identical atoms make the id set ambiguous",
+  "bytes_per_vector": {
+    "float32": 1536,
+    "int8": 384,
+    "bit": 48
+  },
+  "arms": [
+    {
+      "arm": "sqlite-vec float",
+      "queries": 200,
+      "p50_ms": 41.2,
+      "p95_ms": 55.4,
+      "recall_at_10": 1.0
+    },
+    {
+      "arm": "sqlite-vec float + holder filter",
+      "queries": 200,
+      "p50_ms": 29.8,
+      "p95_ms": 30.7,
+      "recall_at_10": 0.599
+    },
+    {
+      "arm": "sqlite-vec int8",
+      "queries": 200,
+      "p50_ms": 35.5,
+      "p95_ms": 42.2,
+      "recall_at_10": 0.977
+    },
+    {
+      "arm": "sqlite-vec int8 + holder filter",
+      "queries": 200,
+      "p50_ms": 22.3,
+      "p95_ms": 28.1,
+      "recall_at_10": 0.595
+    },
+    {
+      "arm": "sqlite-vec bit",
+      "queries": 200,
+      "p50_ms": 2.6,
+      "p95_ms": 2.8,
+      "recall_at_10": 0.728
+    },
+    {
+      "arm": "sqlite-vec bit + holder filter",
+      "queries": 200,
+      "p50_ms": 4.1,
+      "p95_ms": 4.3,
+      "recall_at_10": 0.513
+    },
+    {
+      "arm": "numpy float32 scan (the truth)",
+      "queries": 200,
+      "p50_ms": 8.0,
+      "p95_ms": 9.6,
+      "recall_at_10": 1.0
+    },
+    {
+      "arm": "numpy hamming (sign bit)",
+      "queries": 200,
+      "p50_ms": 18.9,
+      "p95_ms": 19.8,
+      "recall_at_10": 0.011
+    },
+    {
+      "arm": "numpy float32 first 192 dims",
+      "queries": 50,
+      "p50_ms": 7.5,
+      "p95_ms": 8.2,
+      "recall_at_10": 0.722
+    },
+    {
+      "arm": "numpy float32 first 128 dims",
+      "queries": 50,
+      "p50_ms": 7.9,
+      "p95_ms": 8.9,
+      "recall_at_10": 0.57
+    },
+    {
+      "arm": "numpy float32 first 64 dims",
+      "queries": 50,
+      "p50_ms": 4.0,
+      "p95_ms": 8.3,
+      "recall_at_10": 0.43
+    },
+    {
+      "arm": "bit coarse@200 -> float32 rerank in numpy",
+      "queries": 200,
+      "p50_ms": 23.7,
+      "p95_ms": 24.7,
+      "recall_at_10": 0.983
+    }
+  ],
+  "machine": {
+    "system": "Linux",
+    "release": "6.18.40.1-microsoft-standard-WSL2",
+    "cpus": 32,
+    "threads_per_query": 4,
+    "load_average_1_5_15": [
+      2.46,
+      4.17,
+      4.58
+    ]
+  }
+}
