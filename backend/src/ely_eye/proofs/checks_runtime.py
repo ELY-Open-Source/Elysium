@@ -19,6 +19,7 @@ from ..evaluation_schemas import (
 from ..evidence_graph import EvidenceGraphService
 from ..profiles import runtime_profile_report
 from ..runtime import QwenRuntime
+from ..runtime_schemas import AdapterState
 from ..schemas import (
     RuntimeProfile,
     TrainingAdapterKind,
@@ -40,6 +41,16 @@ from .training_trace import (
 )
 
 
+def _generation_adapter(
+    settings: Settings,
+    database: Database,
+    kind: TrainingAdapterKind = TrainingAdapterKind.hme_core_lora,
+) -> tuple[adapters.AdapterSource | None, AdapterState, str]:
+    """Resolve the way generation does, mounted cartridges included, so proof and generation name one copy."""
+    sources, _mounted = adapters.discover(settings, database)
+    return adapters.resolve(sources, settings, kind)
+
+
 class RuntimeChecks:
     """Runtime adapter binding, gold-adapter generation, launch profiles, and the removed module check."""
 
@@ -59,7 +70,7 @@ class RuntimeChecks:
             return deferred
         runtime = QwenRuntime(self.settings)
         status = runtime.status()
-        adapter, _adapter_state, _adapter_reason = adapters.resolve_library_adapter(self.settings)
+        adapter, _adapter_state, _adapter_reason = _generation_adapter(self.settings, self.db)
         weight_path = adapter.path / "adapter_model.safetensors" if adapter else None
         payload = {
             "runtime_status": status.model_dump(mode="json"),
@@ -134,7 +145,7 @@ class RuntimeChecks:
             )
             payload["generation_question"] = generation_question
             status = runtime.status()
-            adapter, _adapter_state, _adapter_reason = adapters.resolve_library_adapter(proof_settings)
+            adapter, _adapter_state, _adapter_reason = _generation_adapter(proof_settings, self.db)
             generation = runtime.generate(generation_question, context)
             answer, citations, citation_report = Verifier().verify_answer(generation.text, context)
             claim_id = EvidenceGraphService(proof_settings, self.db).record_answer(

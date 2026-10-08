@@ -42,6 +42,7 @@ class QwenRuntime:
         self.database = Database(self.settings)
         self._processor: Any | None = None
         self._model: Any | None = None
+        self._attached: adapters.LoadRecord | None = None
 
     def _adapter_choice(self) -> tuple[adapters.AdapterSource | None, str]:
         """The adapter this runtime would attach, plus the reason if it would not attach one."""
@@ -50,7 +51,8 @@ class QwenRuntime:
         return source, reason
 
     def _loaded_adapter(self) -> adapters.LoadRecord | None:
-        return next((item for item in adapters.load_records() if item.kind == TrainingAdapterKind.hme_core_lora), None)
+        """What this instance attached; another instance's model is not this one's claim."""
+        return self._attached
 
     def _generation_adapter_fields(self) -> dict[str, str | None]:
         record = self._loaded_adapter()
@@ -314,7 +316,7 @@ class QwenRuntime:
             logger.info("generating without an adapter: %s", reason)
         else:
             model = adapters.load_into_model(model, source.path)
-            adapters.record_load(source)
+            self._attached = adapters.record_load(source, model)
         model.eval()
         self._model, self._processor = model, processor
         return model, processor
@@ -345,7 +347,7 @@ class QwenRuntime:
     def unload(self) -> None:
         self._model = None
         self._processor = None
-        adapters.clear_loads()
+        self._attached = None
         try:
             import torch
 

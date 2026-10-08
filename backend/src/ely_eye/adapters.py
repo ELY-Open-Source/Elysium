@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+import weakref
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -34,16 +34,16 @@ class AdapterSource:
 
 @dataclass(frozen=True)
 class LoadRecord:
-    """An adapter this process actually attached to a live model."""
+    """An adapter this process attached to a model."""
 
     kind: TrainingAdapterKind
     adapter_id: str
     path: str
     sha256: str
-    loaded_at: str
 
 
 _LOADED: dict[str, LoadRecord] = {}
+_LIVE: dict[str, weakref.ReferenceType[object]] = {}
 
 
 def read_manifest(path: Path) -> AdapterManifest:
@@ -143,36 +143,41 @@ def resolve(
     return chosen, "available", "selected from the adapter library"
 
 
-def resolve_library_adapter(
-    settings: Settings,
-    kind: TrainingAdapterKind = TrainingAdapterKind.hme_core_lora,
-) -> tuple[AdapterSource | None, AdapterState, str]:
-    """Resolution without a database: the library only, no mounted cartridges."""
-    return resolve(library_sources(settings), settings, kind)
-
-
-def _preference(source: AdapterSource) -> tuple[bool, float]:
+def _preference(source: AdapterSource) -> tuple[bool, bool, float]:
     weights = source.path / WEIGHTS_FILE
-    return (source.origin == "cartridge", weights.stat().st_mtime if weights.exists() else 0.0)
+    return (
+        source.origin == "cartridge",
+        source.manifest.cartridge_id is not None,
+        weights.stat().st_mtime if weights.exists() else 0.0,
+    )
 
 
 def load_records() -> list[LoadRecord]:
     return list(_LOADED.values())
 
 
+def live_kinds() -> set[str]:
+    """Kinds whose attached model is still alive, not merely attached once."""
+    alive = {kind for kind, reference in _LIVE.items() if reference() is not None}
+    for kind in [kind for kind, reference in _LIVE.items() if reference() is None]:
+        del _LIVE[kind]
+    return alive
+
+
 def clear_loads() -> None:
     _LOADED.clear()
+    _LIVE.clear()
 
 
-def record_load(source: AdapterSource) -> LoadRecord:
+def record_load(source: AdapterSource, model: Any) -> LoadRecord:
     record = LoadRecord(
         kind=source.manifest.kind,
         adapter_id=source.manifest.adapter_id,
         path=str(source.path),
         sha256=source.manifest.sha256,
-        loaded_at=datetime.now().astimezone().isoformat(),
     )
     _LOADED[record.kind.value] = record
+    _LIVE[record.kind.value] = weakref.ref(model)
     logger.info("loaded adapter %s (%s) from %s", record.adapter_id, record.kind.value, record.path)
     return record
 
@@ -191,12 +196,18 @@ def plan(settings: Settings, database: Database) -> AdapterLoadReport:
     """One row per adapter kind, plus a row for every adapter that lost the choice."""
     sources, mounted = discover(settings, database)
     rows: list[AdapterChoice] = []
+    winners: dict[str, AdapterSource | None] = {}
+    alive = live_kinds()
     for kind in TrainingAdapterKind:
         source, state, reason = resolve(sources, settings, kind)
+        winners[kind.value] = source
         record = next((item for item in load_records() if item.kind == kind), None)
         if record is not None:
-            reason = f"attached to the live model from {record.path}"
-            state = "loaded"
+            if kind.value in alive:
+                state, reason = "loaded", f"attached to the live model from {record.path}"
+            else:
+                state = "available"
+                reason = f"attached earlier in this process from {record.path}; that model is gone"
         rows.append(
             AdapterChoice(
                 kind=kind,
@@ -209,15 +220,15 @@ def plan(settings: Settings, database: Database) -> AdapterLoadReport:
                 cartridge_id=source.cartridge_id if source else None,
             )
         )
-    chosen_paths = {row.path for row in rows if row.path}
     for source in sources:
-        if str(source.path) in chosen_paths:
+        winner = winners.get(source.manifest.kind.value)
+        if winner is None or source.path == winner.path:
             continue
         rows.append(
             AdapterChoice(
                 kind=source.manifest.kind,
                 state="deferred",
-                reason="another adapter of this kind wins for the current mount",
+                reason=f"shadowed by {winner.manifest.adapter_id} for the current mount",
                 path=str(source.path),
                 adapter_id=source.manifest.adapter_id,
                 base_model=source.manifest.base_model,

@@ -223,14 +223,24 @@
   - [x] p1-3.1 按卡带/场景解析 6 个 adapter，不再只有 `runtime.py:317`
   - [x] p1-3.2 加载结果可观测：日志 + `GET /api/runtime/adapters`
   - 验收：状态端点列每个 adapter 的 loaded/deferred + 原因；桩权重测试证明加载分支执行
-  - `backend/src/ely_eye/adapters.py` 是唯一的 adapter 解析处。`runtime.py` 原先在 7 处调 `resolve_runtime_adapter`，现在统一走 `_generation_adapter_fields()`；`peft` 只在 `adapters.load_into_model` 里懒加载，`RuntimeAdapter` 与 `resolve_runtime_adapter` 已删除。
+  - `backend/src/ely_eye/adapters.py` 是唯一的 adapter 解析处。`runtime.py` 原先在 7 处调 `resolve_runtime_adapter`，现在统一走 `_generation_adapter_fields()`；生成路径上的 `peft` 只在 `adapters.load_into_model` 里懒加载（训练路径 `training.py:443`、`training.py:767`、`proofs/training_trace.py:33` 仍直接 import peft，那是训练不是生成），`RuntimeAdapter` 与 `resolve_runtime_adapter` 已删除。
   - 「场景」= 挂载的卡带：`AdapterManifest` 和 `CartridgeManifest` 都没有 scenario 字段（读出来的事实），所以解析按 `cartridge_store.mounted_ids` 选，报告写明来自哪个卡带，没有新造字段。
   - 修掉的真 bug：`CartridgeService.attach_adapter`（`cartridge.py:230`）把 adapter 拷进 `<卡带>/adapters/{kind}/`，但解析从来不看卡带目录，挂上去的东西运行时根本不加载。现在挂载卡带里的副本优先于库里的同名 adapter。
   - 测试写出来才发现的第二个 bug：`ready.sort(key=_preference)` 丢了原来的 `reverse=True`，库里的 adapter 反而赢了挂载副本。
-  - 状态只由事实支撑：loaded（有 LoadRecord）/ available（manifest 与 `adapter_model.safetensors` 都在）/ deferred（base_model 不匹配或缺权重文件，原因里写两个模型名）/ missing（磁盘上没有该 kind）。落选者单独一行 `shadowed=True`。
-  - 验收命令：`pytest backend/tests/test_adapters.py -q` → 10 passed。`test_stub_weights_prove_the_load_branch_runs` 用桩权重断言 `attached == [(ANY, 路径)]`、`model.evalled is True`、LoadRecord 存在、端点该行 `state == "loaded"`；`test_unload_clears_the_loaded_state` 断言 unload 后回到 available。
+  - 状态只由事实支撑：loaded（模型还活着——`record_load` 存 `weakref`，且记录挂在具体 `QwenRuntime._attached` 上，不是进程全局）/ available（manifest 与 `adapter_model.safetensors` 都在；模型没了就说「attached earlier in this process … that model is gone」）/ deferred（base_model 不匹配或缺权重文件，原因里写两个模型名）/ missing（磁盘上没有该 kind）。落选者单独一行 `shadowed=True`，且**只在真有赢家时**才有这行，原因点名赢家。
+  - 排序键是三个：挂载卡带 > manifest 带 `cartridge_id` > 权重 mtime。第一个版本漏了中间那个，review 用 `/tmp/p13_pref.py` 量出 parent `9f0f799` 与 HEAD 选中的文件不同——`training.py:106` 写库内 adapter 时会带卡带标记，所以这不是风格问题。
+  - 验收命令：`pytest backend/tests/test_adapters.py -q` → 13 passed。`test_stub_weights_prove_the_load_branch_runs` 用桩权重断言 `attached == [(ANY, 路径)]`、`model.evalled is True`、LoadRecord 存在、端点该行 `state == "loaded"`；`test_generation_reports_the_adapter_it_attached` 走完 transformers 生成路径，断言答案里的 adapter 路径 / kind / id / sha256 与 `output_tokens`；`test_unload_stops_claiming_a_model_that_is_gone` 断言 unload 后回到 available 并说明模型已消失，同时断言另一个实例不会继承这个声明。
+  - 证明与生成解析一致：`proofs/checks_runtime.py` 的 `_generation_adapter()` 用 `discover` + `resolve`（含挂载卡带），不再用只看库的解析，否则同一份证明里 `resolved_adapter` 与 `adapter` 两块会指向不同副本还静默。
   - 新文件 `backend/src/ely_eye/runtime_schemas.py`（30 行）：`schemas.py` 已 498 行，离 500 行红线 2 行，报告类型不放进去。
-  - 门禁：`pytest -q` 222 passed；ruff 干净；mypy 冷缓存查 7 个改动文件 → 2 errors，与 HEAD 的 `runtime.py` 逐条相同（`qwen_vl_utils` 无 stubs、`model_class` 重赋值），净新增 0；pyright 同 7 文件 → 2 errors，HEAD 也是 2 条，都是 `process_vision_info` 的双返回（`vision_process.py:532-534` 由 `return_video_kwargs` 决定返回 2 或 3 元组，产品用默认值取 2 个，运行时正确）。
+  - 门禁：`pytest -q` 225 passed；ruff 干净；mypy 冷缓存查 7 个改动文件 → 2 errors，与 HEAD 的 `runtime.py` 逐条相同（`qwen_vl_utils` 无 stubs、`model_class` 重赋值），净新增 0；pyright 同 7 文件 → 2 errors，HEAD 也是 2 条，都是 `process_vision_info` 的双返回（`vision_process.py:532-534` 由 `return_video_kwargs` 决定返回 2 或 3 元组，产品用默认值取 2 个，运行时正确）。
+  - 独立 review（同一个 `p1review` 里的 pi，模型 `strata/qwen3.8-flash-next-abliterated-iq3_s:high`）第一轮 **FAIL 6 条**，全部核实并改掉：
+    1. `plan()` 用 `chosen_paths` 判落选，把「被拒绝的候选」也当成落选者，于是没有任何 adapter 胜出时却说「another adapter of this kind wins」，还把真正的 deferred 原因盖掉了（reviewer 挂载 cart-home 复现，`hme_router`、`hme_vision_lora` 两行都在撒谎）。
+    2. `_LOADED` 是进程全局，而原因写「attached to the live model」——`api.py` 每个请求新建一个 `QwenRuntime`，`_model is None` 也报 loaded。改成 weakref + 实例字段。
+    3. CHECKLIST 那句「peft 只在 `adapters.load_into_model` 里」在全仓范围不真（training.py 两处、training_trace.py 一处），已限定为生成路径。
+    4. `LoadRecord.loaded_at` 写了没人读 → 删。
+    5. `_preference` 丢了 `manifest.cartridge_id is not None` 这个次级键，换掉了原来会加载哪个 adapter（见上）。
+    6. 证明检查与生成解析不一致（见上）。
+    reviewer 还指出 4 条生成路径与 `status()` 零覆盖，所以「没丢函数」当时只是读出来的——现在有了走完生成路径的测试。
   - CLI 面：`ely-eye adapters` 打印同一份报告。
 - [ ] **p1-4** 工程地基
   - [ ] p1-4.1 pytest 从零到有（后端）
