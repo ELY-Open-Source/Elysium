@@ -159,8 +159,9 @@
   - 验收：`pytest backend/tests/test_asr.py` 绿（13 个测试）；ASR **实跑**，不是 DEFERRED
   - 实测证据（`bench/reports/ASR.md`，`.venv/bin/python -m bench.asr_check` 生成）：3 段 Video-MME 真视频
     **258.18 秒**音频（容器时长 88.93 / 109.18 / 60.07），对着第三方字幕 WER **0.242**——分母是
-    **533 个参考词**（听到 563 个词），三行各自的参考词数是 201 / 296 / 36。CPU int8 4 线程
-    3.26 秒转完，逐行 63.9× / 82.4× / 112.2× 实时。走产品路径摄入后从库里读回：**80 个 audio atom**、
+    **533 个参考词**（听到 563 个词），三行各自的参考词数是 201 / 296 / 36。CPU int8 4 线程跑完这 258 秒
+    音频：两份已提交报告分别 3.26 秒与 3.12 秒（逐行 63.9–112.2× 与 68.4–111.2× 实时——转写秒数随
+    机器负载浮动，WER 与词数不随负载动）。走产品路径摄入后从库里读回：**80 个 audio atom**、
     **563 个词级时间戳**、0 个时序倒错、0 个早于自己所属片段（总共 133 个 atom）。模型
     `Systran/faster-whisper-tiny`（78.2MB，model.bin sha256 dcb76c6586fc06cb…），远低于 500MB 上限。
   - 可复现性是量出来的：解码参数钉死 `beam_size=1, temperature=(0.0,), condition_on_previous_text=False,
@@ -169,6 +170,12 @@
     直接 `TypeError`）。同一台机器连跑两遍：WER 0.242 → 0.242，转写文本逐字节相同。
   - 字幕不是逐字稿，所以这个 WER **不是任何方向的界**：字幕漏词也会掩盖模型漏词。
     报告把分母写在表里，不写「上界」这种断言。
+  - review 第二轮 FAIL 的 4 条全是数字与措辞，也都改了：docstring 里的 1.7 秒是钉参数前那次运行的残留
+    （现在不写数字，只指向报告；并且不再把容器时长叫「语音时长」，因为 `vad_filter=False`）；
+    CHECKLIST 里的 3.55 秒 / 61.6× 与「31 段语音」同样是旧运行残留（钉死后是 38/39/3 段，加起来
+    正好是库里的 80 个 atom）；报告那句「库里有 80 个 atom、0 个时序倒错」原本把只在模型输出上
+    算过的不变量说成库侧的，现在 harness 对库里存的 words 重算（`out_of_order_in_store` /
+    `before_their_segment_in_store`）。速度只报区间，因为转写秒数跟机器负载走。
   - 偏差与根因：
     - 验收路径 `tests/test_audio_ingest.py` 不存在，实际是 `backend/tests/test_asr.py`。
     - `Modality` 只加 `audio`，没加 `transcript`：一份转写就是带时间戳的 audio atom，
