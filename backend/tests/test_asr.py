@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import wave
 from pathlib import Path
 from typing import Any, cast
 
@@ -9,10 +10,19 @@ import numpy as np
 import pytest
 
 from ely_eye import ingestion_media as media_module
-from ely_eye.asr import DEFERRED, SpeechSegment, SpeechTranscriber, SpokenWord, decode_audio
+from ely_eye.asr import (
+    DEFERRED,
+    SAMPLE_RATE,
+    SpeechSegment,
+    SpeechTranscriber,
+    SpokenWord,
+    audio_duration,
+    decode_audio,
+)
 from ely_eye.config import Settings
 from ely_eye.db import Database
 from ely_eye.ingestion import IngestionService, UnsupportedFile
+from ely_eye.ingestion_common import FileTooLarge
 from ely_eye.ocr import OcrResult
 from ely_eye.schemas import Modality
 
@@ -89,12 +99,18 @@ class FakeCv2:
         return True, FakeEncoded()
 
 
-def _settings(tmp_path: Path, asr_model_dir: Path | None = None) -> Settings:
-    return Settings(home=tmp_path / "home", asr_model_dir=asr_model_dir)
+def _settings(tmp_path: Path, asr_model_dir: Path | None = None, max_text_file_bytes: int = 10_000_000) -> Settings:
+    return Settings(home=tmp_path / "home", asr_model_dir=asr_model_dir, max_text_file_bytes=max_text_file_bytes)
 
 
-def _service(tmp_path: Path, transcriber: Any) -> tuple[IngestionService, Database]:
-    settings = _settings(tmp_path)
+def _service(
+    tmp_path: Path,
+    transcriber: Any,
+    *,
+    asr_model_dir: Path | None = None,
+    max_text_file_bytes: int = 10_000_000,
+) -> tuple[IngestionService, Database]:
+    settings = _settings(tmp_path, asr_model_dir=asr_model_dir, max_text_file_bytes=max_text_file_bytes)
     settings.ensure_dirs()
     database = Database(settings)
     service = IngestionService(settings=settings, database=database)
@@ -202,7 +218,71 @@ def test_the_transcriber_names_the_snapshot_it_wants(tmp_path: Path) -> None:
         half.transcribe(_audio(tmp_path))
 
 
+def _video_only(path: Path) -> Path:
+    """A real mp4 with a video stream and no audio track, written by the decoder we already ship."""
+    import av
+
+    with av.open(str(path), "w") as container:
+        stream = container.add_stream("mpeg4", rate=10)
+        stream.width, stream.height, stream.pix_fmt = 64, 64, "yuv420p"
+        for _ in range(5):
+            frame = av.VideoFrame.from_ndarray(np.zeros((64, 64, 3), dtype=np.uint8), format="rgb24")
+            for packet in stream.encode(frame):
+                container.mux(packet)
+        for packet in stream.encode():
+            container.mux(packet)
+    return path
+
+
 def test_a_file_with_no_audio_track_says_so(tmp_path: Path) -> None:
+    video = _video_only(tmp_path / "silent.mp4")
+
+    with pytest.raises(ValueError, match="the file holds no audio track"):
+        decode_audio(video)
+
+
+def test_an_audio_track_with_no_frames_says_so(tmp_path: Path) -> None:
+    silent = tmp_path / "silent.wav"
+    with wave.open(str(silent), "wb") as writer:
+        writer.setnchannels(1)
+        writer.setsampwidth(2)
+        writer.setframerate(SAMPLE_RATE)
+
+    with pytest.raises(ValueError, match="the audio track is empty"):
+        decode_audio(silent)
+
+
+def test_a_walk_records_a_file_over_the_size_cap(tmp_path: Path) -> None:
+    service, database = _service(tmp_path, FakeTranscriber(available=False), max_text_file_bytes=32)
+    folder = tmp_path / "shelf"
+    folder.mkdir()
+    (folder / "note.md").write_text("# 钥匙放在抽屉里\n", encoding="utf-8")
+    (folder / "huge.json").write_text('{"钥匙": "抽屉"}' * 4, encoding="utf-8")
+
+    response = service.ingest_path(folder)
+
+    assert response.atom_count > 0, "the small file is still ingested"
+    assert [item.path for item in response.skipped] == [str(folder / "huge.json")]
+    assert "over max_text_file_bytes=32" in response.skipped[0].reason
+    assert database.atom_count() == response.atom_count
+
+
+def test_an_explicit_file_over_the_size_cap_fails_loudly(tmp_path: Path) -> None:
+    service, _database = _service(tmp_path, FakeTranscriber(available=False), max_text_file_bytes=16)
+    huge = tmp_path / "huge.json"
+    huge.write_text('{"钥匙": "抽屉"}' * 4, encoding="utf-8")
+
+    with pytest.raises(FileTooLarge, match="over max_text_file_bytes=16"):
+        service.ingest_path(huge)
+
+
+def test_the_container_duration_is_the_media_length(tmp_path: Path) -> None:
+    video = _video_only(tmp_path / "silent.mp4")
+
+    assert audio_duration(video) == pytest.approx(0.5, abs=0.05)
+
+
+def test_a_text_file_cannot_be_decoded(tmp_path: Path) -> None:
     markdown = tmp_path / "notes.md"
     markdown.write_text("# 钥匙\n", encoding="utf-8")
 

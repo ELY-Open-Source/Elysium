@@ -16,6 +16,7 @@ from .ingestion_common import (
     SUPPORTED_IMAGE_EXTENSIONS,
     SUPPORTED_TEXT_EXTENSIONS,
     SUPPORTED_VIDEO_EXTENSIONS,
+    FileTooLarge,
     IngestBatch,
     UnsupportedFile,
 )
@@ -62,7 +63,7 @@ class IngestionService(MediaIngest, RepositoryIngest):
         for file_path in files:
             try:
                 file_batch = self._ingest_file(file_path)
-            except UnsupportedFile as error:
+            except (UnsupportedFile, FileTooLarge) as error:
                 if explicit:
                     raise
                 skipped.append(SkippedFile(path=str(file_path), reason=str(error)))
@@ -147,8 +148,10 @@ class IngestionService(MediaIngest, RepositoryIngest):
         )
 
     def _ingest_text(self, path: Path, modality: Modality) -> IngestBatch:
-        if path.stat().st_size > self.settings.max_text_file_bytes:
-            return IngestBatch(sources=[], atoms=[])
+        limit = self.settings.max_text_file_bytes
+        size = path.stat().st_size
+        if size > limit:
+            raise FileTooLarge(f"{path} is {size} bytes, over max_text_file_bytes={limit}")
         source = self._source_record(path, modality.value)
         text = path.read_text(encoding="utf-8", errors="replace")
         atom = EvidenceAtom(

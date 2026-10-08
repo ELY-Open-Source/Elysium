@@ -54,6 +54,10 @@ class UnsupportedFile(ValueError):
     """No reader for this file: a walk records the reason, an explicit path fails."""
 
 
+class FileTooLarge(ValueError):
+    """A reader exists but the file is over the configured cap: refused with its size stated."""
+
+
 @dataclass
 class IngestBatch:
     sources: list[SourceRecord]

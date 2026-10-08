@@ -17,6 +17,14 @@ DOWNLOAD_HINT = (
 DEFERRED = "deferred: no speech model snapshot"
 MODEL_GRAPH = "model.bin"
 SAMPLE_RATE = 16_000
+CPU_THREADS = 4
+TRANSCRIBE_KNOBS: dict[str, Any] = {
+    "word_timestamps": True,
+    "beam_size": 1,
+    "temperature": (0.0,),
+    "condition_on_previous_text": False,
+    "vad_filter": False,
+}
 
 
 @dataclass(frozen=True)
@@ -66,8 +74,18 @@ def decode_audio(path: Path) -> np.ndarray:
     return np.concatenate(frames).astype(np.float32)
 
 
-def _seconds(value: Any) -> float:
-    return float(value)
+def audio_duration(path: Path) -> float:
+    """Seconds of media the container claims; 0.0 when it does not say."""
+    import av
+    from av.error import FFmpegError
+
+    try:
+        with av.open(str(path)) as container:
+            if not container.duration:
+                return 0.0
+            return container.duration / av.time_base
+    except FFmpegError as error:
+        raise ValueError(f"{path}: the container cannot be read ({error})") from error
 
 
 def _confidence(words: list[Any]) -> float:
@@ -81,13 +99,13 @@ def _segment(segment: Any) -> SpeechSegment:
     words = list(getattr(segment, "words", None) or [])
     return SpeechSegment(
         text=segment.text.strip(),
-        start=_seconds(segment.start),
-        end=_seconds(segment.end),
+        start=float(segment.start),
+        end=float(segment.end),
         words=tuple(
             SpokenWord(
                 word=spoken.word.strip(),
-                start=_seconds(spoken.start),
-                end=_seconds(spoken.end),
+                start=float(spoken.start),
+                end=float(spoken.end),
                 confidence=float(getattr(spoken, "probability", 0.0) or 0.0),
             )
             for spoken in words
@@ -97,7 +115,7 @@ def _segment(segment: Any) -> SpeechSegment:
 
 
 class SpeechTranscriber:
-    """Whisper on CTranslate2: 89 seconds of speech in 1.5 seconds of CPU, int8."""
+    """Whisper on CTranslate2: 88.9 seconds of speech in 1.7 seconds of CPU int8 (bench/reports/ASR.md)."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -118,12 +136,15 @@ class SpeechTranscriber:
         if not (directory / MODEL_GRAPH).exists():
             raise SystemExit(f"{directory} holds no {MODEL_GRAPH}; {DOWNLOAD_HINT}")
         model = self._load(directory)
-        segments, _info = model.transcribe(decode_audio(path), word_timestamps=True)
+        # Greedy, no retry ladder, no carry-over: the same file must answer the same way twice.
+        segments, _info = model.transcribe(decode_audio(path), **TRANSCRIBE_KNOBS)
         return [_segment(segment) for segment in segments]
 
     def _load(self, directory: Path) -> Any:
         if self._model is None:
             from faster_whisper import WhisperModel
 
-            self._model = WhisperModel(str(directory), device="cpu", compute_type="int8")
+            self._model = WhisperModel(
+                str(directory), device="cpu", compute_type="int8", cpu_threads=CPU_THREADS
+            )
         return self._model

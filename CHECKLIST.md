@@ -156,11 +156,19 @@
 - [x] **p1-2** 音频摄入
   - [x] p1-2.1 `Modality` 加 audio；未知扩展名不再静默跳过
   - [x] p1-2.2 ASR 接入，转写 atom 带词级时间戳
-  - 验收：`pytest backend/tests/test_asr.py` 绿（8 个测试）；ASR **实跑**，不是 DEFERRED
-  - 实测证据（`bench/reports/ASR.md`，commit 03ca357）：3 段 Video-MME 真视频 210.5 秒音频，
-    对着第三方字幕 WER **0.242**，CPU int8 **51× 实时**，产出 66 个 speech atom、550 个词级时间戳，
-    0 个词时序倒错、0 个词早于自己所属片段。模型 `Systran/faster-whisper-tiny`（78.2MB，
-    model.bin sha256 dcb76c6586fc06cb…），远低于 500MB 上限。字幕不是逐字稿，所以 WER 是上界。
+  - 验收：`pytest backend/tests/test_asr.py` 绿（13 个测试）；ASR **实跑**，不是 DEFERRED
+  - 实测证据（`bench/reports/ASR.md`，`.venv/bin/python -m bench.asr_check` 生成）：3 段 Video-MME 真视频
+    **258.18 秒**音频（容器时长 88.93 / 109.18 / 60.07），对着第三方字幕 WER **0.242**——分母是
+    **533 个参考词**（听到 563 个词），三行各自的参考词数是 201 / 296 / 36。CPU int8 4 线程
+    3.55 秒转完，逐行 61.6× / 73.0× / 97.7× 实时。走产品路径摄入后从库里读回：**80 个 audio atom**、
+    **563 个词级时间戳**、0 个时序倒错、0 个早于自己所属片段（总共 133 个 atom）。模型
+    `Systran/faster-whisper-tiny`（78.2MB，model.bin sha256 dcb76c6586fc06cb…），远低于 500MB 上限。
+  - 可复现性是量出来的：解码参数钉死 `beam_size=1, temperature=(0.0,), condition_on_previous_text=False,
+    vad_filter=False, cpu_threads=4`（`temperature` 给单元素 tuple 才是真的没有回退阶梯——
+    faster-whisper 1.2.1 **没有** `temperature_increment_on_fallback` 这个参数，第一版我传了它，
+    直接 `TypeError`）。同一台机器连跑两遍：WER 0.242 → 0.242，转写文本逐字节相同。
+  - 字幕不是逐字稿，所以这个 WER **不是任何方向的界**：字幕漏词也会掩盖模型漏词。
+    报告把分母写在表里，不写「上界」这种断言。
   - 偏差与根因：
     - 验收路径 `tests/test_audio_ingest.py` 不存在，实际是 `backend/tests/test_asr.py`。
     - `Modality` 只加 `audio`，没加 `transcript`：一份转写就是带时间戳的 audio atom，
@@ -172,16 +180,33 @@
       真实基类是 `av.error.FFmpegError`；只 catch 它，我自己的 `ValueError` 消息才不会被吞。
     - 未知扩展名：显式给路径 → 抛 `UnsupportedFile`（“no reader for .xyz”）；目录扫描 →
       记进 `IngestResponse.skipped` 带原因，继续摄入能读的。以前是返回空 batch，无声无息。
+    - 同一个静默毛病还有一处被 review 抓出来：`_ingest_text` 对超过 `max_text_file_bytes`（10 MiB）
+      的文件也是直接返回空 batch。本仓库自己的语料里就有 277MB 的 `longmemeval_s_cleaned.json`。
+      现在抛 `FileTooLarge`（带字节数和上限），扫描照样记进 `skipped`。
     - 视频现在除了帧 atom 还会产出 speech atom（同一个 mp4：18 帧 + 31 段语音）。
     - 顺手把 p2-4 提前做了：`ingestion.py` 748 行超了 500 规则，拆成
-      `ingestion_common.py`(99) / `ingestion_media.py`(ABC mixin, 285) / `ingestion_repository.py`(346) /
-      `ingestion.py`(193)；`cli.py` 544 行也超了，按已有的 `cli_transactive.register` 模式拆出
-      `cli_senses.py`(84) 和 `cli_common.py`(json_dump)，`cli.py` 现在 479 行。
+      `ingestion_common.py`(102) / `ingestion_media.py`(ABC mixin, 278) / `ingestion_repository.py`(321) /
+      `ingestion.py`(177)；`cli.py` 544 行也超了，按已有的 `cli_transactive.register` 模式拆出
+      `cli_senses.py`(79) 和 `cli_common.py`(json_dump)，`cli.py` 现在 479 行。
+    - review 第一轮 FAIL 的 11 条全部落地：钉死解码参数并跑两遍证明确定性；用容器真实时长
+      而不是「最后一段的结束时间」；表里露出参考词分母、删掉「上界」断言；speech atom 数改成
+      从库里读回（80，不是 bench 自己数的 66）；报告在代码提交之后重新生成，stamp 指向含代码的
+      commit；`cli_senses` 里重复的 `json_dump` 删掉改用 `cli_common`；Go 的 `search_atoms` 描述补上
+      `audio`（MCP 调用方原本发现不了这个过滤值）；`test_a_file_with_no_audio_track_says_so` 原本
+      测的是 markdown，现在用 PyAV 写真·无音轨 mp4 命中 `asr.py` 那条分支，另加空 wav 命中
+      「音轨是空的」；删掉 `_seconds` 这个空壳 wrapper。
+    - 顺手改了个默认值（review 也点了）：`config.py` 的 `embedding_model_id` 从
+      `Qwen/Qwen3-VL-Embedding-8B`（16GB，违反本轮 ≤500MB 的界）换成
+      `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`——冻结的 bench 数字用的就是它。
+    - 门禁里挖出的真根因：`bench/tests/*` 用 `from bench.x import` 而仓库根没有 conftest，
+      所以裸 `pytest` 会 `ModuleNotFoundError: No module named 'bench'`（只有 `python -m pytest` 能跑）。
+      `pyproject.toml` 加 `[tool.pytest.ini_options] pythonpath=["."] testpaths=[…]`，两种起法都绿。
     - 拆完顺手修掉搬过来的旧类型债：`MediaIngest._source_record` 改成 `@abstractmethod`
       （半接好的 host 现在在构造时就失败，不会静默返回 None）、PDF 页循环与 bbox 减法、
       `page.get_text` 的 union 收窄；`pyproject.toml` 里失效的 `fitz.*` mypy override 换成 `faster_whisper.*`。
-    - 全仓 mypy 从 29 个错降到 **24**（本任务净修 5 个，没新增）；改动文件 pyright **0 错**、
-      ruff 干净、207 个测试绿。
+    - 全仓 mypy：干净树上冷缓存实测 parent `03ca357` **26** 个错 → 本任务 **24**（净修 2 个，
+      没新增；之前写的 29 是在半成品工作树上量的，不算）；改动文件 pyright **0 错**、
+      ruff 干净、**212** 个测试绿（裸 `pytest` 与 `python -m pytest` 都是 212）。
 - [ ] **p1-3** adapter 加载
   - [ ] p1-3.1 按卡带/场景解析 6 个 adapter，不再只有 `runtime.py:317`
   - [ ] p1-3.2 加载结果可观测：日志 + `GET /api/runtime/adapters`

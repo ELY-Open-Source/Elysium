@@ -23,7 +23,7 @@ type GetCartridgeInput struct {
 
 type SearchAtomsInput struct {
 	Query    string `json:"query" jsonschema:"search query, matched by the server's own ranking"`
-	Modality string `json:"modality,omitempty" jsonschema:"optional exact modality filter such as text, code, image, pdf_page, pdf_region, video_frame, ui_screenshot"`
+	Modality string `json:"modality,omitempty" jsonschema:"optional exact modality filter such as text, code, image, audio, pdf_page, pdf_region, video_frame, ui_screenshot"`
 	Holder   string `json:"holder,omitempty" jsonschema:"optional: only this holder's memories may answer"`
 	Scenario string `json:"scenario,omitempty" jsonschema:"optional: only this scenario, e.g. home or work"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"maximum number of atoms to return, capped at 100"`

@@ -1,3 +1,9 @@
+[tool.pytest.ini_options]
+# bench/tests imports the bench package by name, so the repo root must be importable
+# whichever way pytest is launched (pytest, or python -m pytest).
+pythonpath = ["."]
+testpaths = ["backend/tests", "bench/tests"]
+
 [tool.mypy]
 python_executable = ".venv/bin/python"
 mypy_path = "."

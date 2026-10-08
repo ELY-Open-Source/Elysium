@@ -9,12 +9,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
 
 import typer
 
 from .asr import DEFERRED as SPEECH_DEFERRED
 from .asr import SpeechTranscriber
+from .cli_common import json_dump
 from .config import Settings
 from .db import Database
 from .describe import DEFERRED, VisionDescriber
@@ -53,11 +53,6 @@ def senses_report(settings: Settings, db: Database) -> dict[str, dict[str, objec
 
 def register(app: typer.Typer, settings: Callable[[], Settings]) -> None:
     """Add the media commands. The settings thunk lets one patch in a test redirect every command."""
-
-    def json_dump(value: Any) -> str:
-        import json
-
-        return json.dumps(value, ensure_ascii=False, indent=2)
 
     @app.command()
     def transcribe(path: Path) -> None:
