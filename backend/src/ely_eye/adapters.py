@@ -37,7 +37,6 @@ class LoadRecord:
     """One adapter this process attached to one model."""
 
     source: AdapterSource
-    sha256: str
 
     @property
     def kind(self) -> TrainingAdapterKind:
@@ -51,6 +50,10 @@ class LoadRecord:
     def path(self) -> str:
         return str(self.source.path)
 
+    @property
+    def sha256(self) -> str:
+        return self.source.manifest.sha256
+
 
 _ATTACHMENTS: list[tuple[LoadRecord, weakref.ReferenceType[object]]] = []
 
@@ -63,7 +66,9 @@ def read_manifest(path: Path) -> AdapterManifest:
     try:
         return AdapterManifest.model_validate_json(text)
     except ValidationError as error:
-        raise ValueError(f"{path}: the adapter manifest is not a valid AdapterManifest ({error})") from error
+        raise ValueError(
+            f"{path}: the adapter manifest is not a valid AdapterManifest ({error})"
+        ) from error
 
 
 def cartridge_roots(database: Database) -> dict[str, Path]:
@@ -111,7 +116,9 @@ def discover(settings: Settings, database: Database) -> tuple[list[AdapterSource
     for cartridge_id in mounted:
         root = roots.get(cartridge_id)
         if root is None:
-            logger.warning("cartridge %s is mounted but its directory is not registered", cartridge_id)
+            logger.warning(
+                "cartridge %s is mounted but its directory is not registered", cartridge_id
+            )
             continue
         for manifest_path in sorted((root / "adapters").glob(f"*/{MANIFEST_FILE}")):
             sources.append(
@@ -144,7 +151,11 @@ def resolve(
         )
     ready = [source for source in matching if (source.path / WEIGHTS_FILE).exists()]
     if not ready:
-        return None, "deferred", f"the {kind.value} manifests are present but none carries {WEIGHTS_FILE}"
+        return (
+            None,
+            "deferred",
+            f"the {kind.value} manifests are present but none carries {WEIGHTS_FILE}",
+        )
     ready.sort(key=_preference, reverse=True)
     chosen = ready[0]
     if chosen.origin == "cartridge":
@@ -172,7 +183,7 @@ def live_attachments() -> list[LoadRecord]:
 
 
 def record_load(source: AdapterSource, model: Any) -> LoadRecord:
-    record = LoadRecord(source=source, sha256=source.manifest.sha256)
+    record = LoadRecord(source=source)
     _ATTACHMENTS[:] = [
         (item, reference) for item, reference in _ATTACHMENTS if reference() is not None
     ]
@@ -208,7 +219,8 @@ def plan(settings: Settings, database: Database) -> AdapterLoadReport:
             reason = f"attached to the live model from {newest.path}"
             held = sorted({record.adapter_id for record in live[:-1] if record.adapter_id != newest.adapter_id})
             if held:
-                reason = f"{reason}; another live model still holds {' and '.join(held)}"
+                subject = "another live model still holds" if len(held) == 1 else "other live models still hold"
+                reason = f"{reason}; {subject} {' and '.join(held)}"
             rows.append(_choice(kind, state, reason, newest.source))
             continue
         if earlier is not None and source is not None:

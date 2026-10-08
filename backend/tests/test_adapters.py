@@ -133,8 +133,14 @@ def test_a_library_adapter_is_selected_for_its_kind(tmp_path: Path) -> None:
 
 def test_an_adapter_on_another_base_model_is_deferred_naming_both_models(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
-    _write_adapter(settings.adapters_dir / "router", kind=TrainingAdapterKind.hme_router, base_model="Qwen/Qwen3.5-0.8B")
-    source, state, reason = adapters.resolve(adapters.library_sources(settings), settings, TrainingAdapterKind.hme_router)
+    _write_adapter(
+        settings.adapters_dir / "router",
+        kind=TrainingAdapterKind.hme_router,
+        base_model="Qwen/Qwen3.5-0.8B",
+    )
+    source, state, reason = adapters.resolve(
+        adapters.library_sources(settings), settings, TrainingAdapterKind.hme_router
+    )
     assert source is None
     assert state == "deferred"
     assert "trained on Qwen/Qwen3.5-0.8B" in reason and f"runtime holds {MODEL}" in reason
@@ -153,7 +159,9 @@ def test_the_mounted_cartridge_copy_wins_over_the_library(tmp_path: Path) -> Non
     database = Database(settings)
     _write_adapter(settings.adapters_dir / "core", adapter_id="library-copy")
     cartridge_root = _cartridge(settings, database, "cart-home")
-    cartridge_copy = _write_adapter(cartridge_root / "adapters" / "hme_core_lora", adapter_id="cartridge-copy")
+    cartridge_copy = _write_adapter(
+        cartridge_root / "adapters" / "hme_core_lora", adapter_id="cartridge-copy"
+    )
     sources, mounted = adapters.discover(settings, database)
     assert mounted == ["cart-home"]
     source, state, reason = adapters.resolve(sources, settings, CORE)
@@ -197,7 +205,9 @@ def test_stub_weights_prove_the_load_branch_runs(tmp_path: Path, monkeypatch) ->
     assert attached == [(mock.ANY, chosen)], "peft was never asked to attach the stub adapter"
     assert model.evalled is True
     assert [record.adapter_id for record in adapters.load_records()] == ["adapter-1"]
-    row = next(item for item in adapters.plan(settings, Database(settings)).adapters if item.kind == CORE)
+    row = next(
+        item for item in adapters.plan(settings, Database(settings)).adapters if item.kind == CORE
+    )
     assert row.state == "loaded" and "attached to the live model" in row.reason
 
 
@@ -219,7 +229,9 @@ def test_unload_stops_claiming_a_model_that_is_gone(tmp_path: Path, monkeypatch)
     assert "that model is gone" in row.reason, row.reason
 
 
-def test_a_loaded_row_names_the_adapter_that_is_actually_attached(tmp_path: Path, monkeypatch) -> None:
+def test_a_loaded_row_names_the_adapter_that_is_actually_attached(
+    tmp_path: Path, monkeypatch
+) -> None:
     settings = _settings(tmp_path)
     attached = _write_adapter(settings.adapters_dir / "x", adapter_id="adapter-x")
     monkeypatch.setattr(adapters, "load_into_model", lambda model, path: _FakeModel())
@@ -227,9 +239,13 @@ def test_a_loaded_row_names_the_adapter_that_is_actually_attached(tmp_path: Path
     runtime = QwenRuntime(settings)
     runtime._load_transformers()
     _write_adapter(settings.adapters_dir / "y", adapter_id="adapter-y")
-    row = next(item for item in adapters.plan(settings, Database(settings)).adapters if item.kind == CORE)
+    row = next(
+        item for item in adapters.plan(settings, Database(settings)).adapters if item.kind == CORE
+    )
     assert row.state == "loaded"
-    assert row.adapter_id == "adapter-x", f"the row promises {row.adapter_id} but {attached} is attached"
+    assert row.adapter_id == "adapter-x", (
+        f"the row promises {row.adapter_id} but {attached} is attached"
+    )
     assert row.path == str(attached) and row.reason.endswith(str(attached)), row.reason
 
 
@@ -256,14 +272,39 @@ def test_one_unload_does_not_declare_another_live_model_gone(tmp_path: Path, mon
     assert row.state == "available" and "that model is gone" in row.reason, row.reason
 
 
+def test_three_live_models_are_named_as_models_not_one_model(tmp_path: Path, monkeypatch) -> None:
+    settings = _settings(tmp_path)
+    monkeypatch.setattr(adapters, "load_into_model", lambda model, path: _FakeModel())
+    monkeypatch.setattr(QwenRuntime, "_load_base_model", lambda self: (_FakeModel(), object()))
+    runtimes = []
+    for name in ("a", "b", "c"):
+        _write_adapter(settings.adapters_dir / name, adapter_id=f"adapter-{name}")
+        runtime = QwenRuntime(settings)
+        runtime._load_transformers()
+        runtimes.append(runtime)
+    row = next(item for item in adapters.plan(settings, Database(settings)).adapters if item.kind == CORE)
+    assert row.state == "loaded" and row.adapter_id == "adapter-c"
+    assert "other live models still hold adapter-a and adapter-b" in row.reason, row.reason
+    assert "another live model" not in row.reason, row.reason
+
+
 def test_a_rejected_candidate_does_not_claim_another_adapter_won(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
-    _write_adapter(settings.adapters_dir / "router", kind=TrainingAdapterKind.hme_router, base_model="Qwen/Qwen3.5-0.8B")
+    _write_adapter(
+        settings.adapters_dir / "router",
+        kind=TrainingAdapterKind.hme_router,
+        base_model="Qwen/Qwen3.5-0.8B",
+    )
     report = adapters.plan(settings, Database(settings))
     router_rows = [row for row in report.adapters if row.kind == TrainingAdapterKind.hme_router]
     assert len(router_rows) == 1, "a rejected candidate was published as a shadow row"
-    assert router_rows[0].state == "deferred" and "trained on Qwen/Qwen3.5-0.8B" in router_rows[0].reason
-    assert not any(row.shadowed for row in report.adapters), "nothing won, so nothing may claim a winner"
+    assert (
+        router_rows[0].state == "deferred"
+        and "trained on Qwen/Qwen3.5-0.8B" in router_rows[0].reason
+    )
+    assert not any(row.shadowed for row in report.adapters), (
+        "nothing won, so nothing may claim a winner"
+    )
 
 
 def test_the_shadow_row_names_the_adapter_that_won(tmp_path: Path) -> None:
@@ -292,9 +333,15 @@ def test_a_cartridge_tagged_adapter_outranks_an_untagged_one(tmp_path: Path) -> 
 def test_generation_reports_the_adapter_it_attached(tmp_path: Path, monkeypatch) -> None:
     settings = _settings(tmp_path)
     chosen = _write_adapter(settings.adapters_dir / "core")
-    monkeypatch.setitem(sys.modules, "qwen_vl_utils", SimpleNamespace(process_vision_info=lambda _messages: ([], None)))
+    monkeypatch.setitem(
+        sys.modules,
+        "qwen_vl_utils",
+        SimpleNamespace(process_vision_info=lambda _messages: ([], None)),
+    )
     monkeypatch.setattr(adapters, "load_into_model", lambda model, path: _FakeModel())
-    monkeypatch.setattr(QwenRuntime, "_load_base_model", lambda self: (_FakeModel(), _FakeProcessor()))
+    monkeypatch.setattr(
+        QwenRuntime, "_load_base_model", lambda self: (_FakeModel(), _FakeProcessor())
+    )
     generation = QwenRuntime(settings).generate_prompt("what does the cartridge hold?")
     assert generation.adapter_path == str(chosen)
     assert generation.adapter_kind == CORE.value and generation.adapter_id == "adapter-1"
