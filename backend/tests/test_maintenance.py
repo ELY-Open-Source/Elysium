@@ -19,6 +19,7 @@ from ely_eye.db import Database
 from ely_eye.memory import MemoryService
 from ely_eye.migrations import SCHEMA_VERSION
 from ely_eye.schemas import EvidenceAtom, MemoryOrigin, Modality, SourceRecord, TrustScores, utc_now
+from ely_eye.storage import ObjectStore
 
 KEYS = "the keys are on the shelf by the door"
 PASSPORT = "the passport is in the blue box"
@@ -164,7 +165,14 @@ def test_doctor_names_the_senses_a_store_holds_but_cannot_use(tmp_path: Path) ->
     )
     database.upsert_atoms(
         [
-            EvidenceAtom(atom_id="img:1", modality=Modality.image, source_id="img", source="file:///img.png", trust=trust),
+            EvidenceAtom(
+                atom_id="img:1",
+                modality=Modality.image,
+                source_id="img",
+                source="file:///img.png",
+                trust=trust,
+                image_ref=ObjectStore(settings).put_bytes(b"\x89PNG\r\n\x1a\n", ".png", "image"),
+            ),
             EvidenceAtom(atom_id="aud:1", modality=Modality.audio, source_id="aud", source="file:///a.mp3", trust=trust),
         ]
     )
@@ -173,6 +181,30 @@ def test_doctor_names_the_senses_a_store_holds_but_cannot_use(tmp_path: Path) ->
     assert len(report.warnings) == 2
     assert "1 picture atom but no CLIP snapshot" in report.warnings[0]
     assert "1 audio atom but no speech snapshot" in report.warnings[1]
+
+
+def test_doctor_names_picture_atoms_whose_bytes_are_gone(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    database = Database(settings)
+    database.init()
+    trust = TrustScores(parser=0.0, ocr=0.0, model=0.0)
+    database.upsert_sources(
+        [SourceRecord(source_id="img", path="file:///img.png", kind="image", mime="image/png", sha256="a", size_bytes=1)]
+    )
+    database.upsert_atoms(
+        [
+            EvidenceAtom(
+                atom_id="img:1",
+                modality=Modality.image,
+                source_id="img",
+                source="file:///img.png",
+                trust=trust,
+                image_ref="object://image/ab/deadbeef.png",
+            )
+        ]
+    )
+    report = maintenance.doctor(settings)
+    assert "1 picture atom with no bytes behind them" in report.warnings[0]
 
 
 def test_doctor_names_a_mount_whose_files_are_gone(tmp_path: Path) -> None:

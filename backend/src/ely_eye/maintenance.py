@@ -14,15 +14,13 @@ from . import __version__
 from .cartridge_store import mounted_ids
 from .config import Settings
 from .db import Database
-from .embeddings import EmbeddingService
 from .migrations import SCHEMA_VERSION
-from .schemas import utc_now
-from .visual_index import VisualIndex
+from .schemas import SenseStatus, utc_now
+from .senses import sense_facts
 
 BACKUP_FILE = "ely_eye.sqlite"
 MANIFEST_FILE = "backup_manifest.json"
 _REQUIRED_TABLES = ("atoms", "sources", "cartridges")
-PICTURE_MODALITIES = ("image", "ui_screenshot")
 
 
 class BackupManifest(BaseModel):
@@ -55,12 +53,6 @@ class DoctorReport(BaseModel):
 
 def _atoms_word(count: int) -> str:
     return "atom" if count == 1 else "atoms"
-
-
-def _modality_counts(database: Database) -> dict[str, int]:
-    with database.connect() as connection:
-        rows = connection.execute("SELECT modality, COUNT(*) AS total FROM atoms GROUP BY modality").fetchall()
-    return {str(row["modality"]): int(row["total"]) for row in rows}
 
 
 def _counts(connection: sqlite3.Connection) -> dict[str, int]:
@@ -175,41 +167,41 @@ def _check_cartridges(database: Database, mounted: list[str], problems: list[str
             problems.append(f"{cartridge_id} is mounted but its files at {root} are gone")
 
 
-def _check_senses(settings: Settings, database: Database, visual: VisualIndex, warnings: list[str]) -> None:
-    counts = _modality_counts(database)
-    pictures = sum(counts.get(name, 0) for name in PICTURE_MODALITIES)
-    if settings.clip_model_dir is not None and visual.model_dir() is None:
-        warnings.append(f"the CLIP snapshot at {settings.clip_model_dir} is missing, so wordless pictures cannot be found")
-    elif pictures and not visual.available():
+def _check_senses(facts: SenseStatus, warnings: list[str]) -> None:
+    """Render the missing senses as sentences; the counting lives in senses.py, not here."""
+    encodable = facts.picture_atoms - facts.picture_bytes_missing
+    if facts.clip_path is not None and facts.visual == "absent":
+        warnings.append(f"the CLIP snapshot at {facts.clip_path} is missing, so wordless pictures cannot be found")
+    elif encodable and facts.visual == "absent":
         warnings.append(
-            f"the store holds {pictures} picture {_atoms_word(pictures)} but no CLIP snapshot is set "
+            f"the store holds {encodable} picture {_atoms_word(encodable)} but no CLIP snapshot is set "
             "(ELY_EYE_CLIP_MODEL_DIR), so they are findable only by the text already on them"
         )
-    elif visual.visual_atoms() and not visual.is_current():
+    elif facts.visual == "stale":
         warnings.append("the visual index is behind the store; run `ely-eye index-visual`")
-    audio = counts.get("audio", 0)
-    if settings.asr_model_dir is None:
-        if audio:
-            warnings.append(
-                f"the store holds {audio} audio {_atoms_word(audio)} but no speech snapshot is set "
-                "(ELY_EYE_ASR_MODEL_DIR), so new audio will not be transcribed"
-            )
-    elif not settings.asr_model_dir.exists():
-        warnings.append(f"the speech snapshot at {settings.asr_model_dir} is missing, so audio cannot be transcribed")
-    if settings.vlm_model_dir is not None and not settings.vlm_model_dir.exists():
-        warnings.append(f"the captioning model at {settings.vlm_model_dir} is missing, so images stay uncaptioned")
-
-
-def _check_indexes(settings: Settings, database: Database, warnings: list[str]) -> None:
-    if not settings.dense_embeddings_enabled:
-        return
-    index = EmbeddingService(settings, database).load_index()
-    stored = database.atom_count()
-    if index is None:
-        warnings.append("dense embeddings are on but no index exists; run `ely-eye build-dense-index`")
-    elif len(index.atom_ids) != stored:
+    if facts.picture_bytes_missing:
+        missing = facts.picture_bytes_missing
         warnings.append(
-            f"the dense index covers {len(index.atom_ids)} atoms while the store holds {stored}; run `ely-eye build-dense-index`"
+            f"{missing} picture {_atoms_word(missing)} with no bytes behind them; re-ingest the source they came from"
+        )
+    if facts.asr_path is not None and facts.speech == "missing":
+        warnings.append(f"the speech snapshot at {facts.asr_path} is missing, so audio cannot be transcribed")
+    elif facts.audio_atoms and facts.speech == "absent":
+        warnings.append(
+            f"the store holds {facts.audio_atoms} audio {_atoms_word(facts.audio_atoms)} but no speech snapshot is set "
+            "(ELY_EYE_ASR_MODEL_DIR), so new audio will not be transcribed"
+        )
+    if facts.vlm_path is not None and facts.captioning == "missing":
+        warnings.append(f"the captioning model at {facts.vlm_path} is missing, so images stay uncaptioned")
+
+
+def _check_indexes(facts: SenseStatus, warnings: list[str]) -> None:
+    if facts.dense == "missing":
+        warnings.append("dense embeddings are on but no index exists; run `ely-eye build-dense-index`")
+    elif facts.dense == "behind":
+        warnings.append(
+            f"the dense index covers {facts.dense_covered} atoms while the store holds {facts.store_atoms}; "
+            "run `ely-eye build-dense-index`"
         )
 
 
@@ -242,8 +234,9 @@ def doctor(settings: Settings) -> DoctorReport:
         problems.append(f"the schema settled at version {version} while this build writes {SCHEMA_VERSION}")
     mounted = mounted_ids(database)
     _check_cartridges(database, mounted, problems)
-    _check_senses(settings, database, VisualIndex(settings, database), warnings)
-    _check_indexes(settings, database, warnings)
+    facts = sense_facts(settings, database)
+    _check_senses(facts, warnings)
+    _check_indexes(facts, warnings)
     if settings.ui_dir is not None and not settings.ui_dir.exists():
         problems.append(f"ui_dir {settings.ui_dir} is set but holds no built interface, so the API refuses to start")
     return DoctorReport(

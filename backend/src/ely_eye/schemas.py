@@ -201,6 +201,14 @@ class SearchResult(BaseModel):
     hits: list[RetrievalHit]
     next_cursor: str | None = None
 
+
+class AtomPage(BaseModel):
+    """A page of the store plus the total behind it, so a list can admit what it left out."""
+
+    atoms: list[EvidenceAtom]
+    total: int
+    next_cursor: str | None = None
+
 class ContextPlan(BaseModel):
     question: str
     profile: RuntimeProfile
@@ -261,11 +269,39 @@ class RuntimeStatus(BaseModel):
     vram_total_mb: int | None = None
     vram_used_mb: int | None = None
 
+SenseState = Literal["absent", "missing", "ready"]
+VisualState = Literal["absent", "stale", "ready"]
+DenseState = Literal["off", "missing", "behind", "current"]
+
+
+class SenseStatus(BaseModel):
+    """What the machine can perceive right now, stated once for the UI and the doctor to share.
+
+    `absent` means the sense was never given a model, `missing` means it was given one that is gone.
+    A store full of pictures and no CLIP snapshot is a different problem, and needs a different
+    sentence, than a snapshot directory somebody deleted.
+    """
+
+    dense: DenseState
+    dense_covered: int
+    store_atoms: int
+    picture_atoms: int
+    picture_bytes_missing: int
+    visual: VisualState
+    audio_atoms: int
+    speech: SenseState
+    captioning: SenseState
+    clip_path: str | None = None
+    asr_path: str | None = None
+    vlm_path: str | None = None
+
+
 class SystemStatus(BaseModel):
     app: str = "Ely-Eye"
     version: str
     runtime: RuntimeStatus
     memory: MemoryStatus
+    senses: SenseStatus
     profiles: dict[str, dict[str, Any]]
     data_home: str
 

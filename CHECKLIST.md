@@ -287,12 +287,33 @@
   - 验收：CI 绿；干净 clone 上 `docker build` 成功（已实测 `09803cd49add` + 容器 curl 通）；桩 `nvidia-smi` 打印 RTX 5090 证明设备名不再致命（已实测）
   - 独立 review（同一个 `p1review` 里的 pi，模型 `strata/qwen3.8-flash-next-abliterated-iq3_s:high`，三轮，不读我的话只跑东西）：第一轮 **FAIL 9 条**（全是 CHECKLIST 里的数字与断言不重现：测试文件数、套件规模、构建上下文体积、`profiles.py` 异常元组、`training.py` 行号、`cli.py` 行数、把 4090 说成不支持 BF16、备份摘要不可复现、秒数写死）→ 第二轮 **FAIL 1 条**（`_TinyDense` 那两行 docstring 是 p1-4 唯一新增的多行注释，跟 p1-6.4 的「≤1 行」相冲）→ **第三轮 PASS**。reviewer 自己跑 `gh run view`、`pytest`、`ruff`、`mypy`（冷缓存逐文件比对 `908157f` 与 HEAD → 两边都是 24 错/6 文件，逐条同消息）、`pyright`、go 全套、`bash -n` 15 个 `.sh`、`pip wheel`、`sha256sum LICENSE` 与 gnu.org 逐字节比对、拉起 22.4GB 容器 curl 三个 URL，并在真 worktree 里做变异测试（去掉 reranker 桩 → 2 failed；去掉 dense 桩 → 正好复现 CI 那 4 条；只翻 `bench/systems.py:414` 的排序键 → 正好 `fusion_rerank` 那条挂）。它还量了全仓多行 docstring 数 `114 → 114`，确认 p1-4 现在新增 0 条。三轮同一个人，没换人放水。
   - 门禁：`pytest -q` **253 passed**；`ruff check backend/src bench` All checks passed（HEAD 是 17 errors）；mypy 冷缓存查改动文件与 HEAD 同错、净新增 0；`pyright` 查 maintenance 三个文件 → **0 errors, 0 warnings**；go build/vet/test + gofmt 干净；`bash -n` 15 个 `.sh` 干净；`pip wheel ./backend` 能建且元数据带 license 表达式
-- [ ] **p1-5** 产品面
-  - [ ] p1-5.1 `GET /api/search`
-  - [ ] p1-5.2 前端：搜索、浏览、forget、挂载卡带、时间显示、图像渲染
-  - [ ] p1-5.3 `types.ts` 补回 `time` / `source_id` / `trust` / `relations`
-  - [ ] p1-5.4 12 个未用端点：接上或删除
-  - 验收：E2E 测试覆盖五项；`grep` 无未接端点残留
+- [x] **p1-5** 产品面
+  - [x] p1-5.1 搜索端点接上前端
+    - 验收写的是 `GET /api/search`，实际是 p0-3 就有的 `POST /api/search`：查询体带 holder / scenario / modality / image，GET 塞不下这些。前端 `search()` 调它
+  - [x] p1-5.2 前端：搜索、浏览、forget、挂载卡带、时间显示、图像渲染
+    - `App.tsx` 517 行拆成 130 行的壳 + `components/{MemoryPanel,CartridgePanel,SensesPanel,AdapterPanel,ProofPanel,IngestPanel,CompilerPanel,ui}.tsx` + `lib/format.ts`，每个面板自己取数，没有一个文件超 500 行
+    - 为此新增的后端能力在 `backend/src/ely_eye/browse.py`：`GET /api/atoms`（游标翻页 + modality / holder / source 过滤，读 `v_atoms_current`）与 `GET /api/atoms/{atom_id}/image`（`FileResponse`；没图 → 404 点名那颗 atom）
+    - 时间显示：`formatAgo`（just now / 5m / 2h / 3d / 1y）与 `formatStamp`（写死 UTC，`2026-10-08 09:03Z`）；每行是 `holder · origin · scenario · 时间 · trust`
+    - 图像渲染：`<img class="thumb" src=/api/atoms/{id}/image>`，E2E 断言 `naturalWidth > 0`——真解码出像素，不是有个标签就算
+  - [x] p1-5.3 `types.ts` 补回记忆维度
+    - 验收写的 `time` 在 p0-1 已改名 `ingested_at`，另有 `event_time / valid_from / valid_to`。补的是 `source_id, ingested_at, holder_id, origin, scenario, event_time, event_time_precision, valid_from, valid_to, trust`。`relations` 没补：至今没人写 atom 的 relations（p0 记过这条），前端拿它没东西可渲染
+    - 另加 `AtomPage, SearchFilters, SenseStatus, CartridgeManifest, MountState, AdapterChoice, AdapterLoadReport, Runtime*Profile*, ForgetReport`；`MemoryMap` 类型随端点一起删
+  - [x] p1-5.4 未用端点：接上或删除
+    - 删 8 个：`/api/benchmarks/{registry,sources,samples,predictions}`、`/api/research/modules`、`/api/index/dense`、`/api/visual-contradiction-proof`、`/api/memory-map`（前端是 memory-map 唯一的消费者，状态卡本来就带 layer 与卡带数）。底层函数一个没删——`cli.py` 与 `proofs/checks_visual.py` 在用；删的是没人调的 HTTP 壳
+    - 加 2 个：`/api/atoms`、`/api/atoms/{atom_id}/image`；`/api/status` 现在带 `senses`。HTTP 面从 36 条到 **30** 条
+    - 反漂移门禁：`backend/tests/test_product_api.py::test_the_http_surface_is_exactly_what_someone_uses` 把 30 条路由钉成集合，多一条少一条都红
+  - [x] p1-5.5 E2E 五项
+    - `scripts/ui_smoke.sh`：`mktemp -d` 起一个干净 home（`ELY_EYE_DEFAULT_HOLDER=wife`、`ELY_EYE_UI_DIR=frontend/dist`），API 自己用 `StaticFiles(html=True)` 同源挂 UI，浏览器只对一个 origin 说话，收尾删 home
+    - 五项都在真浏览器里做：① 搜 `spare glasses` + scenario `home` → 那行必须同时写 `wife` 和 `home`（「谁在什么场景下知道」就是这个意思）② 按 modality 过滤 → 无字图片渲染出真像素，翻页换掉整页 ③ Forget → 提示 `forgotten: N atoms`，再搜同一句返回「Nothing in the store answers」④ Mount → 状态真的变了 ⑤ Adapter Matrix 每个 kind 一行，状态落在 `loaded|available|deferred|missing` 内且**必须带原因**
+    - 实测：`mount: refused: cannot verify ui_smoke_26f91b8f3a22 on this machine: model_hash, tokenizer_hash, chat_template_hash, rope are unknown`（p0-4 那条「没有 model_dir 就拒绝挂载」的偏差在 UI 里看得见）；`adapters: 6 kinds: missing ×6`，每条原因是「no adapter of kind X is on disk」；KPI 显示 `Runtime ready`、`Qwen/Qwen3.5-9B`、`NVIDIA GeForce RTX 4090 20914/23028 MiB`、`Cartridges 1`
+    - 失败留证据：截图 `ui-failure.png` + Memory 面板文本 + 那一刻 `/api/atoms?modality=…` 返回的 JSON
+    - 网络噪声分开判：`404 /api/proof-suite/latest`（没跑过证明的库就该 404，面板写 pending）和被拒的挂载 400 算预期，其余 ≥400 一律红；JS 未捕获异常一律红
+  - 三条是 E2E 逼出来的真缺陷，都不是样式问题：
+    - `AdapterPanel` 的指标条渲染 `load.gpu_available` 与 `load.probe_status`，而 `AdapterLoadReport`（`runtime_schemas.py:27`）只有 `model_id / mounted / adapters`——没 GPU 的机器上它会永远显示「no gpu visible」，而这台机器有 4090。删掉那两个 span 和 `types.ts` 里编出来的五个字段，只渲染服务端真给的
+    - 我第一版 E2E 硬写 `modality=image`，结果 0 行：`ingestion_media.py:277` 按**文件名**判 kind（`ui_markers = ("screenshot","screen","figma","ui","wireframe","mockup")`），我那个文件叫 `ui-smoke-wordless.png` → 存成 `ui_screenshot`。改成从 `/api/atoms` 读回那颗 atom 的 modality 再选，库说是啥就是啥。顺带记一条本轮没动的产品缺陷：`"ui"` 是子串匹配，`guide.png`、`quickstart.png` 都会被叫成 UI 截图；不改是因为冻结的 bench 数字是在现规则下量的
+    - playwright 1.60 在 Ubuntu 26.04 上没有 chromium 构建（`Playwright does not support chromium on ubuntu26.04-x64`），`npm i -D playwright@1.64.0` 才有；而且它的 npm 包不自动下浏览器，要 `npx playwright install chromium`
+  - 顺手挖掉的产品根因：`/api/status` 与 `doctor` 各算一遍「这台机器能感知什么」，两份真相。抽成 `backend/src/ely_eye/senses.py::sense_facts()`，两边只渲染它。图片计数从 modality 改成「有没有 `image_ref`」：按 modality 数会漏掉 pdf_region 的截图裁块，也看不见字节已被删走的 atom。现在 `picture_bytes_missing` 会让 doctor 说「N picture atoms with no bytes behind them; re-ingest the source they came from」，而 CLIP 那条警告只数还能编码的
+  - 验收：`bash scripts/ui_smoke.sh` → `PASS: the console searches, pages, forgets, mounts and reports adapter states`；`pytest -q` **263 passed**；`ruff check` 8 个改动文件 All checks passed；mypy 冷缓存查这 8 个文件 `Success: no issues found`，全仓仍是 **24 错 / 6 文件**（与 p1-4 记的基线相同，净新增 0）；`pyright` 这 8 个文件 **0 errors, 0 warnings**；go build/vet/test + gofmt 干净；`npm run build` + `eslint .` 干净；`scripts/mcp_write_smoke.sh` 仍 PASS
 - [ ] **p1-6** 代码卫生
   - [ ] p1-6.1 `evals.py` 2413 行拆到 ≤500 行/文件
   - [ ] p1-6.2 删 dead code 与未调用函数

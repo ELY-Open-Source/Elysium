@@ -141,12 +141,30 @@ class VisualIndex:
         _LOADED.clear()
         return removed
 
-    def is_current(self, atoms: list[EvidenceAtom] | None = None) -> bool:
-        """True when the index covers exactly the image atoms the store holds right now."""
+    def visual_atom_ids(self) -> set[str]:
+        """Picture atoms whose bytes are still on disk, asked with one light query."""
+        store = ObjectStore(self.settings)
+        with self.db.connect() as connection:
+            rows = connection.execute(
+                "SELECT atom_id, image_ref FROM v_atoms_current WHERE image_ref IS NOT NULL AND image_ref != ''"
+            ).fetchall()
+        kept: set[str] = set()
+        for row in rows:
+            try:
+                path = store.resolve(str(row["image_ref"]))
+            except ValueError:
+                continue
+            if path.exists():
+                kept.add(str(row["atom_id"]))
+        return kept
+
+    def is_current(self, atom_ids: set[str] | None = None) -> bool:
+        """True when the index covers exactly the picture atoms the store holds right now."""
         loaded = self.load()
         if loaded is None:
             return False
-        return {atom.atom_id for atom in self.visual_atoms(atoms)} == set(loaded[0])
+        wanted = self.visual_atom_ids() if atom_ids is None else atom_ids
+        return wanted == set(loaded[0])
 
     def search_text(self, query: str, top_k: int, restrict: set[str] | None = None) -> list[tuple[str, float]]:
         vector = self.encoder().encode_texts([query])[0]

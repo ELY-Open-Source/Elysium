@@ -442,3 +442,51 @@ meter {
     align-items: flex-start;
   }
 }
+
+.atom-row {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.atom-body {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.atom-body header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.atom-body p,
+.atom-body small {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid #d7ded2;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}

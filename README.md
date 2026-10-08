@@ -53,8 +53,12 @@ and launch one:
 .\.venv\Scripts\ely-eye.exe proof-suite
 ```
 
-Every command has an HTTP equivalent under `/api/...`, and the dashboard shows
-the same state: Adapter Matrix, Proof Suite, Memory Map, Cache Trace.
+The console is served by the API itself once `ELY_EYE_UI_DIR` points at
+`frontend/dist`. It shows the state the CLI prints — runtime, GPU, library,
+cartridges, senses, adapters, proof suite — and it is the only place to search
+the store as somebody, page through atoms, forget one, and mount a cartridge.
+`scripts/ui_smoke.sh` drives that console in a real browser against a fresh
+store and fails if any of it stops working.
 
 ## Fine-tuning
 

@@ -5,8 +5,9 @@ import shutil
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -14,33 +15,18 @@ from . import __version__
 from .adapters import plan as adapter_plan
 from .api_cartridges import register as register_cartridge_routes
 from .api_holders import register as register_holder_routes
-from .benchmarks import (
-    benchmark_prediction_report,
-    benchmark_registry_report,
-    benchmark_sample_report,
-    benchmark_source_report,
-)
+from .browse import browse, picture
 from .cache_fabric import CacheFabric
 from .cartridge import CartridgeService
 from .compiler import ContextCompiler
 from .config import Settings, get_settings
 from .db import Database
-from .embeddings import EmbeddingService
-from .evaluation_schemas import (
-    BenchmarkPredictionReport,
-    BenchmarkRegistryReport,
-    BenchmarkSampleReport,
-    BenchmarkSourceReport,
-    HashHopProof,
-    ProofCheck,
-    ProofSuiteReport,
-)
+from .evaluation_schemas import HashHopProof, ProofSuiteReport
 from .evidence_graph import EvidenceGraphService
 from .ingestion import IngestionService
 from .memory import MemoryService
 from .profiles import runtime_profile_report
 from .proofs import HashHopEvaluator, PRDProofSuite
-from .research_modules import ResearchModuleService
 from .retrieval import RetrievalService
 from .runtime import QwenRuntime, RuntimeUnavailableError
 from .runtime_schemas import AdapterLoadReport
@@ -48,11 +34,13 @@ from .schemas import (
     AdapterManifest,
     AdapterStatus,
     AnswerResponse,
+    AtomPage,
     EvidenceAtom,
     ForgetReport,
     ForgetRequest,
     MemoryOrigin,
     MemoryStatus,
+    Modality,
     PathIngestRequest,
     RememberRequest,
     RuntimeProfile,
@@ -63,6 +51,7 @@ from .schemas import (
     SystemStatus,
     UploadIngestRequest,
 )
+from .senses import sense_facts
 from .training import safetensor_weight_stats
 from .verifier import Verifier, VisualContradictionLens
 
@@ -114,6 +103,7 @@ def create_app() -> FastAPI:
             version=__version__,
             runtime=runtime,
             memory=memory,
+            senses=sense_facts(settings, db),
             data_home=str(settings.home),
             profiles={
                 "Live Demo": {"context_tokens": settings.live_context_tokens, "purpose": "stable 262K workflow"},
@@ -260,21 +250,33 @@ def create_app() -> FastAPI:
     def adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> list[AdapterStatus]:
         return list_adapter_statuses(settings)
 
-    @app.get("/api/benchmarks/registry", response_model=BenchmarkRegistryReport)
-    def benchmarks_registry() -> BenchmarkRegistryReport:
-        return benchmark_registry_report()
+    @app.get("/api/atoms", response_model=AtomPage)
+    def atoms(
+        settings: Annotated[Settings, Depends(settings_dep)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        cursor: str | None = None,
+        modality: Modality | None = None,
+        source_id: str | None = None,
+        holder: str | None = None,
+    ) -> AtomPage:
+        try:
+            return browse(
+                settings,
+                limit=limit,
+                cursor=cursor,
+                modality=modality,
+                source_id=source_id,
+                holder=holder,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    @app.get("/api/benchmarks/sources", response_model=BenchmarkSourceReport)
-    def benchmarks_sources() -> BenchmarkSourceReport:
-        return benchmark_source_report()
-
-    @app.get("/api/benchmarks/samples", response_model=BenchmarkSampleReport)
-    def benchmarks_samples(settings: Annotated[Settings, Depends(settings_dep)]) -> BenchmarkSampleReport:
-        return benchmark_sample_report(settings.data_dir / "benchmark_samples")
-
-    @app.get("/api/benchmarks/predictions", response_model=BenchmarkPredictionReport)
-    def benchmarks_predictions(settings: Annotated[Settings, Depends(settings_dep)]) -> BenchmarkPredictionReport:
-        return benchmark_prediction_report(settings, settings.data_dir / "benchmark_predictions")
+    @app.get("/api/atoms/{atom_id}/image")
+    def atom_image(atom_id: str, settings: Annotated[Settings, Depends(settings_dep)]) -> FileResponse:
+        found = picture(settings, atom_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=f"{atom_id} has no picture to show")
+        return FileResponse(found.path, media_type=found.mime)
 
     @app.get("/api/runtime/profiles", response_model=RuntimeProfileReport)
     def runtime_profiles(
@@ -285,22 +287,6 @@ def create_app() -> FastAPI:
     @app.get("/api/runtime/adapters", response_model=AdapterLoadReport)
     def runtime_adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> AdapterLoadReport:
         return adapter_plan(settings, Database(settings))
-
-    @app.get("/api/research/modules")
-    def research_modules(settings: Annotated[Settings, Depends(settings_dep)]):
-        db = Database(settings)
-        compiler = ContextCompiler(settings, db)
-        context = compiler.compile(
-            "Ely-Eye V-NSA DVKV x-modal KV speculative prefetch evidence graph",
-            RuntimeProfile.research_theater,
-        )
-        return ResearchModuleService(settings, db).build_report(context.plan.question, context.hits)
-
-    @app.post("/api/index/dense")
-    def build_dense_index(settings: Annotated[Settings, Depends(settings_dep)]):
-        service = EmbeddingService(settings)
-        index = service.build_index()
-        return {"atoms": len(index.atom_ids), "dimensions": int(index.vectors.shape[1]) if index.vectors.size else 0}
 
     @app.post("/api/hashhop", response_model=HashHopProof)
     def hashhop(request: HashHopRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> HashHopProof:
@@ -327,20 +313,6 @@ def create_app() -> FastAPI:
         if report is None:
             raise HTTPException(status_code=404, detail="No PRD proof suite has been generated.")
         return report
-
-    @app.post("/api/visual-contradiction-proof", response_model=ProofCheck)
-    def visual_contradiction_proof(settings: Annotated[Settings, Depends(settings_dep)]) -> ProofCheck:
-        return PRDProofSuite(settings).visual_contradiction_proof()
-
-    @app.get("/api/memory-map")
-    def memory_map(settings: Annotated[Settings, Depends(settings_dep)]):
-        db = Database(settings)
-        atoms = db.list_atoms(limit=200)
-        return {
-            "atoms": [atom.model_dump(mode="json") for atom in atoms],
-            "layers": CacheFabric(settings, db).statuses(),
-            "cartridges": CartridgeService(settings, db).list_manifests(),
-        }
 
     mounted_ui = get_settings().ui_dir
     if mounted_ui is not None:

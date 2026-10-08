@@ -32,11 +32,27 @@ export interface MemoryStatus {
   layers: CacheLayerStatus[];
 }
 
+export interface SenseStatus {
+  dense: 'off' | 'missing' | 'behind' | 'current';
+  dense_covered: number;
+  store_atoms: number;
+  picture_atoms: number;
+  picture_bytes_missing: number;
+  visual: 'absent' | 'stale' | 'ready';
+  audio_atoms: number;
+  speech: 'absent' | 'missing' | 'ready';
+  captioning: 'absent' | 'missing' | 'ready';
+  clip_path: string | null;
+  asr_path: string | null;
+  vlm_path: string | null;
+}
+
 export interface SystemStatus {
   app: string;
   version: string;
   runtime: RuntimeStatus;
   memory: MemoryStatus;
+  senses: SenseStatus;
   profiles: Record<string, Record<string, unknown>>;
   data_home: string;
 }
@@ -108,22 +124,63 @@ export interface LayoutBox {
   frame_second?: number | null;
 }
 
+export interface TrustScores {
+  parser: number;
+  ocr: number;
+  model: number;
+}
+
 export interface EvidenceAtom {
   atom_id: string;
   modality: string;
+  source_id: string;
   source: string;
   text: string;
   image_ref: string | null;
   layout: LayoutBox | null;
   token_equivalent: number;
+  ingested_at: string;
+  holder_id: string;
+  origin: string;
+  scenario: string;
+  event_time: string | null;
+  event_time_precision: string;
+  valid_from: string | null;
+  valid_to: string | null;
+  trust: TrustScores;
+}
+
+export interface AtomPage {
+  atoms: EvidenceAtom[];
+  total: number;
+  next_cursor: string | null;
+}
+
+export interface SearchFilters {
+  holder?: string | null;
+  as_holder?: string | null;
+  scenario?: string | null;
+  source_id?: string | null;
+  modality?: string | null;
+  since?: string | null;
+  until?: string | null;
+  min_trust?: number | null;
 }
 
 export interface RetrievalHit {
   atom: EvidenceAtom;
   sparse_score: number;
   dense_score: number;
+  visual_score: number;
   graph_score: number;
   final_score: number;
+}
+
+export interface SearchResult {
+  query: string;
+  status: 'hits' | 'no_match';
+  hits: RetrievalHit[];
+  next_cursor: string | null;
 }
 
 export interface AnswerResponse {
@@ -176,13 +233,83 @@ export interface ProofSuiteReport {
   dna_after: string | null;
 }
 
-export interface MemoryMap {
-  atoms: EvidenceAtom[];
-  layers: CacheLayerStatus[];
-  cartridges: Array<{
-    cartridge_id: string;
-    name: string;
-    token_equivalent: number;
-    dna: string | null;
-  }>;
+export interface CartridgeManifest {
+  cartridge_id: string;
+  name: string;
+  created_at: string;
+  model_base: string;
+  source_count: number;
+  atom_count: number;
+  token_equivalent: number;
+  artifacts: Record<string, string>;
+  kv_fingerprint: Record<string, unknown> | null;
+  dna: string | null;
+}
+
+export interface MountState {
+  mounted: string[];
+  scoped: boolean;
+}
+
+export interface AdapterChoice {
+  kind: string;
+  state: 'loaded' | 'available' | 'deferred' | 'missing';
+  reason: string;
+  path: string | null;
+  adapter_id: string | null;
+  base_model: string | null;
+  origin: 'library' | 'cartridge' | null;
+  cartridge_id: string | null;
+  shadowed: boolean;
+}
+
+export interface AdapterLoadReport {
+  model_id: string;
+  mounted: string[];
+  adapters: AdapterChoice[];
+}
+
+export interface RuntimeLaunchProfile {
+  name: string;
+  runtime: string;
+  role: string;
+  context_tokens: number;
+  script: string;
+  command: string[];
+  environment: Record<string, string>;
+  required_features: string[];
+}
+
+export interface RuntimeProfileValidation {
+  name: string;
+  runtime: string;
+  status: 'ready' | 'missing';
+  script_exists: boolean;
+  package: string | null;
+  package_version: string | null;
+  executable: string | null;
+  gpu_available: boolean;
+  probe_command: string[];
+  probe_status: 'passed' | 'failed' | 'skipped';
+  probe_exit_code: number | null;
+  probe_output: string | null;
+  detail: string;
+}
+
+export interface RuntimeProfileReport {
+  status: 'ready' | 'incomplete';
+  created_at: string;
+  profiles: RuntimeLaunchProfile[];
+  validations: RuntimeProfileValidation[];
+}
+
+export interface ForgetReport {
+  source_id: string;
+  atom_ids: string[];
+  atoms_deleted: number;
+  edges_deleted: number;
+  cache_entries_cleared: number;
+  vector_index_dropped: boolean;
+  affected_cartridges: Array<Record<string, unknown>>;
+  reason: string;
 }
