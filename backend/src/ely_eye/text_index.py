@@ -68,7 +68,7 @@ COMMON_TERM_FRACTION = 0.05
 RAREST_KEEP = 3
 
 
-def rare_terms(connection: sqlite3.Connection, terms: list[str], *, fraction: float = COMMON_TERM_FRACTION) -> list[str]:
+def rare_terms(connection: sqlite3.Connection, terms: list[str], *, fraction: float | None = None) -> list[str]:
     """Drop the terms a library uses everywhere, and keep the ones that identify an answer.
 
     bm25 scores every row an OR query touches, so a question carrying `the` pays for a hundred
@@ -85,14 +85,17 @@ def rare_terms(connection: sqlite3.Connection, terms: list[str], *, fraction: fl
     counted exactly.
 
     0.05 is measured, not chosen: on the frozen suite (n=173, holder-scoped) recall@10 peaks at
-    0.899 with p50 58.6 ms there, against 0.893 / 112.9 ms at 0.20 and 0.844 / 13.4 ms at 0.01.
+    0.899 with p50 58.6 ms there, against 0.893 / 112.9 ms at 0.20 and 0.844 / 13.4 ms at 0.01, and
+    `bench/term_sweep.py` is the artifact that prints that curve. The bound is read when the call
+    runs, not when the function was written, so that sweep can move it.
     """
+    bound = COMMON_TERM_FRACTION if fraction is None else fraction
     if len(terms) == 1:
         return terms
     total = int(connection.execute("SELECT count(*) FROM atoms").fetchone()[0])
     if total == 0:
         return terms
-    cap = max(int(total * fraction) + 1, 2)
+    cap = max(int(total * bound) + 1, 2)
     counts = [(term, _term_matches(connection, fts_expression([term]), cap)) for term in terms]
     rare = [term for term, matches in counts if matches < cap]
     if rare:
