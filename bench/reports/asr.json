@@ -1,78 +1,114 @@
 {
-  "generated_utc": "2026-10-08T01:05:45+00:00",
-  "commit": "03ca35763fd63eb8d8f0d2c721d02c6c3ded90a7",
+  "generated_utc": "2026-10-08T02:24:47+00:00",
+  "commit": "709104e80915e43a1095a270a87f09cbb611d51b",
   "model": {
     "id": "Systran/faster-whisper-tiny",
     "sha256_model_bin": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1",
-    "compute": "cpu int8"
+    "compute": "cpu int8",
+    "cpu_threads": 4,
+    "decode_knobs": {
+      "word_timestamps": "True",
+      "beam_size": "1",
+      "temperature": "(0.0,)",
+      "condition_on_previous_text": "False",
+      "vad_filter": "False"
+    }
   },
-  "reference": "Video-MME community subtitles (third-party captions, not verbatim transcripts)",
+  "reference": "Video-MME community subtitles: third-party captions, not verbatim transcripts",
   "machine": {
     "system": "Linux",
     "release": "6.18.40.1-microsoft-standard-WSL2",
     "cpus": 32,
     "threads_per_query": 4,
     "load_average_1_5_15": [
-      1.84,
-      1.85,
-      6.99
+      9.65,
+      2.54,
+      0.88
+    ]
+  },
+  "passes": {
+    "count": 2,
+    "word_error_rate": [
+      0.242,
+      0.242
+    ],
+    "identical_transcripts": true,
+    "per_video_wer": [
+      {
+        "video": "0IdYJGBmguM",
+        "first": 0.229,
+        "second": 0.229
+      },
+      {
+        "video": "1q-5IIyZL20",
+        "first": 0.253,
+        "second": 0.253
+      },
+      {
+        "video": "1tidNDIpKSY",
+        "first": 0.222,
+        "second": 0.222
+      }
     ]
   },
   "totals": {
     "videos": 3,
-    "audio_seconds": 210.5,
+    "audio_seconds": 258.18,
+    "transcribe_seconds": 3.26,
     "word_error_rate": 0.242,
-    "speech_atoms": 66,
-    "words": 550,
+    "reference_words": 533,
+    "hypothesis_words": 563,
+    "words": 563,
     "out_of_order": 0,
-    "before_their_segment": 0
+    "before_their_segment": 0,
+    "atoms_all": 133,
+    "speech_atoms": 80,
+    "word_timestamps": 563,
+    "sources": 3
   },
   "videos": [
     {
       "video": "0IdYJGBmguM",
-      "seconds": 88.9,
-      "transcribe_seconds": 1.73,
-      "real_time_factor": 51.3,
-      "segments": 31,
-      "speech_atoms": 31,
-      "modality": "audio",
-      "hypothesis_words": 218,
+      "seconds": 88.93,
+      "transcribe_seconds": 1.39,
+      "real_time_factor": 63.9,
+      "segments": 38,
       "reference_words": 201,
-      "word_error_rate": 0.179,
-      "mean_word_confidence": 0.879,
-      "words": 218,
+      "hypothesis_words": 219,
+      "edits": 46,
+      "word_error_rate": 0.229,
+      "mean_word_confidence": 0.861,
+      "words": 219,
       "out_of_order": 0,
       "before_their_segment": 0
     },
     {
       "video": "1q-5IIyZL20",
-      "seconds": 99.9,
-      "transcribe_seconds": 1.94,
-      "real_time_factor": 51.6,
-      "segments": 32,
-      "speech_atoms": 32,
-      "modality": "audio",
-      "hypothesis_words": 300,
+      "seconds": 109.18,
+      "transcribe_seconds": 1.33,
+      "real_time_factor": 82.4,
+      "segments": 39,
       "reference_words": 296,
-      "word_error_rate": 0.28,
-      "mean_word_confidence": 0.83,
-      "words": 300,
+      "hypothesis_words": 313,
+      "edits": 75,
+      "word_error_rate": 0.253,
+      "mean_word_confidence": 0.821,
+      "words": 313,
       "out_of_order": 0,
       "before_their_segment": 0
     },
     {
       "video": "1tidNDIpKSY",
-      "seconds": 21.7,
-      "transcribe_seconds": 1.34,
-      "real_time_factor": 16.1,
+      "seconds": 60.07,
+      "transcribe_seconds": 0.54,
+      "real_time_factor": 112.2,
       "segments": 3,
-      "speech_atoms": 3,
-      "modality": "audio",
-      "hypothesis_words": 32,
       "reference_words": 36,
-      "word_error_rate": 0.278,
+      "hypothesis_words": 31,
+      "edits": 8,
+      "word_error_rate": 0.222,
       "mean_word_confidence": 0.852,
-      "words": 32,
+      "words": 31,
       "out_of_order": 0,
       "before_their_segment": 0
     }
