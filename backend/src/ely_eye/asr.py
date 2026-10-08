@@ -115,7 +115,7 @@ def _segment(segment: Any) -> SpeechSegment:
 
 
 class SpeechTranscriber:
-    """Whisper on CTranslate2: 88.9 seconds of speech in 1.7 seconds of CPU int8 (bench/reports/ASR.md)."""
+    """Whisper on CTranslate2, greedy on CPU int8; bench/reports/ASR.md carries the measured speed."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()

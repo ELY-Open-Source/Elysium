@@ -148,11 +148,20 @@ def speech_atoms_in_the_store(videos: list[Path]) -> dict[str, Any]:
             service.ingest_path(video)
         atoms = database.list_atoms()
         audio = [atom for atom in atoms if atom.modality == Modality.audio]
+        out_of_order = 0
+        before_their_segment = 0
+        for atom in audio:
+            segment_start = float(atom.metadata.get("start_seconds", 0.0))
+            starts = [float(word["start"]) for word in atom.metadata.get("words", [])]
+            out_of_order += sum(1 for first, second in pairwise(starts) if second < first)
+            before_their_segment += sum(1 for start in starts if start < segment_start - 0.01)
         return {
             "atoms_all": len(atoms),
             "speech_atoms": len(audio),
             "word_timestamps": sum(len(atom.metadata.get("words", [])) for atom in audio),
             "sources": len({atom.source_id for atom in audio}),
+            "out_of_order_in_store": out_of_order,
+            "before_their_segment_in_store": before_their_segment,
         }
 
 
@@ -265,8 +274,9 @@ def write_markdown(report: dict[str, Any]) -> None:
         (
             f"Ingested through the product path, the store holds {totals['speech_atoms']} audio atoms from "
             f"{totals['sources']} sources carrying {totals['word_timestamps']} word timestamps "
-            f"({totals['out_of_order']} out of order, {totals['before_their_segment']} before their own segment) "
-            f"out of {totals['atoms_all']} atoms in total."
+            f"({totals['out_of_order_in_store']} out of order, "
+            f"{totals['before_their_segment_in_store']} before their own segment) out of {totals['atoms_all']} "
+            "atoms in total, checked on the words as stored rather than on the model's answer."
         ),
         "",
         (

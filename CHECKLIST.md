@@ -160,7 +160,7 @@
   - 实测证据（`bench/reports/ASR.md`，`.venv/bin/python -m bench.asr_check` 生成）：3 段 Video-MME 真视频
     **258.18 秒**音频（容器时长 88.93 / 109.18 / 60.07），对着第三方字幕 WER **0.242**——分母是
     **533 个参考词**（听到 563 个词），三行各自的参考词数是 201 / 296 / 36。CPU int8 4 线程
-    3.55 秒转完，逐行 61.6× / 73.0× / 97.7× 实时。走产品路径摄入后从库里读回：**80 个 audio atom**、
+    3.26 秒转完，逐行 63.9× / 82.4× / 112.2× 实时。走产品路径摄入后从库里读回：**80 个 audio atom**、
     **563 个词级时间戳**、0 个时序倒错、0 个早于自己所属片段（总共 133 个 atom）。模型
     `Systran/faster-whisper-tiny`（78.2MB，model.bin sha256 dcb76c6586fc06cb…），远低于 500MB 上限。
   - 可复现性是量出来的：解码参数钉死 `beam_size=1, temperature=(0.0,), condition_on_previous_text=False,
@@ -183,7 +183,7 @@
     - 同一个静默毛病还有一处被 review 抓出来：`_ingest_text` 对超过 `max_text_file_bytes`（10 MiB）
       的文件也是直接返回空 batch。本仓库自己的语料里就有 277MB 的 `longmemeval_s_cleaned.json`。
       现在抛 `FileTooLarge`（带字节数和上限），扫描照样记进 `skipped`。
-    - 视频现在除了帧 atom 还会产出 speech atom（同一个 mp4：18 帧 + 31 段语音）。
+    - 视频现在除了帧 atom 还会产出 speech atom（同一个 mp4：18 帧 + 38 段语音，即 38 个 audio atom）。
     - 顺手把 p2-4 提前做了：`ingestion.py` 748 行超了 500 规则，拆成
       `ingestion_common.py`(102) / `ingestion_media.py`(ABC mixin, 278) / `ingestion_repository.py`(321) /
       `ingestion.py`(177)；`cli.py` 544 行也超了，按已有的 `cli_transactive.register` 模式拆出
