@@ -18,6 +18,7 @@ from .benchmarks import (
 from .cartridge import CartridgeService
 from .cartridge_assets import CartridgeAssetService
 from .cli_common import json_dump
+from .cli_maintenance import register as register_maintenance_commands
 from .cli_senses import register as register_sense_commands
 from .cli_senses import senses_report
 from .cli_transactive import register as register_transactive_commands
@@ -40,6 +41,7 @@ app = typer.Typer(no_args_is_help=True)
 
 register_transactive_commands(app, lambda: get_settings())
 register_sense_commands(app, lambda: get_settings())
+register_maintenance_commands(app, lambda: get_settings())
 
 
 @app.command()

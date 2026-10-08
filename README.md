@@ -148,6 +148,14 @@ capsule, any attached adapters, and the eval proofs.
 ```text
 backend/      Python: ingestion, retrieval, runtime, training, proof suite, FastAPI
 frontend/     the local dashboard (Vite + React)
-scripts/      PowerShell: install, model download, serving, runtimes, fine-tuning
+scripts/      install, model download, serving, runtimes, fine-tuning (.ps1 on Windows, .sh on Linux)
 ely-eye-mcp/  Go: local MCP server exposing the memory store to coding agents
 ```
+
+## License
+
+AGPL-3.0-only. Copyright © 2026 雷电芽衣 <zhangyanghaha0407@outlook.com>.
+
+The PDF reader (PyMuPDF) is dual-licensed under AGPL-3.0 or an Artifex
+Commercial license, so this project ships under AGPL while that dependency is
+in use. Buying the Artifex license is what would allow a permissive one.

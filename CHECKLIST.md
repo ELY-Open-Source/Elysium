@@ -246,15 +246,41 @@
   - 第四轮 **PASS**（同一个 reviewer，39 条命令、15分44秒，不读我的话只跑东西）：它自己写探针复现了三个场景（挂 X 后写更新的 Y → 行说 adapter-x；两个 runtime 一个 unload → 仍 loaded/adapter-y 且不说 gone；两个都 unload → available + gone），自己跑变异测试（行身份改回解析结果 → 3 个测试 FAILED；`live_attachments()` 忽略存活 → 2 个 FAILED；去掉复数主语 → 2 个 FAILED），并逐项核了仓库规则（无文件 >500 行、新增 `#` 注释 0 行、4 个单行 docstring、无新造 scenario 字段、无新依赖、无 v1/v2、无死代码）。它另记一条有界陈旧：`live_attachments()` 只在下次 `record_load` 时清理，所以刚被回收的模型在下一次加载前仍可能显示 loaded（docstring 写了）。它还提了一条「挂载是按连接的」——**这条我实测推翻**：`mounts` 是表，同一个 home 上换一个 `Database` 对象读 `mounted_ids` 仍返回 `['cart-a']`；那个测试断言 `mounted == []` 只是因为那个测试本身没挂任何东西。
   - CLI 面：`ely-eye adapters` 打印同一份报告。
 - [ ] **p1-4** 工程地基
-  - [ ] p1-4.1 pytest 从零到有（后端）
-  - [ ] p1-4.2 go test 从零到有（MCP）
+  - [x] p1-4.1 pytest 从零到有（后端）
+    - 验收写的路径是 `tests/`，实际在 `backend/tests/`（24 个文件）；`pytest -q` 全仓 **252 passed**
+  - [x] p1-4.2 go test 从零到有（MCP）
+    - 5 个 `*_test.go`（`internal/apiclient/client_test.go` 4 个、`internal/mcpserver/write_tools_test.go` 6 个等），`go build ./... && go vet ./... && go test ./... && gofmt -l .` 全干净
   - [ ] p1-4.3 CI 在 Linux runner 上跑真测试
-  - [ ] p1-4.4 `Dockerfile` 不再 COPY 缺失的 `PRD.md`
-  - [ ] p1-4.5 去掉 `RTX 4090` / `Ubuntu` 硬编码，改可配置
-  - [ ] p1-4.6 补 `.sh` 脚本，与 `.ps1` 对等
-  - [ ] p1-4.7 `LICENSE`
-  - [ ] p1-4.8 `backup` / `restore` / `doctor`
-  - 验收：CI 绿；干净 clone 上 `docker build` 成功；桩 `nvidia-smi` 证明设备名不再致命
+    - `.github/workflows/ci.yml` 四个 job：backend（python 3.12 = `requires-python` 的下限，`pip install -e "./backend[dev]"` → `python -m pytest -q` → `ruff check backend/src bench`）、mcp（go 1.25 build/vet/test + gofmt）、interface（node 22 `npm ci && npm run build`）、image（`docker build` + 起容器 curl `/api/status` 与 `/`）
+    - 首跑 run **37736363930**：image / interface / mcp 绿，backend 红在 `No module named pytest` —— **pytest 不是任何地方的依赖，所以「跑测试」这件事在一个新克隆上根本不可执行**。修法是把测试工具写进依赖声明：`backend/pyproject.toml` 新增 `[project.optional-dependencies] dev = ["pytest>=9.1.0", "ruff==0.16.10"]`，CI 与新人装的是同一套，ruff 也不再靠 CI 里一个裸版本号漂移
+    - 为了让 CI 真能当门禁，先清了仓库既有的 lint 债：`ruff check backend/src bench` 在 HEAD 上是 **17 errors**，现在 All checks passed（14 条机械 `--fix`，加 `profiles.py` 三个探针把 `except Exception` 收窄成 `(OSError, subprocess.SubprocessError, ValueError)`，并显式挡住 `json.loads` 返回 dict 的假设）
+  - [x] p1-4.4 `Dockerfile` 不再 COPY 缺失的 `PRD.md`
+    - 干净克隆实测：`git clone` 之后 `ls PRD.md` → `No such file or directory`（PRD 一直没进 git），旧镜像在 `COPY README.md PRD.md ./` 那一步就建不出来
+    - 改两阶段：`node:22-bookworm-slim AS ui` 跑 `npm ci && npm run build`（Ubuntu 24.04 自带的 node 18 建不了 Vite 8，`frontend/package.json` 是 `vite ^8.0.0`），运行阶段 `pip install ./backend`（不再 `-e`）+ `COPY --from=ui /ui/dist /srv/ely-eye/ui`，node/npm 从运行阶段去掉
+    - 建了却没人服务也是假的：`config.py` 加 `ui_dir`（env `ELY_EYE_UI_DIR`），`api.py` 用 `StaticFiles(html=True)` 同源挂 `/`；目录被设了但不存在 → `SystemExit` 点名 `npm run build`，不静默降级。前端本来就打相对 `/api/...`，所以同源不需要改客户端
+    - 实测：干净克隆 `docker build -t ely-eye:ci .` → `Successfully built 09803cd49add`（22.4GB，torch CUDA wheel）；`docker run -p 18765:8765` → `GET /api/status` 200（`available:false` + `SGLang endpoint is not reachable`，无模型服务器时应有）、`GET /` 200 text/html 带 `/assets/index-C4NuxpJV.js`（200，208733 字节）与 css 200
+    - 另加 `.dockerignore`：没有它从开发机建镜像要送 19GB 构建上下文（`.venv`、`bench/corpus` 19GB、`bench/runs`、`node_modules`），Dockerfile 一个字都不读
+  - [x] p1-4.5 去掉 `RTX 4090` / `Ubuntu` 硬编码，改可配置
+    - 根因是量出来的：这台机器 `printenv` 里 `WSL_DISTRO_NAME=Ubuntu` 已设，也就是在 WSL 内部地 shell 本来就是 Linux，`wsl.exe` 那一跳只有从 Windows 宿主才需要。旧代码无条件 `wsl.exe -d Ubuntu`，于是原生 Linux 上六个 profile 全被报成 missing，哪怕卡就在机器上
+    - `profiles.py` 重写宿主判定：`uses_wsl()`（`WSL_DISTRO_NAME` 有值即假）、`host_shell()`、`host_path()`、`gpu_available()`（替掉 `wsl_gpu_available()`）、`host_python_command()`、`launch_script()`（按宿主选 `.ps1` / `.sh`）；`Settings.wsl_distro` 可配；`schemas.py:442` 字段名 `wsl_gpu` → `gpu_available`（Linux 上叫 wsl 是撒谎）
+    - 设备名致命这条也拆了：`proofs/training_trace.py` 新增 `cuda_bf16_training(environment)`，判据是 `cuda_available and bf16_supported`（`training.training_environment()` 本来就记了这两个事实），不再 `"RTX 4090" in device_name`；`training.py:1272` 报错里那句 PRD 卡名删掉
+    - 验收就是桩：PATH 上放一个打印 `NVIDIA GeForce RTX 5090` 的假 `nvidia-smi` → `gpu_available` 为真（顺带证明 `bash -lc` 会带 PATH）；exit 127 的桩 → 假；`cuda_bf16_training` 对 5090、4080 都为真，对不支持 bf16 的 4090 为假；`require_cuda_bf16` 的报错里不含 4090。`backend/tests/test_host_profiles.py` 8 个测试，含「每个 profile 在本机都有对应脚本」
+  - [x] p1-4.6 补 `.sh` 脚本，与 `.ps1` 对等
+    - 14 个 `.sh`：六个 launch（sglang live/extreme、vllm live/extreme、ktransformers、llamacpp，flag 与 `.ps1` 逐条对齐）+ install / install-cuda-torch / setup-linux-runtimes / serve-backend / serve-frontend / verify / download-models / run-prd-finetune；全部 `chmod +x` 且 `bash -n` 干净
+    - 六个跨 WSL 的 `.ps1` 改成 `$distro = if ($env:ELY_EYE_WSL_DISTRO) { $env:ELY_EYE_WSL_DISTRO } else { "Ubuntu" }` 再 `wsl.exe -d $distro`
+    - 诚实记录两处没证到的：这台机器没有 PowerShell 解析器，那六个 `.ps1` 的改动是机械替换、未经语法校验；`scripts/run-all-prd-finetunes.ps1`（100 行）还没有 `.sh` 对应
+  - [x] p1-4.7 `LICENSE`
+    - 选 **AGPL-3.0-only**，依据是查来的不是猜的：`pymupdf` 安装元数据写 `Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License`，而 `gh repo view --json visibility` → **PUBLIC**，分发真的发生，所以 AGPL 的 network 条款真的会咬人。PyMuPDF 是 PDF 页/区块 atom 的承重墙，只要它还在，写 MIT 就是不诚实
+    - `LICENSE` 与 gnu.org 原文逐字节相同（sha256 `0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0`）；`backend/pyproject.toml` 加 `license = "AGPL-3.0-only"`，`pip wheel` 实测元数据出 `License-Expression: AGPL-3.0-only`；`frontend/package.json` 同值；README 新增 License 段写明版权人与「买 Artifex 商业授权才谈得上宽松许可」
+    - 这是业务决定不是工程决定：owner 若要 MIT，得先处置 PyMuPDF（买授权或换 reader），我在 README 与这里都标出来
+  - [x] p1-4.8 `backup` / `restore` / `doctor`
+    - `backend/src/ely_eye/maintenance.py` + `cli_maintenance.py`（走仓库已有的 `register(app, settings)` 模式，因为 `cli.py` 已 488 行，再塞三个命令就破 500 规则）。backup 用 SQLite 自己的在线备份 API（服务在跑也能备，不是 `shutil.copy` 拷一个正在写的 WAL 库），清单记 schema 版本 / 行数 / sha256 / 体积 / 版本，行数是从**副本**读回来的
+    - restore 的顺序是校验在先：sha256 对不上清单 → 拒绝；`PRAGMA integrity_check` 不是 ok → 拒绝；缺必需表 → 拒绝；schema 比本构建新 → 拒绝；被替换的库连同 `-wal`/`-shm` 留成 `.before-restore`；然后 `Database(settings).init()`，所以旧备份是「进来时被迁移」而不是要求人再跑一次
+    - doctor 分两级：problems 让库停摆（integrity、打不开、挂载的卡带文件没了、ui_dir 设了但没建），warnings 只说明降级（快照缺失、视觉索引落后、dense 索引落后）。真数据实测（`bench/runs/baseline`，906MB / 165,973 atoms / 50,278 sources）：`backup` 4.0 秒，清单里的 sha256 `c815c6049c5bb562…` 用 `sha256sum` 独立核对一致；`restore` 到新 home 2.8 秒，读回 165,973 atoms / 50,278 sources / schema 7 全等；`doctor` ok=true、0 problems，并给出真降级警告：**「the store holds 21362 picture atoms but no CLIP snapshot is set (ELY_EYE_CLIP_MODEL_DIR), so they are findable only by the text already on them」**
+    - doctor 第一版是假健康：它只对「路径设了但目录不在」报警，对「库里有 21,362 个图片 atom 却压根没配 CLIP」报 ok=true。现在按库里的 modality 计数判，`test_doctor_names_the_senses_a_store_holds_but_cannot_use` 钉住这条
+    - 测试写出来才发现的两条：`Database.__init__` 每次构造都跑迁移，所以 doctor 永远看不到旧 schema，我原先那句 remediation「run `ely-eye status` to migrate」是编的 → 改成 catch `SystemExit` 报「the store cannot be opened by this build: …」；另一条是 fixture 假设错（`_store()` 往已有库里加，被替换的库确实有 3 个 atom），改测试不改产品
+  - 验收：CI 绿；干净 clone 上 `docker build` 成功（已实测 `09803cd49add` + 容器 curl 通）；桩 `nvidia-smi` 打印 RTX 5090 证明设备名不再致命（已实测）
+  - 门禁：`pytest -q` **252 passed**；`ruff check backend/src bench` All checks passed（HEAD 是 17 errors）；mypy 冷缓存查改动文件与 HEAD 同错、净新增 0；`pyright` 查 maintenance 三个文件 → **0 errors, 0 warnings**；go build/vet/test + gofmt 干净；`bash -n` 15 个 `.sh` 干净；`pip wheel ./backend` 能建且元数据带 license 表达式
 - [ ] **p1-5** 产品面
   - [ ] p1-5.1 `GET /api/search`
   - [ ] p1-5.2 前端：搜索、浏览、forget、挂载卡带、时间显示、图像渲染
