@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 from .config import Settings
-from .schemas import RuntimeLaunchProfile, RuntimeProfileReport, RuntimeProfileValidation
+from .runtime_schemas import RuntimeLaunchProfile, RuntimeProfileReport, RuntimeProfileValidation
 
 EXTREME_YARN_OVERRIDE = {
     "text_config": {

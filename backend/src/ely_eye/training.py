@@ -6,7 +6,8 @@ from pathlib import Path
 
 from .config import Settings, get_settings
 from .db import Database
-from .schemas import AdapterManifest, TrainingAdapterKind
+from .runtime_schemas import AdapterManifest
+from .schemas import TrainingAdapterKind
 from .training_common import TrainingSample
 from .training_datasets import (
     build_prd_dataset,

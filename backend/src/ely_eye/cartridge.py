@@ -15,8 +15,8 @@ from . import cartridge_store
 from .config import Settings, get_settings
 from .db import Database
 from .kv_fingerprint import compute_fingerprint, fingerprint_diff, unverifiable_fields
+from .runtime_schemas import AdapterManifest
 from .schemas import (
-    AdapterManifest,
     CartridgeManifest,
     EvidenceAtom,
     MountState,

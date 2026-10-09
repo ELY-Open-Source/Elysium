@@ -17,7 +17,7 @@ from PIL import Image
 from .cartridge import JSON_PARQUET_COLUMNS, CartridgeService
 from .config import Settings, get_settings
 from .db import Database
-from .schemas import CartridgeAssetReport, CartridgeAssetStatus
+from .runtime_schemas import CartridgeAssetReport, CartridgeAssetStatus
 from .storage import ObjectStore, sha256_file
 
 TEXT_VECTOR_DIMS = 384

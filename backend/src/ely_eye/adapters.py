@@ -13,8 +13,14 @@ from pydantic import ValidationError
 from . import cartridge_store
 from .config import Settings
 from .db import Database
-from .runtime_schemas import AdapterChoice, AdapterLoadReport, AdapterOrigin, AdapterState
-from .schemas import AdapterManifest, TrainingAdapterKind
+from .runtime_schemas import (
+    AdapterChoice,
+    AdapterLoadReport,
+    AdapterManifest,
+    AdapterOrigin,
+    AdapterState,
+)
+from .schemas import TrainingAdapterKind
 
 logger = logging.getLogger("ely_eye.adapters")
 

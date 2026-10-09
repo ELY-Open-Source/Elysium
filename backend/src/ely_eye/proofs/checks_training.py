@@ -14,10 +14,8 @@ from ..db import Database
 from ..evaluation_schemas import (
     ProofCheck,
 )
-from ..schemas import (
-    AdapterManifest,
-    TrainingAdapterKind,
-)
+from ..runtime_schemas import AdapterManifest
+from ..schemas import TrainingAdapterKind
 from ..training_common import sha256_file, sha256_tree
 from ..training_metrics import safetensor_weight_stats
 

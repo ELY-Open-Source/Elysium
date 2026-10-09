@@ -8,10 +8,8 @@ import math
 from pathlib import Path
 from typing import Any
 
-from ..schemas import (
-    AdapterManifest,
-    TrainingAdapterKind,
-)
+from ..runtime_schemas import AdapterManifest
+from ..schemas import TrainingAdapterKind
 from ..training_common import (
     AUTOCAST_DTYPE,
     GRADIENT_CHECKPOINTING_MODE,

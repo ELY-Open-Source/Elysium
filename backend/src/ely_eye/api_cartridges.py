@@ -12,7 +12,8 @@ from .cartridge import CartridgeService
 from .cartridge_assets import CartridgeAssetService
 from .config import Settings
 from .db import Database
-from .schemas import AppendRequest, CartridgeAssetReport, CartridgeManifest, MountState
+from .runtime_schemas import CartridgeAssetReport
+from .schemas import AppendRequest, CartridgeManifest, MountState
 
 
 def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:

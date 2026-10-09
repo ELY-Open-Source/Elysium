@@ -9,7 +9,8 @@ from typing import Any
 
 from .config import Settings
 from .db import Database
-from .schemas import AdapterManifest, TrainingAdapterKind
+from .runtime_schemas import AdapterManifest
+from .schemas import TrainingAdapterKind
 from .training_common import (
         AUTOCAST_DTYPE,
         GRADIENT_CHECKPOINTING_MODE,
