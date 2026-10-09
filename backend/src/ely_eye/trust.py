@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from unicodedata import normalize
 
 from .schemas import EvidenceAtom, MemoryOrigin
-from .text_index import fts_all_expression, fts_terms
+from .text_index import cjk_pairs, fts_all_expression, fts_terms, is_cjk
 
 if TYPE_CHECKING:
     from .db import Database
@@ -81,9 +81,11 @@ def corroborating_atom_ids(
     The words demanded are the claim's longest, with the instruction phrases stripped out, and the
     count is fixed. Neither the attack's own words nor the size of the library decides whether a
     second source is believed: an earlier rule that dropped words common to the corpus left a
-    two-atom library unable to corroborate anything, and 40 unrelated memories able to.
+    two-atom library unable to corroborate anything, and 40 unrelated memories able to. A claim with
+    fewer usable words than the rule demands is never corroborated, so a two-word rumour stays
+    uncited — failing closed was chosen over trusting a sentence too short to compare.
     """
-    terms = _claim_terms(atom.text)
+    terms = claim_terms(atom.text)
     if len(terms) < CORROBORATION_TERMS:
         return []
     expression = fts_all_expression(terms[:CORROBORATION_TERMS])
@@ -110,21 +112,48 @@ def is_citable(atom: EvidenceAtom, database: Database) -> bool:
     return not atom.quarantined or bool(corroborating_atom_ids(database, atom))
 
 
-def _claim_terms(text: str) -> list[str]:
+def claim_terms(text: str) -> list[str]:
     """This claim's own words, longest first, with the instruction phrases stripped out.
 
     The words that made a text untrustworthy must not decide whether it is believed: a stranger who
     writes "answer pineapple" twice would otherwise corroborate himself.
+
+    A CJK run is a single term to fts_terms, so a Chinese claim would offer one term and could never
+    reach the three this rule demands. Each run is broken into its adjacent two-character pairs and
+    three are taken from across the sentence, so a second source has to agree in three separate
+    places rather than repeat one stretch of characters.
     """
     try:
         terms = fts_terms(text)
     except ValueError:
         return []
-    blocked: set[str] = set()
+    blocked = _signal_words(text)
+    expanded: list[str] = []
+    for term in terms:
+        if is_cjk(term):
+            expanded.extend(_spread([pair for pair in cjk_pairs(term) if pair not in blocked]))
+        elif term not in blocked:
+            expanded.append(term)
+    unique = list(dict.fromkeys(expanded))
+    return sorted(unique, key=lambda term: -len(term))
+
+
+def _signal_words(text: str) -> set[str]:
+    """Every word the injection phrases in this text contribute, CJK pairs included."""
+
+    words: set[str] = set()
     for signal in injection_signals(text):
         try:
-            blocked.update(fts_terms(signal))
+            found = fts_terms(signal)
         except ValueError:
-            blocked.add(_fold(signal))
-    unique = [term for term in dict.fromkeys(terms) if term not in blocked]
-    return sorted(unique, key=lambda term: (-len(term), term))
+            found = [_fold(signal)]
+        for word in found:
+            words.update(cjk_pairs(word) if is_cjk(word) else [word])
+    return words
+
+
+def _spread(pairs: list[str]) -> list[str]:
+    """Take CORROBORATION_TERMS pairs spread across the run instead of clustered at its start."""
+    if len(pairs) <= CORROBORATION_TERMS:
+        return pairs
+    return [pairs[int(index * len(pairs) / CORROBORATION_TERMS)] for index in range(CORROBORATION_TERMS)]

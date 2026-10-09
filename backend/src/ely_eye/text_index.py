@@ -70,7 +70,7 @@ def fts_all_expression(terms: list[str]) -> str:
 
 
 def _term_phrase(term: str) -> str:
-    return _cjk_phrase(term) if _is_cjk(term) else f"{_quote(term)}*"
+    return _cjk_phrase(term) if is_cjk(term) else f"{_quote(term)}*"
 
 
 def fts_query(query: str) -> str:
@@ -146,8 +146,14 @@ def _bare(text: str) -> str:
     return _SPACES.sub(" ", _SEPARATORS.sub(" ", spaced)).strip().lower()
 
 
-def _is_cjk(term: str) -> bool:
+def is_cjk(term: str) -> bool:
+    """True when every character of this term is one the index stores on its own."""
     return all(char in _CJK_CHARS for char in term)
+
+
+def cjk_pairs(run: str) -> list[str]:
+    """Every adjacent two-character run inside a CJK string, in order."""
+    return [run[start : start + 2] for start in range(len(run) - 1)]
 
 
 def _phrase(run: str) -> str:
@@ -162,7 +168,7 @@ def _cjk_phrase(run: str) -> str:
     appear inside 我们的钥匙放在玄关抽屉里. Offering every adjacent pair as an alternative keeps
     adjacency — 钥 and 匙 still have to touch — without demanding equal length.
     """
-    phrases = list(dict.fromkeys([_phrase(run)] + [_phrase(run[start : start + 2]) for start in range(len(run) - 1)]))
+    phrases = list(dict.fromkeys([_phrase(run)] + [_phrase(pair) for pair in cjk_pairs(run)]))
     return phrases[0] if len(phrases) == 1 else "(" + " OR ".join(phrases) + ")"
 
 
