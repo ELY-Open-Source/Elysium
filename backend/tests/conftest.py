@@ -55,6 +55,12 @@ def model_dir(tmp_path: Path) -> Path:
     return write_model(tmp_path / "model")
 
 
+@pytest.fixture
+def write_token() -> str:
+    """The credential a test client presents when it writes; unset, the server takes no writes."""
+    return "test-token"
+
+
 class HashEmbeddings:
     """A stand-in for the embedding model: the same words give the same vector, no download.
 

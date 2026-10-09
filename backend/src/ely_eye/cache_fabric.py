@@ -17,8 +17,9 @@ class CacheFabric:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
 
-    def semantic_key(self, question: str, profile: str) -> str:
-        return hashlib.sha256(f"compiler-v2\n{profile}\n{question}".encode()).hexdigest()
+    def semantic_key(self, question: str, profile: str, store_revision: int) -> str:
+        """A compiled context is only true for the corpus it was compiled from, so the corpus is part of its name."""
+        return hashlib.sha256(f"compiler-v2\n{profile}\n{store_revision}\n{question}".encode()).hexdigest()
 
     def record_hit(self, layer: str, cache_key: str, bytes_estimate: int = 0, metadata: dict[str, Any] | None = None) -> None:
         self.db.log_cache_event(layer, cache_key, "hit", bytes_estimate, metadata)
@@ -42,6 +43,16 @@ class CacheFabric:
             return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise ValueError(f"{path}: the semantic cache entry is unreadable ({error})") from error
+
+    def drop_semantic_cache(self) -> int:
+        """Delete every compiled context: each one may quote a memory that no longer exists."""
+        directory = self.settings.cache_dir / "semantic"
+        if not directory.exists():
+            return 0
+        entries = list(directory.glob("*.json"))
+        for path in entries:
+            path.unlink()
+        return len(entries)
 
     def statuses(self) -> list[CacheLayerStatus]:
         rows = self.db.cache_layer_rows()

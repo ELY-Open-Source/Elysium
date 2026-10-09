@@ -69,6 +69,7 @@ def atom_params(atom: EvidenceAtom) -> tuple[Any, ...]:
         to_json(atom.supersedes),
         to_json(atom.visibility.model_dump()),
         atom.retention_until.isoformat() if atom.retention_until else None,
+        1 if atom.quarantined else 0,
     )
 
 
@@ -100,6 +101,7 @@ def row_to_atom(row: sqlite3.Row) -> EvidenceAtom:
         supersedes=from_json(row["supersedes_json"], []),
         visibility=Visibility(**from_json(row["visibility_json"], {})),
         retention_until=from_iso(row["retention_until"]),
+        quarantined=bool(row["quarantined"]),
     )
 
 

@@ -81,9 +81,10 @@ class Database:
                     embedding_refs_json, layout_json, relations_json, trust_json,
                     token_equivalent, metadata_json, holder_id, origin, scenario,
                     event_time, event_time_end, event_time_precision, event_time_source,
-                    valid_from, valid_to, supersedes_json, visibility_json, retention_until
+                    valid_from, valid_to, supersedes_json, visibility_json, retention_until,
+                    quarantined
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(atom_id) DO UPDATE SET
                     modality=excluded.modality,
                     source=excluded.source,
@@ -107,7 +108,8 @@ class Database:
                     valid_to=excluded.valid_to,
                     supersedes_json=excluded.supersedes_json,
                     visibility_json=excluded.visibility_json,
-                    retention_until=excluded.retention_until
+                    retention_until=excluded.retention_until,
+                    quarantined=excluded.quarantined
                 """,
                 [atom_params(atom) for atom in atoms],
             )
@@ -118,6 +120,7 @@ class Database:
             )
             # New text changes which words are common, so every remembered count is void.
             connection.execute("DELETE FROM term_df")
+            self._bump_revision(connection)
 
     def list_atoms(self, limit: int | None = None) -> list[EvidenceAtom]:
         with self.connect() as connection:
@@ -188,6 +191,7 @@ class Database:
                 "WHERE valid_to IS NULL AND atom_id IN (SELECT value FROM json_each(?))",
                 (closed_at.isoformat(), to_json(atom_ids)),
             )
+            self._bump_revision(connection)
         return int(cursor.rowcount)
 
     def delete_atoms(self, atom_ids: list[str]) -> int:
@@ -201,6 +205,13 @@ class Database:
                 "DELETE FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(atom_ids),)
             )
             connection.execute("DELETE FROM term_df")
+            self._bump_revision(connection)
+        return int(cursor.rowcount)
+
+    def delete_source(self, source_id: str) -> int:
+        """Erase where a memory came from, so a forget leaves no provenance row behind."""
+        with self.connect() as connection:
+            cursor = connection.execute("DELETE FROM sources WHERE source_id = ?", (source_id,))
         return int(cursor.rowcount)
 
     def delete_edges_touching(self, atom_ids: list[str]) -> int:
@@ -230,6 +241,17 @@ class Database:
     def atom_count(self) -> int:
         with self.connect() as connection:
             return int(connection.execute("SELECT COUNT(*) FROM atoms").fetchone()[0])
+
+    def revision(self) -> int:
+        """What a compiled context was compiled against; see store_meta."""
+        with self.connect() as connection:
+            row = connection.execute("SELECT value FROM store_meta WHERE key = 'revision'").fetchone()
+        return int(row["value"]) if row is not None else 0
+
+    def _bump_revision(self, connection: sqlite3.Connection) -> None:
+        """A write changes what a compiled context may contain, so the semantic cache must notice."""
+        connection.execute("INSERT OR IGNORE INTO store_meta(key, value) VALUES ('revision', '0')")
+        connection.execute("UPDATE store_meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'revision'")
 
     def token_equivalent_sum(self) -> int:
         with self.connect() as connection:

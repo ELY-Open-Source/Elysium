@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ const maxErrorBody = 4096
 
 type Client struct {
 	BaseURL string
+	Token   string
 	HTTP    *http.Client
 }
 
@@ -30,7 +32,15 @@ func New(baseURL string) *Client {
 	}
 	return &Client{
 		BaseURL: strings.TrimRight(baseURL, "/"),
+		Token:   strings.TrimSpace(os.Getenv("ELY_EYE_AUTH_TOKEN")),
 		HTTP:    &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+// authorize attaches the write token; the server refuses a write without it.
+func (c *Client) authorize(request *http.Request) {
+	if c.Token != "" {
+		request.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 }
 
@@ -40,6 +50,7 @@ func (c *Client) Get(ctx context.Context, path string, out any) error {
 	if err != nil {
 		return fmt.Errorf("cannot build the request for %s: %w", path, err)
 	}
+	c.authorize(request)
 	return c.do(request, path, out)
 }
 
@@ -78,6 +89,7 @@ func (c *Client) Post(ctx context.Context, path string, body any, out any) error
 		return fmt.Errorf("cannot build the request for %s: %w", path, err)
 	}
 	request.Header.Set("Content-Type", "application/json")
+	c.authorize(request)
 	return c.do(request, path, out)
 }
 

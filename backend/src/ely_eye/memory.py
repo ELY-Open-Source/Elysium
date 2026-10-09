@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from . import trust
+from .cache_fabric import CacheFabric
 from .config import Settings, get_settings
 from .db import Database
 from .schemas import (
@@ -45,6 +47,7 @@ class MemoryService:
         self.db = database or Database(self.settings)
         self.vectors = vectors or VectorIndex(self.settings, self.db)
         self.pictures = VisualIndex(self.settings, self.db)
+        self.cache = CacheFabric(self.settings, self.db)
 
     def remember(
         self,
@@ -114,6 +117,7 @@ class MemoryService:
             visibility=visibility or Visibility(),
             retention_until=retention_until,
         )
+        trust.stamp([atom], origin=origin)
         self.db.upsert_atoms([atom])
         self.vectors.sync_atoms([atom.atom_id])
         return atom
@@ -169,8 +173,8 @@ class MemoryService:
     ) -> ForgetReport:
         """Delete a memory and everything derived from it.
 
-        The cascade is the whole point: an answer cached from a forgotten memory is still
-        on screen, and a vector index that still carries it will keep surfacing it.
+        The cascade is the whole point: a cached answer or a live vector will keep
+        surfacing a memory the owner asked to erase, so both go with it.
         """
         if (atom_id is None) == (source_id is None):
             raise ValueError("forget takes exactly one of atom_id or source_id")
@@ -185,6 +189,9 @@ class MemoryService:
         edges_deleted = self.db.delete_edges_touching(doomed_ids)
         atoms_deleted = self.db.delete_atoms(doomed_ids)
         cache_cleared = self.db.clear_cache_events(f"forget:{target_source}")
+        semantic_cleared = self.cache.drop_semantic_cache()
+        if self.db.delete_source(target_source) != 1:
+            raise ValueError(f"{target_source}: the source row vanished before the forget could erase it")
         vectors_dropped, visual_dropped = self._drop_derived_vectors(doomed_ids)
         return ForgetReport(
             source_id=target_source,
@@ -192,6 +199,7 @@ class MemoryService:
             atoms_deleted=atoms_deleted,
             edges_deleted=edges_deleted,
             cache_entries_cleared=cache_cleared,
+            semantic_cache_cleared=semantic_cleared,
             vectors_dropped=vectors_dropped,
             visual_index_dropped=visual_dropped,
             affected_cartridges=self._cartridges_holding(target_source),

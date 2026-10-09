@@ -10,6 +10,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 
+from .api_auth import require_write
 from .config import Settings
 from .db import Database
 from .holder_store import HolderStore
@@ -28,8 +29,11 @@ from .transactive_schemas import (
 def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     """Register the transactive routes. The server owns the timestamps, the caller does not."""
 
+    app.state.write_settings = settings_dep
+
     def store(settings: Settings) -> HolderStore:
         return HolderStore(Database(settings))
+
 
     @app.get("/api/holders", response_model=list[Holder])
     def holders(settings: Annotated[Settings, Depends(settings_dep)]) -> list[Holder]:
@@ -40,6 +44,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
         holder_id: str,
         request: HolderUpsertRequest,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> Holder:
         now = utc_now()
         entry = Holder(
@@ -67,6 +72,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     def delete_holder(
         holder_id: str,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> Holder:
         registry = store(settings)
         entry = registry.get(holder_id)

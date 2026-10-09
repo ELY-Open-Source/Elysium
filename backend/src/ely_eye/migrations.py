@@ -16,7 +16,7 @@ import sqlite3
 from .storage import token_equivalent, visual_token_equivalent
 from .text_index import index_text
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -45,7 +45,8 @@ ATOM_COLUMNS_V2 = """
     valid_to TEXT,
     supersedes_json TEXT NOT NULL DEFAULT '[]',
     visibility_json TEXT NOT NULL DEFAULT '{}',
-    retention_until TEXT
+    retention_until TEXT,
+    quarantined INTEGER NOT NULL DEFAULT 0
 """
 
 _BASE_TABLES = """
@@ -133,6 +134,13 @@ _BASE_TABLES = """
         value TEXT NOT NULL
     );
 
+    -- One row, bumped by every write that changes which atoms are current. A compiled context is
+    -- only true for the corpus it was compiled from, and its cache key carries this number.
+    CREATE TABLE IF NOT EXISTS store_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+
 CREATE VIRTUAL TABLE IF NOT EXISTS atom_fts USING fts5(
 atom_id UNINDEXED,
 source,
@@ -172,6 +180,11 @@ _V1_TO_V2_COLUMNS = (
     ("supersedes_json", "TEXT NOT NULL DEFAULT '[]'"),
     ("visibility_json", "TEXT NOT NULL DEFAULT '{}'"),
     ("retention_until", "TEXT"),
+)
+
+# Columns added after the second version, grouped by the schema version that introduced them.
+_NEW_ATOM_COLUMNS: tuple[tuple[int, tuple[tuple[str, str], ...]], ...] = (
+    (9, (("quarantined", "INTEGER NOT NULL DEFAULT 0"),)),
 )
 
 
@@ -251,6 +264,12 @@ def apply(connection: sqlite3.Connection) -> None:
         _rebuild_fts(connection)
     if version < 7:
         _recount_visual_tokens(connection)
+    for target, columns in _NEW_ATOM_COLUMNS:
+        if version < target:
+            existing = _column_names(connection, "atoms")
+            for name, definition in columns:
+                if name not in existing:
+                    connection.execute(f"ALTER TABLE atoms ADD COLUMN {name} {definition}")
 
     connection.executescript(VIEWS)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")

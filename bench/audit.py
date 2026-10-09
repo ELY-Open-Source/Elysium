@@ -231,6 +231,17 @@ def self_test(manifest: dict[str, Any]) -> int:
     return failures
 
 
+def product_sources(root: Path) -> list[Path]:
+    """The product's proof suite, wherever it lives now: it moved out of one evals.py into a package."""
+    package = root / "backend" / "src" / "ely_eye" / "proofs"
+    if not package.is_dir():
+        raise SystemExit(f"{package}: --product asked for the proof suite but it is not there")
+    sources = sorted(package.glob("*.py"))
+    if not sources:
+        raise SystemExit(f"{package}: the proof suite holds no python file")
+    return sources
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--self-test", action="store_true", help="check the auditor against injected cheating")
@@ -248,10 +259,9 @@ def main() -> int:
     ]
     violations = audit_sources(sources)
     if args.product:
-        product = ROOT.parent / "backend" / "src" / "ely_eye" / "evals.py"
-        if not product.is_file():
-            raise SystemExit(f"{product}: --product asked for the proof suite but it is not there")
-        violations.extend(best_of_violations(product.read_text(encoding="utf-8"), "backend/src/ely_eye/evals.py"))
+        for path in product_sources(ROOT.parent):
+            name = str(path.relative_to(ROOT.parent))
+            violations.extend(best_of_violations(path.read_text(encoding="utf-8"), name))
 
     for name in FROZEN_REPORTS:
         path = REPORTS / name

@@ -19,10 +19,10 @@ WALLET = "钱包在玄关的挂钩上"
 
 
 @pytest.fixture
-def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    settings = Settings(home=tmp_path, default_holder="wife")
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, write_token: str) -> TestClient:
+    settings = Settings(home=tmp_path, default_holder="wife", auth_token=write_token)
     monkeypatch.setattr(api_module, "get_settings", lambda: settings)
-    return TestClient(api_module.create_app())
+    return TestClient(api_module.create_app(), headers={"Authorization": f"Bearer {write_token}"})
 
 
 def search(client: TestClient, payload: dict) -> dict:

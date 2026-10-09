@@ -190,11 +190,13 @@ def upload_home(client: TestClient) -> str:
 
 
 def test_the_api_mounts_and_reports_the_scope(
-    tmp_path: Path, model_dir: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, model_dir: Path, monkeypatch: pytest.MonkeyPatch, write_token: str
 ) -> None:
-    settings = Settings(home=tmp_path / "home", model_dir=model_dir, default_holder="wife")
+    settings = Settings(
+        home=tmp_path / "home", model_dir=model_dir, default_holder="wife", auth_token=write_token
+    )
     monkeypatch.setattr(api_module, "get_settings", lambda: settings)
-    client = TestClient(api_module.create_app())
+    client = TestClient(api_module.create_app(), headers={"Authorization": f"Bearer {write_token}"})
 
     atom = client.post("/api/memory", json={"text": HOME_KEYS, "scenario": "home"}).json()
     assert client.get("/api/mounts").json() == {"mounted": [], "scoped": False, "atoms_in_scope": 0}
@@ -218,11 +220,13 @@ def test_the_api_mounts_and_reports_the_scope(
 
 
 def test_the_api_appends_and_refuses_an_unknown_atom(
-    tmp_path: Path, model_dir: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, model_dir: Path, monkeypatch: pytest.MonkeyPatch, write_token: str
 ) -> None:
-    settings = Settings(home=tmp_path / "home", model_dir=model_dir, default_holder="wife")
+    settings = Settings(
+        home=tmp_path / "home", model_dir=model_dir, default_holder="wife", auth_token=write_token
+    )
     monkeypatch.setattr(api_module, "get_settings", lambda: settings)
-    client = TestClient(api_module.create_app())
+    client = TestClient(api_module.create_app(), headers={"Authorization": f"Bearer {write_token}"})
     client.post("/api/memory", json={"text": HOME_KEYS, "scenario": "home"})
     cartridge_id = upload_home(client)
 

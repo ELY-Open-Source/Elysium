@@ -16,8 +16,28 @@ import type {
   SystemStatus,
 } from './types';
 
+const TOKEN_KEY = 'ely_eye_token';
+
+/** The write token lives in the browser, not in the bundle: a served page must not ship the owner's secret. */
+export function readToken(): string {
+  return window.localStorage.getItem(TOKEN_KEY) ?? '';
+}
+
+export function writeToken(token: string): void {
+  if (token) {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    window.localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const headers = new Headers(init?.headers);
+  const token = readToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const response = await fetch(url, { ...init, headers });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail));

@@ -13,6 +13,10 @@ class Settings(BaseSettings):
 
     home: Path = Field(default_factory=lambda: Path.cwd() / ".ely_eye")
     default_holder: str = "local"
+    auth_token: str | None = None
+    allowed_origins: list[str] = Field(
+        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
     model_id: str = "Qwen/Qwen3.5-9B"
     model_dir: Path | None = None
     kv_cache_dtype: str = "auto"

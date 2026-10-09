@@ -108,6 +108,7 @@ class EvidenceAtom(BaseModel):
     supersedes: list[str] = Field(default_factory=list)
     visibility: Visibility = Field(default_factory=Visibility)
     retention_until: datetime | None = None
+    quarantined: bool = False
 
     @model_validator(mode="after")
     def _times_are_ordered(self) -> EvidenceAtom:
@@ -225,6 +226,7 @@ class CompiledContext(BaseModel):
     packed_text: str
     token_equivalent: int
     cache_trace_id: str
+    quarantined_excluded: list[str] = Field(default_factory=list)
 
 class CitationReport(BaseModel):
     cited_atom_ids: list[str]
@@ -431,6 +433,7 @@ class ForgetReport(BaseModel):
     atoms_deleted: int
     edges_deleted: int
     cache_entries_cleared: int
+    semantic_cache_cleared: int
     vectors_dropped: int
     visual_index_dropped: bool
     affected_cartridges: list[dict[str, Any]]

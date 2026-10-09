@@ -365,12 +365,23 @@
   - 门禁：`pytest -q` 全绿（**287 passed**）；`ruff check` 干净；mypy 冷缓存 **24 errors / 9 files**（命令 `.venv/bin/python -m mypy --cache-dir <新目录> backend/src bench`），与 p1-6 基线（`9cb46c1` 同口径 24/9）**净新增 0**——p2-1 一度引入 +2（`vector_index.py` 与 `quant_probe.py` 的 `import sqlite_vec` 没有 stub），根因修法是在 `pyproject.toml` 的 `[[tool.mypy.overrides]]` 里声明 `sqlite_vec` 无 stub，而不是在代码里加 `# type: ignore`；修在 **`71733d8`**，所以 `6cc5640` 那棵树上量到的是 26/11（review 第一轮量的就是那棵树）；`./node_modules/.bin/pyright` 对 p2-1 范围内 **29 个 `.py`** → **0 errors**；同范围（`9cb46c1..fe538ac`，共 48 个文件）还改了 3 个前端文件（`frontend/src/components/MemoryPanel.tsx`、`frontend/src/components/SensesPanel.tsx`、`frontend/src/types.ts`）和 1 个 `.go`（`ely-eye-mcp/internal/domain/types.go`）——前端由 `npm run build`（220.81 kB）+ `npm run lint` exit 0 覆盖，go 由 `go build` / `go vet` / `go test`（ok）+ `gofmt -l` 空覆盖，四条都在 `fe538ac` 上重跑过（pyright 直接吃 `.ts/.tsx` 会报两千多条，那是没 tsconfig 上下文的噪声，不是门禁）；`bench/filesize_check` 干净。
   - 顺带修的测量缺陷：`copy_store()` 只拷 SQLite，所以任何要跑视觉腿的 harness 都得自己带上 `objects/`（25 GB，探针里用符号链接）与 `cache/clip_image_index.npy`；`bench/scale_check.py` 原本直接打开冻结基线库、把它**原地迁移**了，现改成在副本上测（`--scratch`）。产品 CLI 不在这条规则里：p2-1.4 建图片索引时 `ely-eye index-visual` 就把冻结基线从 schema 7 升到了 8，所以 p1-4.8 那两条钉的是**当前**的 mtime / sha256 / schema，并指名是哪一步改的。
   - **五轮评审**（同一个独立评审 pi，只读+自己跑）：第 1 轮 FAIL 7 条（D1–D7：CHECKLIST 引了报告里不存在的数字、腿 harness 没交代向量与图片索引从哪来、多行注释、mypy +2、外推分母不一致）；第 2 轮 FAIL 7 条（D8–D14：一次样本写成区间、stamp 引错提交、跨页做差、极值抄窄、「三跑」其实只有两份、两条没测过的机制断言、门禁把前端算进 pyright 还说 go/npm 未动）；第 3 轮我反驳的三条（测试数、mypy 基线、pyright 文件集）经评审复核成立，但 D8–D13 未动；第 4 轮 D8–D14 逐条跑验通过、只剩 D15（分模态混页做差）；第 5 轮在 `6869d09` **PASS，零缺陷**。评审自己跑的结果：`pytest -q` 287、`bench.filesize_check`、`bench.audit`（31 harness / 2 报告 / 6 集合，clean）、ruff、go 全套、`npm run build` 220.81 kB + lint exit 0，并把 p2-1 全节每个数字对 `leg_check.json` / `QUANT.md` / `DENSE.md` / `SCALE.md` / `CURRENT.md` 逐格对上。教训写进习惯：引用负载相关数字必须给区间或指向报告；一个区间要有两份留档样本；分模态只能同页比；没留档的计时只能当旁证。
-- [ ] **p2-2** 安全与隐私
-  - [ ] p2-2.1 FastAPI 鉴权 + Origin 校验
-  - [ ] p2-2.2 写入信任分级与隔离：未佐证不得被引用
-  - [ ] p2-2.3 注入消毒：外来文本里的指令进隔离区
-  - [ ] p2-2.4 擦除级联（GDPR 风格 forget）
-  - 验收：无 token 写请求被拒；投毒用例在隔离区；级联测试绿
+- [x] **p2-2** 安全与隐私
+  - [x] p2-2.1 FastAPI 鉴权 + Origin 校验（`backend/src/ely_eye/api_auth.py`）
+    - 事实：`require_write(request)` 挂在 **16** 个能改状态的路由上（`api.py` 8、`api_cartridges.py` 6、`api_holders.py` 2）。GET 和三个只读 POST（`/api/search`、`/api/who_knows`、`/api/ask`）不设卡——查询不是写入。`/api/chat` 设卡，因为它写 cache 事件和 evidence 边。全部 19 个 POST/DELETE 里只有那 3 个没卡，逐个核过。
+    - 语义（跑出来的）：Origin 不在白名单 → **403**；服务器没配 token → **403**「this server accepts no writes: start it with ELY_EYE_AUTH_TOKEN set」；缺头或错 token → **401**「write needs the token: send Authorization: Bearer $ELY_EYE_AUTH_TOKEN」。比对用 `secrets.compare_digest`，不是 `==`。
+    - 偏差（环境变量名是跑出来的）：本仓约定是 `env_prefix="ELY_EYE_"` 拼字段名，所以 `auth_token` 的环境变量是 **`ELY_EYE_AUTH_TOKEN`**，不是我起初写的 `ELY_EYE_TOKEN`。发现方式是 smoke 断言 401 却拿到 403，服务器把原因打印出来了。11 处一起改（Go 客户端、前端提示、两条服务器文案、测试断言、脚本）。
+    - 客户端各面：Go `apiclient.Client.Token` 从 `ELY_EYE_AUTH_TOKEN` 读、每个请求带 `Authorization: Bearer`（`TestTheWriteTokenRidesOnEveryRequest` 用 `httptest` 验 POST 与 GET 都带、空 token 不带、环境值 trim）；前端把 token 存 `localStorage`（不进 bundle），顶栏一个 password 输入框；`ely-eye serve` 启动打一行说明写入要不要 token，token 本身不进日志。
+  - [x] p2-2.2 写入信任分级与隔离：未佐证不得被引用
+    - 事实：`quarantined` 列（schema v9）在写路径一处盖（`trust.stamp`，`ingestion.py` 与 `memory.py` 各一处，7 个 reader 路径不用各自记得）。HTTP 上传一律 `third_party`——递过来的字节是别人的话；服务器自己盘上的文件是 `artifact`。编译时 `compiler._split_citable` 按 `trust.is_citable` 分流：隔离区进 `hits`（尝试可见）但不进 `packed_text`，并列入新字段 `CompiledContext.quarantined_excluded`。
+    - 佐证**读时算、不存**（hai-razor）：它是「此刻语料里有没有第二个来源」的属性，存下来就得每次写入重算，还会让外来事实永远引用不了。限制写进 docstring：佐证是**词面**的、不是语义的——两个来源共享最稀的词只说明这话被看见了两次。SQL 只在 `v_atoms_current` 里找、`quarantined = 0` 才配作证、同 source 不算自己、上限 3 条。
+  - [x] p2-2.3 注入消毒：外来文本里的指令进隔离区
+    - 19 条字面信号（11 英 8 中），`NFKC` + casefold + 空白折叠后匹配，所以 `ＩＧＮＯＲＥ ＰＲＥＶＩＯＵＳ ＩＮＳＴＲＵＣＴＩＯＮＳ` 认得。命中只**隔离**不删词：句子还在、搜得到、不进上下文，命中词留在 `atom.metadata["injection_signals"]`。自己记住的「ignore previous instructions」同样被隔离（`origin` 仍是 `self`）——隔离针对句子，不针对作者。
+  - [x] p2-2.4 擦除级联（GDPR 风格 forget）
+    - `forget` 现在清掉：atom（连带 `atom_fts`、`term_df`）、`evidence_edges`（元信念）、vec0 向量、图片索引、**`sources` 行**（新 `db.delete_source`，删不掉就 fail fast）、**语义缓存文件**（新 `CacheFabric.drop_semantic_cache()`，整个 `cache/semantic/*.json`——派生数据、forget 罕见、没人能保证一份编译过的上下文只引用了还活着的记忆）。`cartridge_atoms` 靠 `ON DELETE CASCADE` 走，`cache_events` 留一条 `memory/invalidated` 痕迹。导出卡带只报告不改写（别人引过它的 DNA）。报告多一个 `semantic_cache_cleared` 字段，Go `domain.ForgetReport` 同步。
+    - 顺带修一个根因：语义缓存 key 原是 `sha256("compiler-v2\n{profile}\n{question}")`，编译过一次就把隔离判定冻住——新证据进来了旧答案照旧。改成把 **store revision** 放进 key（新 `store_meta` 表，`upsert_atoms` / `close_atoms` / `delete_atoms` 各 +1）。已知边界：卡带 mount/switch 不 bump。
+  - 验收：`pytest backend/tests/test_api_auth.py backend/tests/test_trust_quarantine.py backend/tests/test_memory_write.py` → 8 + 9 + 8 全绿（无 token 写被拒、投毒进隔离区且不进 `packed_text`、级联逐项数出来：atom / fts / 边 / 向量 / `sources` / `cartridge_atoms` / 缓存文件）。跨进程：`bash scripts/mcp_write_smoke.sh` → `PASS: remember, supersede, search, forget, cartridge mounting and the transactive referral work through MCP`，脚本先证 401（无 token 写）与 200（带 token 写）再跑 MCP 全流程，两个服务器加 MCP 子进程共用一个 token。
+  - 门禁：`pytest -q` **306 passed**；`ruff check` 干净；mypy 冷缓存 **24 errors / 9 files**（与 `9cb46c1` 基线净新增 0）；`./node_modules/.bin/pyright` 对 23 个后端文件与 2 个 bench 文件 **0 errors**；`go build` / `go vet` / `go test` + `gofmt -l` 空；`npm run build` 221.39 kB + eslint exit 0；`bench/filesize_check` 干净。
+  - 顺带修的 harness 缺陷：`bench/audit.py --product` 还指着 `evals.py`，而证明套件在 p1-6 已拆进 `backend/src/ely_eye/proofs/`。它 fail fast 报了「not there」，但那条反自证规则其实已经**审不到产品**。改成 `product_sources(root)` 审整个包，并加测试钉住「必须有 `suite.py`、整包零 re-roll 违规」。现在 `--product` → `audited 31 harness files, 2 reports, 6 set files` / `clean`，顺带在当前树上重新证了 p0-6。
 - [ ] **p2-3** 短期/长期分层
   - [ ] p2-3.1 工作记忆层
   - [ ] p2-3.2 巩固台账 + watermark，可重放不重复计数

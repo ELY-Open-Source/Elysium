@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest
 
+from ely_eye.cache_fabric import CacheFabric
+from ely_eye.cartridge_store import add_membership
 from ely_eye.config import Settings
 from ely_eye.db import Database
 from ely_eye.memory import MemoryService
@@ -136,14 +138,21 @@ def test_forget_reaches_every_copy_of_a_memory(
         [{"from_atom_id": "seed-1:text", "to_atom_id": "other", "relation": "cites", "confidence": 1.0}]
     )
     service.db.log_cache_event(layer="compiler", cache_key="k", event="hit", bytes_estimate=10)
+    CacheFabric(service.settings, service.db).write_semantic_cache("compiled-1", {"packed_text": KEYS})
     VectorIndex(service.settings, service.db, fake_embeddings()).sync()
 
     report = service.forget(atom_id="seed-1:text", reason="the drawer is empty")
 
     assert report.atoms_deleted == 1
     assert report.edges_deleted == 1
-    assert report.cache_entries_cleared == 1
+    assert report.cache_entries_cleared == 2
     assert report.vectors_dropped == 1
+    assert report.semantic_cache_cleared == 1
+    assert not (service.settings.cache_dir / "semantic" / "compiled-1.json").exists()
+    with service.db.connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM sources").fetchone()[0] == 0, (
+            "a forgotten memory leaves no record of where it came from"
+        )
     assert VectorIndex(service.settings, service.db, fake_embeddings()).stats()["vectors"] == 0
     assert service.db.atom_count() == 0
     with service.db.connect() as connection:
@@ -170,8 +179,13 @@ def test_forget_names_the_cartridge_that_exported_the_source(service: MemoryServ
         token_equivalent=6,
         created_at=NOW,
     )
+    add_membership(service.db, "cart-1", ["seed-1:text"])
     report = service.forget(source_id="seed-1")
     assert report.affected_cartridges == [{"cartridge_id": "cart-1", "contains_source": True}]
+    with service.db.connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM cartridge_atoms").fetchone()[0] == 0, (
+            "a cartridge must stop holding a memory that no longer exists"
+        )
 
 
 def test_forget_refuses_a_request_that_names_nothing(service: MemoryService) -> None:

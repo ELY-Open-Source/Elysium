@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterable
 
+from . import trust
 from .cache_fabric import SEMANTIC_LAYER, CacheFabric
 from .config import Settings, get_settings
 from .db import Database
@@ -25,7 +26,7 @@ class ContextCompiler:
         self.cache = CacheFabric(self.settings, self.db)
 
     def compile(self, question: str, profile: RuntimeProfile) -> CompiledContext:
-        cache_key = self.cache.semantic_key(question, profile.value)
+        cache_key = self.cache.semantic_key(question, profile.value, self.db.revision())
         cached = self.cache.read_semantic_cache(cache_key)
         if cached is not None:
             compiled = CompiledContext.model_validate(cached)
@@ -40,7 +41,8 @@ class ContextCompiler:
             self.cache.record_miss(SEMANTIC_LAYER, cache_key)
         plan = self.plan(question, profile)
         hits = self.retrieval.search(plan.retrieval_query, plan.evidence_budget_atoms).hits
-        packed_text, token_total = self._pack_hits(hits, plan.token_budget, plan.retrieval_query)
+        citable, held = self._split_citable(hits)
+        packed_text, token_total = self._pack_hits(citable, plan.token_budget, plan.retrieval_query)
         trace_id = hashlib.sha256(f"{cache_key}:{token_total}".encode()).hexdigest()[:16]
         compiled = CompiledContext(
             plan=plan,
@@ -48,6 +50,7 @@ class ContextCompiler:
             packed_text=packed_text,
             token_equivalent=token_total,
             cache_trace_id=trace_id,
+            quarantined_excluded=[hit.atom.atom_id for hit in held],
         )
         self.cache.write_semantic_cache(cache_key, compiled.model_dump(mode="json"))
         return compiled
@@ -70,6 +73,15 @@ class ContextCompiler:
                 "Contradictions must be reported as contradiction_notes.",
             ],
         )
+
+    def _split_citable(self, hits: list[RetrievalHit]) -> tuple[list[RetrievalHit], list[RetrievalHit]]:
+        """A quarantined atom reaches the prompt only when a trusted source says the same thing."""
+
+        citable: list[RetrievalHit] = []
+        held: list[RetrievalHit] = []
+        for hit in hits:
+            (citable if trust.is_citable(hit.atom, self.db) else held).append(hit)
+        return citable, held
 
     def _compression_strategy(self, profile: RuntimeProfile, modalities: Iterable[Modality]) -> str:
         has_visual = any(modality in {Modality.image, Modality.pdf_page, Modality.video_frame, Modality.ui_screenshot} for modality in modalities)

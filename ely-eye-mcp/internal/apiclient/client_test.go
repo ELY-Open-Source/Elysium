@@ -77,6 +77,52 @@ func TestUnreachableAPIPointsAtTheServerThatShouldBeRunning(t *testing.T) {
 	}
 }
 
+func TestTheWriteTokenRidesOnEveryRequest(t *testing.T) {
+	seen := make(chan string, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	client := New(server.URL)
+	client.Token = "sekret"
+	if err := client.Post(context.Background(), "/api/memory", map[string]any{}, &struct{}{}); err != nil {
+		t.Fatalf("Post failed: %v", err)
+	}
+	if err := client.Get(context.Background(), "/api/status", &struct{}{}); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	for _, path := range []string{"POST", "GET"} {
+		if got := <-seen; got != "Bearer sekret" {
+			t.Errorf("%s Authorization = %q, want the bearer token the server demands", path, got)
+		}
+	}
+}
+
+func TestNoTokenMeansNoHeader(t *testing.T) {
+	seen := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	if err := New(server.URL).Get(context.Background(), "/api/status", &struct{}{}); err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if got := <-seen; got != "" {
+		t.Errorf("Authorization = %q, want no header when no token is configured", got)
+	}
+}
+
+func TestTheTokenComesFromTheEnvironment(t *testing.T) {
+	t.Setenv("ELY_EYE_AUTH_TOKEN", "  sekret  ")
+	if got := New("http://127.0.0.1:8765").Token; got != "sekret" {
+		t.Errorf("Token = %q, want the environment's value, trimmed", got)
+	}
+}
+
 func TestNewDefaultsToLocalServe(t *testing.T) {
 	if got := New("").BaseURL; got != "http://127.0.0.1:8765" {
 		t.Errorf("BaseURL = %q, want the default serve address", got)

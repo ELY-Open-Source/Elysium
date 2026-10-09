@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from . import __version__
 from .adapters import plan as adapter_plan
+from .api_auth import require_write
 from .api_cartridges import register as register_cartridge_routes
 from .api_holders import register as register_holder_routes
 from .browse import browse, picture
@@ -76,9 +77,10 @@ def settings_dep() -> Settings:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Ely-Eye", version=__version__)
+    app.state.write_settings = settings_dep
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=settings_dep().allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -116,6 +118,7 @@ def create_app() -> FastAPI:
     def ingest_path(
         request: PathIngestRequest,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ):
         try:
             return IngestionService(settings).ingest_path(request.path, request.cartridge_name)
@@ -126,6 +129,7 @@ def create_app() -> FastAPI:
     def ingest_upload(
         metadata: Annotated[UploadIngestRequest, Depends()],
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
         files: Annotated[list[UploadFile], File()],
     ):
         upload_root = settings.data_dir / "uploads"
@@ -144,7 +148,7 @@ def create_app() -> FastAPI:
         service = IngestionService(settings)
         aggregate = None
         for path in saved_paths:
-            result = service.ingest_path(path, None)
+            result = service.ingest_path(path, None, origin=MemoryOrigin.third_party)
             if aggregate is None:
                 aggregate = result
             else:
@@ -162,7 +166,11 @@ def create_app() -> FastAPI:
         return aggregate
 
     @app.post("/api/chat", response_model=AnswerResponse)
-    def chat(request: ChatRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> AnswerResponse:
+    def chat(
+        request: ChatRequest,
+        settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
+    ) -> AnswerResponse:
         db = Database(settings)
         compiler = ContextCompiler(settings, db)
         context = compiler.compile(request.question, request.profile)
@@ -200,7 +208,9 @@ def create_app() -> FastAPI:
 
     @app.post("/api/memory", response_model=EvidenceAtom)
     def remember(
-        request: RememberRequest, settings: Annotated[Settings, Depends(settings_dep)]
+        request: RememberRequest,
+        settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> EvidenceAtom:
         try:
             return MemoryService(settings).remember(
@@ -218,7 +228,9 @@ def create_app() -> FastAPI:
 
     @app.post("/api/memory/supersede", response_model=EvidenceAtom)
     def supersede(
-        request: SupersedeRequest, settings: Annotated[Settings, Depends(settings_dep)]
+        request: SupersedeRequest,
+        settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> EvidenceAtom:
         try:
             return MemoryService(settings).supersede(
@@ -234,7 +246,11 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/memory/forget", response_model=ForgetReport)
-    def forget(request: ForgetRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> ForgetReport:
+    def forget(
+        request: ForgetRequest,
+        settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
+    ) -> ForgetReport:
         try:
             return MemoryService(settings).forget(
                 atom_id=request.atom_id, source_id=request.source_id, reason=request.reason
@@ -288,7 +304,11 @@ def create_app() -> FastAPI:
         return adapter_plan(settings, Database(settings))
 
     @app.post("/api/hashhop", response_model=HashHopProof)
-    def hashhop(request: HashHopRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> HashHopProof:
+    def hashhop(
+        request: HashHopRequest,
+        settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
+    ) -> HashHopProof:
         evaluator = HashHopEvaluator(settings)
         if request.kind == "text":
             return evaluator.generate_text_proof(request.hops, request.token_equivalent)
@@ -300,6 +320,7 @@ def create_app() -> FastAPI:
     def proof_suite(
         request: ProofSuiteRequest,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> ProofSuiteReport:
         try:
             return PRDProofSuite(settings).run(request.cartridge_id)

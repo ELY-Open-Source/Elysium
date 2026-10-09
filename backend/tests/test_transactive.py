@@ -204,10 +204,12 @@ def test_a_store_without_holders_gains_the_table_on_reopen(tmp_path: Path) -> No
         assert connection.execute("SELECT COUNT(*) AS n FROM holders").fetchone()["n"] == 0
 
 
-def test_the_http_surface_serves_the_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = Settings(home=tmp_path / "home", default_holder="husband")
+def test_the_http_surface_serves_the_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, write_token: str
+) -> None:
+    settings = Settings(home=tmp_path / "home", default_holder="husband", auth_token=write_token)
     monkeypatch.setattr(api_module, "get_settings", lambda: settings)
-    client = TestClient(api_module.create_app())
+    client = TestClient(api_module.create_app(), headers={"Authorization": f"Bearer {write_token}"})
 
     store = Store(settings)
     store.wife_remembers(HOME_KEYS)

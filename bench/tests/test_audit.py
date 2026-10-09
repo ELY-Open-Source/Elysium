@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,6 +12,7 @@ from bench.audit import (
     best_of_violations,
     frozen_counts,
     injected_cases,
+    product_sources,
     report_violations,
     scorer_is_independent,
     third_party_origins,
@@ -41,6 +43,20 @@ def test_a_loop_that_rerolls_until_a_score_clears_is_a_violation() -> None:
 
 def test_a_plain_data_loop_is_not_flagged() -> None:
     assert best_of_violations(HONEST, "runner.py") == []
+
+
+def test_the_product_audit_reads_the_package_that_holds_the_proof_suite() -> None:
+    sources = product_sources(Path(__file__).resolve().parents[2])
+    assert any(path.name == "suite.py" for path in sources), "the auditor must read the real suite"
+    for path in sources:
+        assert best_of_violations(path.read_text(encoding="utf-8"), path.name) == [], (
+            f"{path.name} re-rolls until a score clears"
+        )
+
+
+def test_a_missing_proof_package_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match="proof suite"):
+        product_sources(tmp_path)
 
 
 def test_an_explicit_best_of_name_is_flagged_wherever_it_appears() -> None:

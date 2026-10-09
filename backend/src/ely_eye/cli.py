@@ -46,6 +46,11 @@ register_maintenance_commands(app, lambda: get_settings())
 
 @app.command()
 def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
+    settings = get_settings()
+    if settings.auth_token:
+        typer.echo(f"writes need Authorization: Bearer $ELY_EYE_AUTH_TOKEN; {len(settings.allowed_origins)} allowed origin(s)")
+    else:
+        typer.echo("writes are closed on this server: start it with ELY_EYE_AUTH_TOKEN set")
     uvicorn.run(create_app(), host=host, port=port)
 
 

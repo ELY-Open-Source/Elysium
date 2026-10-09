@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from . import trust
 from .asr import SpeechTranscriber
 from .config import Settings, get_settings
 from .db import Database
@@ -25,6 +26,7 @@ from .ingestion_repository import RepositoryIngest, extract_symbols
 from .schemas import (
     EvidenceAtom,
     IngestResponse,
+    MemoryOrigin,
     Modality,
     SkippedFile,
     SourceRecord,
@@ -55,7 +57,13 @@ class IngestionService(MediaIngest, RepositoryIngest):
         self.transcriber = SpeechTranscriber(self.settings)
         self.vectors = vectors or VectorIndex(self.settings, self.db)
 
-    def ingest_path(self, path: Path, cartridge_name: str | None = None) -> IngestResponse:
+    def ingest_path(
+        self,
+        path: Path,
+        cartridge_name: str | None = None,
+        *,
+        origin: MemoryOrigin = MemoryOrigin.artifact,
+    ) -> IngestResponse:
         path = path.expanduser().resolve()
         if not path.exists():
             raise FileNotFoundError(path)
@@ -79,6 +87,7 @@ class IngestionService(MediaIngest, RepositoryIngest):
             batch.atoms.extend(repository_batch.atoms)
 
         self.db.upsert_sources(batch.sources)
+        trust.stamp(batch.atoms, origin=origin)
         self.db.upsert_atoms(batch.atoms)
         self.vectors.sync_atoms([atom.atom_id for atom in batch.atoms])
 

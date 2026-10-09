@@ -1,7 +1,7 @@
 import { Activity, Archive, Database, Gauge, RefreshCw, Server } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { getAdapters, getStatus } from './api';
+import { getAdapters, getStatus, readToken, writeToken } from './api';
 import { AdapterPanel } from './components/AdapterPanel';
 import { CartridgePanel } from './components/CartridgePanel';
 import { CompilerPanel } from './components/CompilerPanel';
@@ -17,6 +17,7 @@ export function App() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [adapters, setAdapters] = useState<AdapterStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState(readToken);
 
   async function refresh() {
     const [nextStatus, nextAdapters] = await Promise.all([getStatus(), getAdapters()]);
@@ -63,13 +64,27 @@ export function App() {
           <p className="eyebrow">Ely-Eye v4.0</p>
           <h1>Local VLM Context OS</h1>
         </div>
-        <button
-          className="icon-button"
-          title="Refresh status"
-          onClick={() => refreshQuietly()}
-        >
-          <RefreshCw size={18} />
-        </button>
+        <div className="topbar-actions">
+          <input
+            className="token-input"
+            type="password"
+            value={token}
+            placeholder="写入令牌"
+            aria-label="写入令牌"
+            title="服务器设置了 ELY_EYE_AUTH_TOKEN 时，写入需要它"
+            onChange={(event) => {
+              setToken(event.target.value);
+              writeToken(event.target.value);
+            }}
+          />
+          <button
+            className="icon-button"
+            title="Refresh status"
+            onClick={() => refreshQuietly()}
+          >
+            <RefreshCw size={18} />
+          </button>
+        </div>
       </header>
 
       {error && <div className="error-line">{error}</div>}

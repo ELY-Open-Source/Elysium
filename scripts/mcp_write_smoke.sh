@@ -7,6 +7,8 @@ home="$(mktemp -d)"
 port="${PORT:-8799}"
 export ELY_EYE_HOME="$home"
 export ELY_EYE_API="http://127.0.0.1:${port}"
+# The server decides who may write; the MCP child inherits this and sends it on every mutation.
+export ELY_EYE_AUTH_TOKEN="smoke-token"
 
 python_bin="$root/.venv/bin/python"
 [ -x "$python_bin" ] || python_bin="python3"
@@ -47,6 +49,22 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
+# The gate, proved before anything else: a query needs nothing, a write needs the token.
+status="$(curl -s -o "$home/refused.json" -w '%{http_code}' -X POST "http://127.0.0.1:${port}/api/memory" \
+  -H 'content-type: application/json' -d '{"text":"a write with no token"}')"
+if [ "$status" != "401" ]; then
+  echo "FAIL: an untokened write returned HTTP $status, want 401"
+  cat "$home/refused.json"
+  exit 1
+fi
+status="$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:${port}/api/memory" \
+  -H 'content-type: application/json' -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
+  -d '{"text":"a write with the token"}')"
+if [ "$status" != "200" ]; then
+  echo "FAIL: a tokened write returned HTTP $status, want 200"
+  exit 1
+fi
+
 (cd "$root/ely-eye-mcp" && go build -o "$home/ely-eye-mcp" ./cmd/ely-eye-mcp)
 
 # A second principal on the same SQLite file. The server, not the client, decides who a memory
@@ -66,12 +84,15 @@ if [ "$ready" -ne 1 ]; then
 fi
 secret="护照在书房第二个抽屉里"
 curl -sf -X POST "http://127.0.0.1:${wife_port}/api/memory" -H 'content-type: application/json' \
+  -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
   -d "{\"text\":\"${secret}\",\"scenario\":\"home\"}" >/dev/null
 curl -sf -X POST "http://127.0.0.1:${wife_port}/api/holders/wife" -H 'content-type: application/json' \
+  -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
   -d '{"name":"小美","kind":"person","knows_about":["护照"],"contact":{"channel":"signal","address":"+86-555"}}' >/dev/null
 
 printf 'the pantry keeps flour\n' > "$home/pantry.txt"
 uploaded="$(curl -sf -X POST "http://127.0.0.1:${port}/api/ingest/upload?cartridge_name=home" \
+  -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
   -F "files=@${home}/pantry.txt;type=text/plain")"
 cartridge_id="$(printf '%s' "$uploaded" | "$python_bin" -c 'import json,sys; print(json.load(sys.stdin)["cartridge_id"])')"
 if [ -z "$cartridge_id" ] || [ "$cartridge_id" = "None" ]; then

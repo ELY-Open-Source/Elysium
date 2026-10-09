@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 
+from .api_auth import require_write
 from .cartridge import CartridgeService
 from .cartridge_assets import CartridgeAssetService
 from .config import Settings
@@ -16,6 +17,9 @@ from .schemas import AppendRequest, CartridgeAssetReport, CartridgeManifest, Mou
 
 def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     """Mounting decides what a search may see; the KV fingerprint decides if it may mount here."""
+
+    app.state.write_settings = settings_dep
+
 
     @app.get("/api/cartridges")
     def cartridges(settings: Annotated[Settings, Depends(settings_dep)]):
@@ -29,6 +33,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     def mount_cartridge(
         cartridge_id: str,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> CartridgeManifest:
         try:
             return CartridgeService(settings).mount(cartridge_id)
@@ -39,6 +44,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     def switch_cartridge(
         cartridge_id: str,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> CartridgeManifest:
         try:
             return CartridgeService(settings).switch(cartridge_id)
@@ -49,6 +55,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     def unmount_cartridge(
         cartridge_id: str,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> MountState:
         try:
             return CartridgeService(settings).unmount(cartridge_id)
@@ -60,6 +67,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
         cartridge_id: str,
         request: AppendRequest,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> CartridgeManifest:
         try:
             return CartridgeService(settings).append(cartridge_id, request.atom_ids)
@@ -70,6 +78,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     def finalize_cartridge(
         cartridge_id: str,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ) -> CartridgeAssetReport:
         try:
             return CartridgeAssetService(settings).finalize(cartridge_id)
@@ -80,6 +89,7 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     def refresh_cartridge(
         cartridge_id: str,
         settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
     ):
         db = Database(settings)
         try:
