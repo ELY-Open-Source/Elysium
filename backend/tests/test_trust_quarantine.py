@@ -239,6 +239,14 @@ def test_a_function_word_does_not_stand_in_for_the_claim_it_hangs_off(settings: 
     assert is_citable(stranger, Database(settings)), "the Chinese positions are the assertion; the trailing 'the' is not part of it"
 
 
+def test_a_content_word_that_is_also_a_function_word_leaves_a_claim_uncitable(settings: Settings) -> None:
+    claim = "The meeting is in May"
+    stranger = remember(settings, claim, origin=MemoryOrigin.third_party, holder="vendor")
+    remember(settings, claim, holder="husband")
+    assert not claim_terms(claim), "the fixed list drops 'May' with the rest, and a claim of nothing but function words has no spine"
+    assert not is_citable(stranger, Database(settings)), "a word-for-word witness still cannot be compared: fail-closed, the price of refusing to let 'the' carry a claim"
+
+
 def test_one_foreign_latin_word_cannot_drop_the_chinese_assertion(settings: Settings) -> None:
     stranger = remember(settings, "档案室的恒温器保持十八度 cryptography", origin=MemoryOrigin.third_party, holder="vendor")
     remember(settings, "档案室的恒温器保持二十六度 cryptography", holder="husband")

@@ -35,11 +35,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Refuse a busy port: the readiness probe only asks whether *something* answers, so a server left
+# over from another run would be measured instead of ours and every assertion downstream would lie.
+if curl -sf "http://127.0.0.1:${port}/api/status" >/dev/null 2>&1; then
+  echo "FAIL: port ${port} already answers; stop that server or run with PORT=<free port>."
+  exit 1
+fi
+
 "$python_bin" -m ely_eye.cli serve --port "$port" >"$home/api.log" 2>&1 &
 api=$!
 
 ready=0
 for _ in $(seq 1 80); do
+  if ! kill -0 "$api" 2>/dev/null; then
+    echo "FAIL: the Ely-Eye API process exited before it was ready"
+    cat "$home/api.log"
+    exit 1
+  fi
   if curl -sf "http://127.0.0.1:${port}/api/status" >/dev/null 2>&1; then ready=1; break; fi
   sleep 0.5
 done

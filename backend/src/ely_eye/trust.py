@@ -45,8 +45,7 @@ CORROBORATION_TERMS = 3
 CORROBORATION_LIMIT = 3
 # A claim written in both scripts is corroborated in both: the CJK positions plus its most distinctive Latin word.
 LATIN_WITH_CJK = 1
-# A function word cannot be one of the places a witness has to match. The list is fixed and knows nothing
-# about the corpus, so it cannot decide belief by size the way a rare-term cutoff did.
+# A function word cannot be one of the places a witness has to match; the list is fixed and never looks at the corpus, so it cannot decide belief by size the way a rare-term cutoff did.
 STOPWORDS: frozenset[str] = frozenset(
     ["a", "an", "the", "and", "or", "but", "if", "then", "than", "of", "to", "in", "on", "for", "with", "without", "within", "at", "by", "from", "into", "over", "under", "above", "as", "that", "this", "these", "those", "it", "its", "he", "she", "they", "them", "we", "you", "i", "not", "no", "yes", "very", "just", "also", "too", "am", "is", "are", "was", "were", "be", "been", "being", "do", "does", "did", "have", "has", "had", "having", "will", "would", "shall", "should", "can", "could", "may", "might", "must", "there", "here", "where", "when", "who", "whom", "whose", "which", "what", "how", "why"]
 )
@@ -134,8 +133,12 @@ def claim_terms(text: str) -> list[str]:
     word drop the Chinese assertion out of the comparison.
 
     Each script is measured on its own terms. A claim with fewer than three usable pairs is not made
-    comparable by a borrowed Latin word, and a demanded word is only counted if it carries content —
-    "恒温器 the" repeated verbatim, or "Pineapple answer the", is too short to corroborate anything.
+    comparable by a borrowed Latin word, and the Latin words it does demand skip a fixed list of
+    function words — "恒温器 the" repeated verbatim, or "Pineapple answer the", is too short to
+    corroborate anything. That list is fixed, so it also drops a content word that happens to be a
+    function word: "May", "can", "do". A claim built only from such words ("It can do that") offers
+    nothing to compare and is never citable. That direction is fail-closed, and it is a cost paid for
+    not letting a planted "the" carry a claim.
 
     What that does not buy: the middle position of a long claim can land on filler, so a witness that
     keeps the three positions and changes a date or a number elsewhere is still read as agreement, and
