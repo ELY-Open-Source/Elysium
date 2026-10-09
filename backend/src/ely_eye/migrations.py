@@ -315,8 +315,7 @@ def apply(connection: sqlite3.Connection) -> None:
                 if name not in existing:
                     connection.execute(f"ALTER TABLE atoms ADD COLUMN {name} {definition}")
     if version < 10:
-        # CREATE VIEW IF NOT EXISTS keeps the old body, and the tenth version changed which rows
-        # the current tier contains, so an upgraded database has to be told to look again.
+        # CREATE VIEW IF NOT EXISTS keeps the old body, and v10 changed which rows are current, so an upgraded store must be told to look again.
         connection.execute("DROP VIEW IF EXISTS v_atoms_current")
 
     connection.executescript(VIEWS)

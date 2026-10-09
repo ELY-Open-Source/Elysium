@@ -323,8 +323,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
             f"p50 {timing['p50'] * 1000:.1f}ms",
             flush=True,
         )
-    # Read the version after the arms: the copy arrives at the source's schema and the product
-    # migrates it the first time it opens, so the version before the run is not the one measured.
+    # Read the version after the arms: the copy arrives at the source's schema and the product migrates it on first open, so the pre-run version is not what was measured.
     return {
         "commit": git_commit(),
         "schema_version": _schema(copy_home),

@@ -284,8 +284,7 @@ def test_a_ninth_version_database_gains_the_tiers_in_place(tmp_path: Path) -> No
     _seed_source(database)
     database.upsert_atoms([_atom("key")])
     with database.connect() as connection:
-        # The downgrade removes what a ninth build never had, including the view and indexes
-        # that reference those columns, so the reopened store really is a ninth-version one.
+        # The downgrade removes what a ninth build never had, view and indexes included, so the reopened store really is ninth-version.
         connection.executescript(
             """
             DROP VIEW IF EXISTS v_atoms_current;

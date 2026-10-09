@@ -201,7 +201,10 @@ def test_the_same_subject_measuring_two_things_still_reads_as_one_quantity(tmp_p
 def test_a_memory_that_leads_with_a_number_has_no_subject_to_conflict_on(tmp_path) -> None:
     service, _ = _lane(tmp_path, ["22 度", "24 度"])
 
-    assert service.conflicts("wife") == [], "with no subject named the store cannot claim they are one thing"
+    assert service.conflicts("wife") == [], (
+        "the number is all the memory has to name itself with, so the store has no subject it could "
+        "call the two one thing and records nothing"
+    )
 
 
 def test_a_qualifier_on_the_subject_reads_as_a_different_thing(tmp_path) -> None:
@@ -214,10 +217,65 @@ def test_a_qualifier_on_the_subject_reads_as_a_different_thing(tmp_path) -> None
     )
 
 
-def test_the_first_number_under_a_label_is_the_value_that_is_compared(tmp_path) -> None:
-    service, _ = _lane(tmp_path, ["2026 saw 3 releases", "2026 saw 5 releases"])
+def test_a_year_that_leads_a_memory_names_the_thing_it_counts(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["2026 saw 3 releases", "2027 saw 5 releases"])
 
     assert service.conflicts("wife") == [], (
-        "the year leads, so it is what the subject's value records; a count that moves behind it "
-        "is not noticed — the store names one quantity per label, not every quantity in a sentence"
+        "the year is what the count belongs to, not the quantity that moved: 2026 and 2027 are two "
+        "records, and comparing their counts would call every timeline a disagreement"
+    )
+
+
+def test_the_same_year_counting_differently_is_a_conflict(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["2026 saw 3 releases", "2026 saw 5 releases"])
+
+    found = service.conflicts("wife")
+    assert [conflict.terms for conflict in found] == [["saw"]], (
+        "one year, two counts: the year names the record and the count standing behind it is the "
+        "quantity that moved, which is what the holder asked to be told about"
+    )
+    assert [(conflict.older_value, conflict.newer_value) for conflict in found] == [("3", "5")]
+
+
+def test_room_numbers_name_the_room_rather_than_measure_it(tmp_path) -> None:
+    service, database = _lane(tmp_path, ["Room 3 holds 22 degrees", "Room 4 holds 24 degrees"])
+
+    assert service.conflicts("wife") == [], (
+        "a number written onto the subject is part of its name: Room 3 and Room 4 are two rooms, "
+        "each steady at its own temperature, and suppressing one would throw away a real fact"
+    )
+    assert sorted(_search(tmp_path, database, "Room")) == sorted(
+        ["Room 3 holds 22 degrees", "Room 4 holds 24 degrees"]
+    ), "both rooms stay findable"
+
+
+def test_two_routers_keep_their_own_counters(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["The router 1 forwards 220 packets", "The router 2 forwards 240 packets"])
+
+    assert service.conflicts("wife") == [], (
+        "the counter that identifies the router is not the counter it reports, so each router keeps "
+        "its own number the way each room keeps its own temperature"
+    )
+
+
+def test_a_number_past_a_word_is_still_the_value_that_moved(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["The rent is 2200 dollars", "The rent is 2400 dollars"])
+
+    found = service.conflicts("wife")
+    assert [conflict.terms for conflict in found] == [["rent"]], (
+        "a number standing past a word measures the subject instead of naming it, which is what "
+        "keeps the ordinary case — a rent that changed — reaching the holder"
+    )
+    assert [(conflict.older_value, conflict.newer_value) for conflict in found] == [
+        ("2200", "2400")
+    ]
+
+
+def test_a_letter_qualifier_does_not_rename_the_room(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["Room A holds 22 degrees", "Room B holds 24 degrees"])
+
+    assert len(service.conflicts("wife")) == 1, (
+        "only a number written onto the subject renames it, so Room A and Room B still read as one "
+        "room whose reading moved — the pair is recorded for the holder to settle rather than "
+        "silently resolved, and this is the boundary the rule does not cross"
     )

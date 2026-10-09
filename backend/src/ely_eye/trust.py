@@ -223,25 +223,25 @@ def numeric_values(text: str) -> StatedNumbers:
     A number is attributed twice: to the subject the memory leads with, and to the content word
     standing beside it. 「恒温器放在书房，设定 22 度」 and 「恒温器调到 24 度」 phrase the setting
     differently but lead with the same thing, and it is that shared label which makes the pair one
-    disagreement about one quantity rather than two unrelated counts.
+    disagreement about one quantity rather than two unrelated counts. A number written onto the
+    subject itself is part of the object's name, not a quantity — 「Room 3」 and 「Room 4」 are two
+    rooms — so it joins the subject instead of being recorded as a value.
     """
     try:
         tokens = fts_terms(text)
     except ValueError:
         return StatedNumbers(subject="", values={})
-    subject = ""
-    for token in tokens:
-        # An English memory usually opens with an article, and a subject behind one is still the
-        # subject: 「The router forwards 220 packets」 leads with its router, not with 「the」.
-        subject = _label(token, first=True)
-        if subject:
-            break
+    subject, named_at = _subject_and_rename_slot(tokens)
     values: dict[str, str] = {}
     beside = ""
-    for token in tokens:
+    for index, token in enumerate(tokens):
         stated = _NUMBER.findall(token)
         if not stated:
             beside = _label(token) or beside
+            continue
+        if index == named_at and not _LETTER.search(token):
+            # A bare number written onto the subject names the object rather than measuring it: 「Room 3」 is not one reading.
+            subject = f"{subject}{stated[0]}"
             continue
         for value in stated:
             if subject:
@@ -249,6 +249,26 @@ def numeric_values(text: str) -> StatedNumbers:
             if beside:
                 values.setdefault(beside, value)
     return StatedNumbers(subject=subject, values=values)
+
+
+def _subject_and_rename_slot(tokens: list[str]) -> tuple[str, int]:
+    """The thing a memory is about, and the slot where a number would rename rather than measure it.
+
+    A memory that opens with a number is about that number: 「2026 saw 3 releases」 counts releases
+    for 2026, so 2026 names the thing and 3 measures it. An English memory usually opens with an
+    article, and a subject behind one is still the subject: 「The router forwards 220 packets」 leads
+    with its router, not with 「the」. Only a number written onto the subject renames it; one
+    standing past a word is a value, which is why 「The rent is 2200 dollars」 can move. A CJK run can
+    fuse the subject and what it reports into one token, and the number after that is a value too:
+    「恒温器调到 24 度」 adjusts a thermostat, it does not name a thing called 「恒温器调到 24」.
+    """
+    for index, token in enumerate(tokens):
+        if _NUMBER.fullmatch(token.strip(_PUNCTUATION)):
+            return token.strip(_PUNCTUATION), -1
+        head = _label(token, first=True)
+        if head:
+            return head, -1 if _label(token) != head else index + 1
+    return "", -1
 
 
 def quantity_conflict(older_text: str, newer_text: str) -> QuantityConflict | None:
@@ -267,8 +287,7 @@ def quantity_conflict(older_text: str, newer_text: str) -> QuantityConflict | No
         return None
     subject = older.subject
     if subject in newer.values and _as_float(older.values[subject]) != _as_float(newer.values[subject]):
-        # The subject carries the value here, so it is named rather than whichever shared label
-        # sorts first: 「router」 is what the pair disagrees about, not the verb beside it.
+        # The subject itself carries the two values, so it is named rather than the verb beside it.
         return QuantityConflict(term=subject, older_value=older.values[subject], newer_value=newer.values[subject])
     term = conflicting_number(older.values, newer.values)
     if term is None:
@@ -316,3 +335,4 @@ def _label(token: str, *, first: bool = False) -> str:
 
 _PUNCTUATION = " \t\n.,;:!?。，；：！？、"
 _NUMBER = re.compile(r"[-+]?\d+(?:\.\d+)?")
+_LETTER = re.compile(r"[^\W\d_]")

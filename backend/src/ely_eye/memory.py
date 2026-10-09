@@ -322,8 +322,7 @@ class MemoryService:
         )
         self.db.upsert_atoms([rollup])
         self.vectors.sync_atoms([atom_id])
-        # The watermark is the newest memory actually rolled up, not the clock of the pass: a
-        # consolidation run with a clock behind the memories would otherwise count them twice.
+        # The watermark is the newest memory actually rolled up, not the clock of the pass: a pass run behind the memories would count them twice.
         record = ConsolidationRecord(
             holder_id=holder_id,
             scenario=scenario,
