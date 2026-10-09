@@ -121,7 +121,11 @@ class HolderStore:
         return entry
 
     def verify_token(self, token: str) -> str | None:
-        """Which holder a bearer token speaks for, or None when it speaks for nobody."""
+        """Which holder a bearer token speaks for, or None when it speaks for nobody.
+
+        The store keeps only the sha256 digest, so this is SQL equality on the digest: no plaintext
+        exists here to compare in constant time, and a copied database cannot replay a token.
+        """
         if not token:
             return None
         with self.database.connect() as connection:
