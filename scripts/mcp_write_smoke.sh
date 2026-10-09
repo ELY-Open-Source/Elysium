@@ -172,6 +172,11 @@ for required in ("remember", "supersede_memory", "forget_memory", "mounted_cartr
 
 statement = "keys are in the hall drawer"
 remembered = tool("remember", {"text": statement, "scenario": "home"})["atom"]
+if "recall_count" not in remembered:
+    raise SystemExit(
+        "FAIL: the API answered with no recall_count; a server left over from before the memory tiers "
+        "took the port after our guard passed — stop it and re-run"
+    )
 if not remembered["holder_id"]:
     raise SystemExit(f"FAIL: the server stamped no holder: {remembered}")
 atom_id = remembered["atom_id"]

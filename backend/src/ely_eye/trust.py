@@ -225,7 +225,9 @@ def numeric_values(text: str) -> StatedNumbers:
     differently but lead with the same thing, and it is that shared label which makes the pair one
     disagreement about one quantity rather than two unrelated counts. A number written onto the
     subject itself is part of the object's name, not a quantity — 「Room 3」 and 「Room 4」 are two
-    rooms — so it joins the subject instead of being recorded as a value.
+    rooms — but only while the memory still has another number waiting to be its reading. A number
+    with nothing after it is the reading itself: 「温度 22 度」 states a temperature, and renaming the
+    thermostat after it would leave the memory with no quantity left to compare.
     """
     try:
         tokens = fts_terms(text)
@@ -257,18 +259,32 @@ def _subject_and_rename_slot(tokens: list[str]) -> tuple[str, int]:
     A memory that opens with a number is about that number: 「2026 saw 3 releases」 counts releases
     for 2026, so 2026 names the thing and 3 measures it. An English memory usually opens with an
     article, and a subject behind one is still the subject: 「The router forwards 220 packets」 leads
-    with its router, not with 「the」. Only a number written onto the subject renames it; one
-    standing past a word is a value, which is why 「The rent is 2200 dollars」 can move. A CJK run can
+    with its router, not with 「the」. Only a number written onto the subject renames it, and only
+    when the memory still has a later number to report: 「Room 3 holds 22 degrees」 names a room and
+    then reads it, while 「温度 22 度」 has nothing behind the 22 but the unit. A number standing past
+    a word is a value either way, which is why 「The rent is 2200 dollars」 can move. A CJK run can
     fuse the subject and what it reports into one token, and the number after that is a value too:
     「恒温器调到 24 度」 adjusts a thermostat, it does not name a thing called 「恒温器调到 24」.
     """
     for index, token in enumerate(tokens):
-        if _NUMBER.fullmatch(token.strip(_PUNCTUATION)):
+        stated = _NUMBER.fullmatch(token.strip(_PUNCTUATION))
+        if stated:
             return token.strip(_PUNCTUATION), -1
         head = _label(token, first=True)
         if head:
-            return head, -1 if _label(token) != head else index + 1
+            renames = _label(token) == head and _numbers_follow(tokens, index + 2)
+            return head, index + 1 if renames else -1
     return "", -1
+
+
+def _numbers_follow(tokens: list[str], start: int) -> bool:
+    """Whether the memory still has a bare number to state after the slot in question.
+
+    A name is only worth taking when something else is left to be the reading. Without this test the
+    shortest Chinese phrasings — 「温度 22 度」, 「预算 5000 元」 — fold their only number into the
+    subject and the memory reports no quantity at all, so no later memory can ever disagree with it.
+    """
+    return any(_NUMBER.fullmatch(token.strip(_PUNCTUATION)) for token in tokens[start:])
 
 
 def quantity_conflict(older_text: str, newer_text: str) -> QuantityConflict | None:

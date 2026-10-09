@@ -198,12 +198,12 @@ def test_the_same_subject_measuring_two_things_still_reads_as_one_quantity(tmp_p
     )
 
 
-def test_a_memory_that_leads_with_a_number_has_no_subject_to_conflict_on(tmp_path) -> None:
+def test_two_memories_that_are_only_a_number_do_not_name_the_same_thing(tmp_path) -> None:
     service, _ = _lane(tmp_path, ["22 度", "24 度"])
 
     assert service.conflicts("wife") == [], (
-        "the number is all the memory has to name itself with, so the store has no subject it could "
-        "call the two one thing and records nothing"
+        "each number becomes its own subject — 「22」 and 「24」 — so these are two different things "
+        "to the store, not one quantity that moved; it finds a subject, it just is not the same one"
     )
 
 
@@ -278,4 +278,43 @@ def test_a_letter_qualifier_does_not_rename_the_room(tmp_path) -> None:
         "only a number written onto the subject renames it, so Room A and Room B still read as one "
         "room whose reading moved — the pair is recorded for the holder to settle rather than "
         "silently resolved, and this is the boundary the rule does not cross"
+    )
+
+
+def test_a_short_chinese_reading_is_a_value_and_not_part_of_a_name(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["温度 22 度", "温度 24 度"])
+
+    found = service.conflicts("wife")
+    assert [conflict.terms for conflict in found] == [["温度"]], (
+        "「温度 22 度」 has nothing behind the 22 but the unit, so the 22 is the reading and not the "
+        "name of a thing called 温度22 — renaming it would leave the memory stating no quantity at "
+        "all, and the most common Chinese phrasing would never be noticed as an update"
+    )
+    assert [(conflict.older_value, conflict.newer_value) for conflict in found] == [("22", "24")]
+
+
+def test_a_budget_that_changed_is_recorded(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["预算 5000 元", "预算 8000 元"])
+
+    found = service.conflicts("wife")
+    assert [(conflict.terms, conflict.older_value, conflict.newer_value) for conflict in found] == [
+        (["预算"], "5000", "8000")
+    ], "a two-character subject is the common case, not an edge case: the number after it moves"
+
+
+def test_a_latin_reading_with_nothing_after_it_is_a_value_too(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["The thermostat 22 degrees", "The thermostat 24 degrees"])
+
+    assert len(service.conflicts("wife")) == 1, (
+        "the same rule has to hold in both scripts or it is a rule about Chinese, not about memories"
+    )
+
+
+def test_an_identifier_with_no_reading_after_it_reads_as_a_quantity(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["Room 3 is big", "Room 4 is big"])
+
+    assert len(service.conflicts("wife")) == 1, (
+        "a label cannot tell an identifier from a reading: with no second number in the sentence the "
+        "3 and 4 are compared as one quantity that moved, so this pair is recorded and the holder "
+        "settles it — the boundary the rule does not cross, and the price of not hiding a disagreement"
     )
