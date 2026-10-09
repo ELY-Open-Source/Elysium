@@ -49,6 +49,7 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
     report: dict[str, Any] = {
         "commit": "abcdef123456",
         "schema_version": 8,
+        "source_schema_version": 7,
         "store": "bench/runs/leg_check/data/ely_eye.sqlite",
         "source_store": "bench/runs/dense_scale",
         "dense_vectors": 153857,
@@ -85,5 +86,8 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "every answerable conversation query (150) measured whole" in text
     ), "a 15-probe sample cannot separate six question types, and the report must say which set the table used"
     assert "| 0.44 |" in text, "the probe table needs its own newest-first column"
+    assert (
+        "arrives at v7 and the product migrates it when it opens, so every arm ran on v8" in text
+    ), "the schema named in the report has to be the one the product ran on, not the one the copy arrived with"
     assert "unlabelled" not in text, "an unlabelled bucket would hide which set a number came from"
     assert "abcdef123456" in text and "load_average" not in text

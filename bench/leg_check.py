@@ -244,6 +244,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
     print(f"{len(memory)} answerable {MEMORY_MODALITY} queries, measured whole beside the probes", flush=True)
 
     vectors = _dense_vectors(home / "data" / "ely_eye.sqlite")
+    source_schema = _schema(home)
     if vectors == 0 and any(config["dense"] for config in CONFIGS):
         raise SystemExit(
             f"{home}: the store carries no dense vectors, so a dense arm here would rank an empty "
@@ -254,7 +255,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
     arms: list[dict[str, Any]] = []
     picture: dict[str, Any] | None = None
     rate: dict[str, Any] | None = None
-    schema = 0
+    copy_home = home
     for config in CONFIGS:
         print(f"  {config['label']}: dense={config['dense']} visual={config['visual']}", flush=True)
         copy_home = prepare(
@@ -267,7 +268,6 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
             clip_model=models["clip"],
             embedding_model=models["embedding"],
         )
-        schema = _schema(copy_home)
         if config["visual"]:
             picture = picture_facts(clip_index)
             if rate is None:
@@ -323,9 +323,12 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
             f"p50 {timing['p50'] * 1000:.1f}ms",
             flush=True,
         )
+    # Read the version after the arms: the copy arrives at the source's schema and the product
+    # migrates it the first time it opens, so the version before the run is not the one measured.
     return {
         "commit": git_commit(),
-        "schema_version": schema,
+        "schema_version": _schema(copy_home),
+        "source_schema_version": source_schema,
         "store": str(scratch / "data" / "ely_eye.sqlite"),
         "source_store": str(home),
         "dense_vectors": vectors,

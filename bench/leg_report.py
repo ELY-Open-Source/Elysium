@@ -68,7 +68,11 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             [
                 "# LEGS: what each retrieval leg is worth",
                 "",
-                f"- commit: `{report['commit']}`, schema v{report['schema_version']}",
+                (
+                    f"- commit: `{report['commit']}`, schema v{report['schema_version']} — the copy "
+                    f"arrives at v{report['source_schema_version']} and the product migrates it when "
+                    f"it opens, so every arm ran on v{report['schema_version']}"
+                ),
                 (
                     f"- store: {report['store']} — a copy of {report['source_store']}, which carries "
                     f"{report['dense_vectors']:,} dense vectors built by bench/dense_scale. The build "
