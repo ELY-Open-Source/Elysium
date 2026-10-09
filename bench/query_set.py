@@ -17,6 +17,7 @@ class Query:
     holder: str | None
     answerable: bool
     as_of: str | None
+    category: str | None = None
 
 
 
@@ -44,6 +45,7 @@ def load_queries(modalities: Sequence[str] = MODALITIES) -> list[Query]:
                     holder=record["scope"]["holder"],
                     answerable=answerable,
                     as_of=record.get("as_of"),
+                    category=(record.get("origin") or {}).get("category"),
                 )
             )
     if not queries:
@@ -65,19 +67,64 @@ def holder_index(modalities: Sequence[str] = MODALITIES) -> dict[str, str]:
 
 
 
+def source_times(modalities: Sequence[str] = MODALITIES) -> dict[str, str]:
+    """source_id -> when that source says it happened, from the corpus side of the suite."""
+    times: dict[str, str] = {}
+    for modality in modalities:
+        path = SETS / "corpus" / f"{modality}.jsonl"
+        if not path.is_file():
+            raise SystemExit(f"{path}: missing corpus index, run python -m bench.build_sets first")
+        for record in read_jsonl(path):
+            observed = record.get("observed_at")
+            if observed:
+                times[record["source_id"]] = str(observed)
+    return times
+
+
+
 SCALE_PROBES = 40
+
+
+def _shares(pools: dict[str, list[Query]], count: int) -> dict[str, int]:
+    """How many probes each modality gets: its share of the suite, never zero when there is room."""
+    names = sorted(pools)
+    total = sum(len(pools[name]) for name in names)
+    exact = {name: count * len(pools[name]) / total for name in names}
+    share = {name: int(exact[name]) for name in names}
+    short = count - sum(share.values())
+    for name in sorted(names, key=lambda name: (-(exact[name] - int(exact[name])), name))[:short]:
+        share[name] += 1
+    if count >= len(names):
+        for name in names:
+            while share[name] == 0:
+                donor = max((other for other in names if share[other] > 1), key=lambda other: share[other])
+                share[donor] -= 1
+                share[name] += 1
+    return {name: min(share[name], len(pools[name])) for name in names}
 
 
 def scale_probes(queries: Sequence[Query], count: int = SCALE_PROBES) -> list[Query]:
     """Queries to time at every corpus size.
 
     Latency does not need gold hits, and a truncated corpus keeps almost none of them,
-    so selecting probes by gold would silently drop the small sizes entirely.
+    so selecting probes by gold would silently drop the small sizes entirely. The budget is then
+    split across modalities by suite weight: one stride over file order truncated the tail and
+    timed 300 probes that held no conversation query at all.
     """
     if count <= 0:
         raise SystemExit("the scale curve needs at least one probe query")
-    answerable = [query for query in queries if query.answerable]
-    if not answerable:
+    pools: dict[str, list[Query]] = {}
+    for query in queries:
+        if query.answerable:
+            pools.setdefault(query.modality, []).append(query)
+    if not pools:
         raise SystemExit("the scale curve needs answerable queries")
-    stride = max(1, len(answerable) // count)
-    return answerable[::stride][:count]
+    shares = _shares(pools, count)
+    chosen: list[Query] = []
+    for modality in sorted(pools):
+        if shares[modality] == 0:
+            continue
+        pool = pools[modality]
+        stride = max(1, len(pool) // shares[modality])
+        chosen.extend(pool[::stride][: shares[modality]])
+    return chosen

@@ -32,6 +32,11 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "median_distinct_sources": 4,
         "by_modality": {"code": 0.953, "pdf": 0.849},
         "modality_counts": {"code": 128, "pdf": 86},
+        "by_category": {"knowledge-update": 1.0, "temporal-reasoning": 0.947, "unlabelled": 0.84},
+        "category_counts": {"knowledge-update": 25, "temporal-reasoning": 19, "unlabelled": 256},
+        "newest_gold_first": 0.44,
+        "newest_gold_first_by_category": {"knowledge-update": 0.4, "temporal-reasoning": 0.526},
+        "newest_gold_first_counts": {"knowledge-update": 25, "temporal-reasoning": 19},
     }
     report: dict[str, Any] = {
         "commit": "abcdef123456",
@@ -63,4 +68,8 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
     assert (
         "53,668 atoms at 512 dimensions" in text and "44.7" in text
     ), "the picture index needs its shape in the report, and its build cost derived from a measured rate"
+    assert (
+        "knowledge-update" in text and "1.000" in text and "0.40 (25)" in text
+    ), "the two question types the contract names need their own recall and their own n"
+    assert "unlabelled" not in text, "an unlabelled bucket would hide which set a number came from"
     assert "abcdef123456" in text and "load_average" not in text

@@ -8,7 +8,7 @@ behaviour instead of recall, and never mixed into the recall denominator.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 Z_TWO_SIDED_95 = 1.959963984540054
@@ -87,6 +87,23 @@ def chance_recall_at_k(gold: int, corpus_size: int, k: int) -> float:
     if gold <= 0:
         return 0.0
     return min(1.0, k / corpus_size)
+
+
+def newest_gold_first(ranked: Sequence[str], gold: set[str], times: Mapping[str, str]) -> bool | None:
+    """For a question answered by several memories, did the newest one come back first?
+
+    recall@10 counts any gold memory, which hides a knowledge-update failure: the older value is
+    still a memory, it is just no longer the answer. None when the question has fewer than two
+    dated gold memories or the ranking returned none of them.
+    """
+    dated = [source for source in gold if source in times]
+    if len(dated) < 2:
+        return None
+    newest = max(dated, key=lambda source: times[source])
+    found = [source for source in ranked if source in gold]
+    if not found:
+        return None
+    return found[0] == newest
 
 
 def score_query(

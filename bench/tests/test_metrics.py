@@ -9,6 +9,7 @@ from bench.metrics import (
     chance_recall_at_k,
     first_hit_rank,
     ndcg_at_10,
+    newest_gold_first,
     recall_at_k,
     reciprocal_rank,
     score_query,
@@ -101,3 +102,28 @@ def test_aggregate_separates_answerable_from_unanswerable() -> None:
 def test_aggregate_needs_answerable_queries() -> None:
     with pytest.raises(SystemExit):
         aggregate([score_query("none", [], set())])
+
+
+TIMES = {
+    "old": "2023-01-01T00:00:00+00:00",
+    "new": "2024-06-01T00:00:00+00:00",
+    "undated": "",
+}
+
+
+def test_a_recall_hit_on_an_outdated_memory_is_not_reported_as_the_answer() -> None:
+    """recall@10 scores both orders the same; a replaced value is not the answer."""
+    assert newest_gold_first(["old", "new"], {"old", "new"}, TIMES) is False
+    assert newest_gold_first(["new", "old"], {"old", "new"}, TIMES) is True
+
+
+def test_a_question_with_one_dated_memory_has_no_newest_answer() -> None:
+    assert newest_gold_first(["old"], {"old"}, TIMES) is None
+    assert newest_gold_first(["old", "undated"], {"old", "undated"}, {"old": TIMES["old"]}) is None
+
+
+def test_a_ranking_that_returned_none_of_the_dated_memories_is_not_counted() -> None:
+    assert newest_gold_first(["x", "y"], {"old", "new"}, TIMES) is None
+    assert (
+        newest_gold_first(["old", "x"], {"old", "new"}, TIMES) is False
+    ), "a newest memory that never came back did not come back first"

@@ -21,8 +21,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from bench.metrics import aggregate, score_query
-from bench.query_set import load_queries, scale_probes
+from bench.metrics import aggregate, newest_gold_first, score_query
+from bench.query_set import load_queries, scale_probes, source_times
 from bench.report import git_commit
 from bench.run import latency
 from bench.scratch import copy_store
@@ -189,6 +189,32 @@ def rank_all(service: Any, ids: dict[str, str], probes: list[Any], top_k: int) -
     return rankings, distinct, timings
 
 
+def _groups(
+    answerable: list[Any], scores: list[Any], rankings: list[list[str]], times: dict[str, str]
+) -> dict[str, Any]:
+    """recall@10 by modality and by the question type the set recorded, plus who came back first."""
+    by_modality: dict[str, list[float]] = {}
+    by_category: dict[str, list[float]] = {}
+    newest: dict[str, list[bool]] = {}
+    every_newest: list[bool] = []
+    for query, score, ranking in zip(answerable, scores, rankings, strict=True):
+        by_modality.setdefault(query.modality, []).append(score.recall_at_10)
+        by_category.setdefault(query.category or "unlabelled", []).append(score.recall_at_10)
+        flag = newest_gold_first(ranking, set(query.gold), times)
+        if flag is not None:
+            newest.setdefault(query.category or "unlabelled", []).append(flag)
+            every_newest.append(flag)
+    return {
+        "by_modality": {name: sum(rows) / len(rows) for name, rows in sorted(by_modality.items())},
+        "modality_counts": {name: len(rows) for name, rows in sorted(by_modality.items())},
+        "by_category": {name: sum(rows) / len(rows) for name, rows in sorted(by_category.items())},
+        "category_counts": {name: len(rows) for name, rows in sorted(by_category.items())},
+        "newest_gold_first": sum(every_newest) / len(every_newest) if every_newest else None,
+        "newest_gold_first_by_category": {name: sum(rows) / len(rows) for name, rows in sorted(newest.items())},
+        "newest_gold_first_counts": {name: len(rows) for name, rows in sorted(newest.items())},
+    }
+
+
 def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: int, models: dict[str, Path]) -> dict[str, Any]:
     """Score every configuration on the same probes, one warm service per configuration."""
     from ely_eye.config import Settings
@@ -207,6 +233,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
     if not answerable:
         raise SystemExit("the frozen suite carries no answerable query; nothing to score")
     print(f"{len(answerable)} answerable probes", flush=True)
+    times = source_times()
 
     vectors = _dense_vectors(home / "data" / "ely_eye.sqlite")
     if vectors == 0 and any(config["dense"] for config in CONFIGS):
@@ -253,9 +280,6 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         ]
         summary = aggregate(scores)
         timing = latency(timings)
-        by_modality: dict[str, list[float]] = {}
-        for query, score in zip(answerable, scores, strict=True):
-            by_modality.setdefault(query.modality, []).append(score.recall_at_10)
         arms.append(
             {
                 "label": config["label"],
@@ -269,10 +293,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
                 "p50_seconds": timing["p50"],
                 "p95_seconds": timing["p95"],
                 "median_distinct_sources": statistics.median(distinct),
-                "by_modality": {
-                    modality: sum(rows) / len(rows) for modality, rows in sorted(by_modality.items())
-                },
-                "modality_counts": {modality: len(rows) for modality, rows in sorted(by_modality.items())},
+                **_groups(answerable, scores, rankings, times),
             }
         )
         print(
@@ -326,6 +347,37 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
             + " |"
         )
     counts = report["arms"][0]["modality_counts"]
+
+    def category_table(title: str, field: str, sizes_field: str) -> list[str]:
+        """A table over the question types the sets label; unlabelled sets stay out of it."""
+        names = sorted({name for arm in report["arms"] for name in arm[field] if name != "unlabelled"})
+        if not names:
+            return []
+        lines = [
+            f"## {title}",
+            "",
+            "| leg configuration | " + " | ".join(names) + " |",
+            "| --- |" + " --- |" * len(names),
+        ]
+        for arm in report["arms"]:
+            values, sizes = arm[field], arm[sizes_field]
+            cells = []
+            for name in names:
+                if name not in values:
+                    cells.append("—")
+                elif field == "by_category":
+                    cells.append(f"{values[name]:.3f}")
+                else:
+                    cells.append(f"{values[name]:.2f} ({sizes[name]})")
+            lines.append(f"| {arm['label']} | " + " | ".join(cells) + " |")
+        labelled = report["arms"][0][sizes_field]
+        lines += [
+            "",
+            "_Queries per type: "
+            + ", ".join(f"{name} {size}" for name, size in labelled.items() if name != "unlabelled")
+            + "._",
+        ]
+        return lines
     path.write_text(
         "\n".join(
             [
@@ -374,6 +426,22 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                 *modality_rows,
                 "",
                 f"_Query counts per modality: {', '.join(f'{name} {count}' for name, count in counts.items())}._",
+                "",
+                *category_table("recall@10 by question type", "by_category", "category_counts"),
+                "",
+                *category_table(
+                    "the newest of the gold memories came back first",
+                    "newest_gold_first_by_category",
+                    "newest_gold_first_counts",
+                ),
+                "",
+                (
+                    "recall@10 counts any gold memory, so a knowledge-update question can score 1.000 "
+                    "while the ranking still leads with the value the speaker has since replaced. The "
+                    "table above asks the sharper question: when the answer lives in several dated "
+                    "memories, is the newest one the first one returned? Only questions with at least two "
+                    "dated gold memories and at least one returned are counted."
+                ),
                 "",
                 (
                     "The picture leg is not a switch this harness flips per row: the product runs it only "
