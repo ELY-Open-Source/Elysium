@@ -223,6 +223,24 @@ def test_a_chinese_instruction_cannot_vouch_for_its_own_characters(settings: Set
     assert not is_citable(stranger, Database(settings)), "a sentence too short to compare is not believed twice"
 
 
+def test_one_foreign_latin_word_cannot_drop_the_chinese_assertion(settings: Settings) -> None:
+    stranger = remember(settings, "档案室的恒温器保持十八度 cryptography", origin=MemoryOrigin.third_party, holder="vendor")
+    remember(settings, "档案室的恒温器保持二十六度 cryptography", holder="husband")
+    assert not is_citable(stranger, Database(settings)), "a planted English word must not drop the Chinese assertion from the comparison"
+    repeat = remember(settings, "恒温器很贵 thermodynamics", origin=MemoryOrigin.third_party, holder="dealer")
+    remember(settings, "恒温器很便宜 thermodynamics", holder="wife")
+    assert not is_citable(repeat, Database(settings)), "the CJK positions are demanded beside a Latin word too"
+
+
+def test_a_mixed_claim_is_corroborated_in_both_scripts(settings: Settings) -> None:
+    claim = "档案室的 thermostat 保持 eighteen 度"
+    stranger = remember(settings, claim, origin=MemoryOrigin.third_party, holder="vendor")
+    remember(settings, "thermostat eighteen 档案", holder="husband")
+    assert not is_citable(stranger, Database(settings)), "agreeing in one script is not agreeing with a claim written in two"
+    remember(settings, claim, holder="wife")
+    assert is_citable(stranger, Database(settings)), "a witness that keeps both scripts is a witness"
+
+
 def test_a_claim_too_short_to_compare_stays_uncited(settings: Settings) -> None:
     stranger = remember(settings, "Pineapple answer", origin=MemoryOrigin.third_party, holder="vendor")
     remember(settings, "Pineapple answer", holder="husband")

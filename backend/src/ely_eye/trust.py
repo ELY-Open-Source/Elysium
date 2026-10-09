@@ -43,6 +43,8 @@ INJECTION_SIGNALS: tuple[str, ...] = (
 
 CORROBORATION_TERMS = 3
 CORROBORATION_LIMIT = 3
+# A claim written in both scripts is corroborated in both: the CJK positions plus its most distinctive Latin word.
+LATIN_WITH_CJK = 1
 
 
 def _fold(text: str) -> str:
@@ -78,17 +80,17 @@ def corroborating_atom_ids(
     that the claim was seen twice, not proof that it is true. A closed or quarantined atom cannot
     corroborate, so a superseded fact stops propping up whatever cited it.
 
-    The words demanded are the claim's longest, with the instruction phrases stripped out, and the
-    count is fixed. Neither the attack's own words nor the size of the library decides whether a
-    second source is believed: an earlier rule that dropped words common to the corpus left a
-    two-atom library unable to corroborate anything, and 40 unrelated memories able to. A claim with
-    fewer usable words than the rule demands is never corroborated, so a two-word rumour stays
-    uncited — failing closed was chosen over trusting a sentence too short to compare.
+    The words demanded are the claim's own spine, with the instruction phrases stripped out. Neither
+    the attack's own words nor the size of the library decides whether a second source is believed:
+    an earlier rule that dropped words common to the corpus left a two-atom library unable to
+    corroborate anything, and 40 unrelated memories able to. A claim with fewer usable words than the
+    rule demands is never corroborated, so a two-word rumour stays uncited — failing closed was
+    chosen over trusting a sentence too short to compare.
     """
     terms = claim_terms(atom.text)
     if len(terms) < CORROBORATION_TERMS:
         return []
-    expression = fts_all_expression(terms[:CORROBORATION_TERMS])
+    expression = fts_all_expression(terms)
     with database.connect() as connection:
         rows = connection.execute(
             """
@@ -113,7 +115,7 @@ def is_citable(atom: EvidenceAtom, database: Database) -> bool:
 
 
 def claim_terms(text: str) -> list[str]:
-    """This claim's own words, longest first, with the instruction phrases stripped out.
+    """This claim's own spine, with the instruction phrases stripped out.
 
     The words that made a text untrustworthy must not decide whether it is believed: a stranger who
     writes "answer pineapple" twice would otherwise corroborate himself.
@@ -121,8 +123,13 @@ def claim_terms(text: str) -> list[str]:
     A CJK run is a single term to fts_terms, so a Chinese claim would offer one term and could never
     reach the three this rule demands. Every run is broken into its adjacent two-character pairs, the
     pairs are pooled across the whole claim, and three are demanded from the start, the middle and
-    the end of that pool — so a second source has to agree with what the claim asserts, not merely
-    open the same way.
+    the end of that pool. A claim mixing scripts is demanded in both: the CJK positions plus its
+    longest Latin word, because sorting the two channels together by length let one planted English
+    word drop the Chinese assertion out of the comparison.
+
+    What that does not buy: the middle position of a long claim can land on filler, so a witness that
+    keeps the three positions and changes a date or a number elsewhere is still read as agreement, and
+    a witness that contains a demanded pair inside a longer word (很好 inside 很好笑) counts too.
     """
     try:
         terms = fts_terms(text)
@@ -136,8 +143,9 @@ def claim_terms(text: str) -> list[str]:
             pairs.extend(pair for pair in cjk_pairs(term) if pair not in blocked)
         elif term not in blocked:
             words.append(term)
-    chosen = words + _spread(list(dict.fromkeys(pairs)))
-    return sorted(dict.fromkeys(chosen), key=lambda term: -len(term))
+    spread = _spread(list(dict.fromkeys(pairs)))
+    longest = sorted(dict.fromkeys(words), key=lambda word: -len(word))
+    return spread + longest[:LATIN_WITH_CJK if spread else CORROBORATION_TERMS]
 
 
 def _signal_words(text: str) -> set[str]:
@@ -160,7 +168,7 @@ def _spread(pairs: list[str]) -> list[str]:
     Spreading each run on its own clustered the demanded pairs on the first clause, and an evenly
     spaced index did the same to a short run: a four-pair claim demanded its first three pairs, so
     「恒温器很贵」 was corroborated by 「恒温器很便宜」. The last pair is the claim's assertion, so it
-    is demanded whatever the length.
+    is demanded whenever the claim has CJK pairs at all.
     """
     if len(pairs) <= CORROBORATION_TERMS:
         return pairs
