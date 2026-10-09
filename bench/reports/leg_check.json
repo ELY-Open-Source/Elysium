@@ -1,6 +1,7 @@
 {
-  "commit": "71733d86d6d27d1f1ebb75205d5e0599f253f791",
-  "schema_version": 8,
+  "commit": "a52c10499b48f171db1ad40f20141acb34028200",
+  "schema_version": 10,
+  "source_schema_version": 9,
   "store": "bench/runs/leg_check/data/ely_eye.sqlite",
   "source_store": "bench/runs/dense_scale",
   "dense_vectors": 153857,
@@ -12,36 +13,151 @@
   },
   "encode_rate": {
     "pictures": 200,
-    "seconds": 11.912494190008147,
-    "per_second": 16.7890952818054
+    "seconds": 10.621729820995824,
+    "per_second": 18.829324730578517
   },
   "probes": 300,
+  "memory_queries": 150,
+  "memory_modality": "conversation",
   "arms": [
     {
       "label": "words only",
       "top_k": 10,
       "dense": false,
       "visual": false,
-      "recall_at_10": 0.8316666666666667,
-      "mrr": 0.6832447089947089,
-      "hit_at_10": 0.8333333333333334,
-      "wilson_lower": 0.7870033503873167,
-      "p50_seconds": 0.0674771249978221,
-      "p95_seconds": 0.14665940315098855,
-      "median_distinct_sources": 4.0,
+      "recall_at_10": 0.8466666666666667,
+      "mrr": 0.6781997354497354,
+      "hit_at_10": 0.8466666666666667,
+      "wilson_lower": 0.8015339429418983,
+      "p50_seconds": 0.08283499400567962,
+      "p95_seconds": 0.15074783855670837,
+      "median_distinct_sources": 7.0,
       "by_modality": {
-        "code": 0.953125,
-        "image": 0.75,
-        "pdf": 0.8488372093023255,
-        "ui_screenshot": 0.5833333333333334,
-        "video": 0.5833333333333334
+        "code": 0.9448818897637795,
+        "conversation": 1.0,
+        "image": 0.72,
+        "pdf": 0.8333333333333334,
+        "ui_screenshot": 0.8181818181818182,
+        "video": 0.4090909090909091
       },
       "modality_counts": {
-        "code": 128,
-        "image": 26,
-        "pdf": 86,
-        "ui_screenshot": 36,
-        "video": 24
+        "code": 127,
+        "conversation": 15,
+        "image": 25,
+        "pdf": 78,
+        "ui_screenshot": 33,
+        "video": 22
+      },
+      "by_category": {
+        "Artistic Performance/Counting Problem/long": 1.0,
+        "Artistic Performance/Counting Problem/short": 0.0,
+        "Artistic Performance/Object Recognition/short": 0.0,
+        "Artistic Performance/Temporal Reasoning/medium": 0.0,
+        "Film & Television/Action Reasoning/long": 0.0,
+        "Film & Television/Action Reasoning/medium": 0.0,
+        "Film & Television/Object Recognition/short": 0.0,
+        "Film & Television/Spatial Perception/short": 0.0,
+        "Knowledge/Action Recognition/medium": 1.0,
+        "Knowledge/Attribute Perception/short": 0.0,
+        "Knowledge/Information Synopsis/short": 0.0,
+        "Knowledge/Object Reasoning/long": 1.0,
+        "Knowledge/Object Reasoning/medium": 1.0,
+        "Life Record/Action Recognition/short": 1.0,
+        "Life Record/Object Recognition/medium": 0.0,
+        "Life Record/Object Recognition/short": 1.0,
+        "Life Record/Temporal Reasoning/long": 1.0,
+        "Multilingual/Object Recognition/long": 1.0,
+        "Multilingual/Object Recognition/short": 0.0,
+        "Sports Competition/Information Synopsis/short": 0.0,
+        "Sports Competition/Object Recognition/short": 1.0,
+        "knowledge-update": 1.0,
+        "multi-session": 1.0,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 1.0,
+        "unlabelled": 0.8745247148288974
+      },
+      "category_counts": {
+        "Artistic Performance/Counting Problem/long": 1,
+        "Artistic Performance/Counting Problem/short": 2,
+        "Artistic Performance/Object Recognition/short": 1,
+        "Artistic Performance/Temporal Reasoning/medium": 1,
+        "Film & Television/Action Reasoning/long": 1,
+        "Film & Television/Action Reasoning/medium": 1,
+        "Film & Television/Object Recognition/short": 1,
+        "Film & Television/Spatial Perception/short": 1,
+        "Knowledge/Action Recognition/medium": 1,
+        "Knowledge/Attribute Perception/short": 1,
+        "Knowledge/Information Synopsis/short": 1,
+        "Knowledge/Object Reasoning/long": 1,
+        "Knowledge/Object Reasoning/medium": 1,
+        "Life Record/Action Recognition/short": 1,
+        "Life Record/Object Recognition/medium": 1,
+        "Life Record/Object Recognition/short": 1,
+        "Life Record/Temporal Reasoning/long": 1,
+        "Multilingual/Object Recognition/long": 1,
+        "Multilingual/Object Recognition/short": 1,
+        "Sports Competition/Information Synopsis/short": 1,
+        "Sports Competition/Object Recognition/short": 1,
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "single-session-assistant": 3,
+        "single-session-preference": 2,
+        "single-session-user": 3,
+        "temporal-reasoning": 2,
+        "unlabelled": 263
+      },
+      "newest_gold_first": 0.42857142857142855,
+      "newest_gold_first_by_category": {
+        "knowledge-update": 0.3333333333333333,
+        "multi-session": 0.5,
+        "temporal-reasoning": 0.5
+      },
+      "newest_gold_first_counts": {
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "temporal-reasoning": 2
+      },
+      "memory": {
+        "queries": 150,
+        "recall_at_10": 0.9158888888888889,
+        "mrr": 0.8230000000000001,
+        "hit_at_10": 0.9533333333333334,
+        "wilson_lower": 0.9068135276008726,
+        "by_modality": {
+          "conversation": 0.9158888888888889
+        },
+        "modality_counts": {
+          "conversation": 150
+        },
+        "by_category": {
+          "knowledge-update": 1.0,
+          "multi-session": 0.8566666666666667,
+          "single-session-assistant": 1.0,
+          "single-session-preference": 0.8,
+          "single-session-user": 0.96,
+          "temporal-reasoning": 0.8786666666666666
+        },
+        "category_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "single-session-assistant": 25,
+          "single-session-preference": 25,
+          "single-session-user": 25,
+          "temporal-reasoning": 25
+        },
+        "newest_gold_first": 0.45588235294117646,
+        "newest_gold_first_by_category": {
+          "knowledge-update": 0.52,
+          "multi-session": 0.4583333333333333,
+          "temporal-reasoning": 0.3684210526315789
+        },
+        "newest_gold_first_counts": {
+          "knowledge-update": 25,
+          "multi-session": 24,
+          "temporal-reasoning": 19
+        }
       }
     },
     {
@@ -49,26 +165,139 @@
       "top_k": 24,
       "dense": false,
       "visual": false,
-      "recall_at_10": 0.8483333333333334,
-      "mrr": 0.6875571326821327,
-      "hit_at_10": 0.85,
-      "wilson_lower": 0.8051823888546709,
-      "p50_seconds": 0.0675995074925595,
-      "p95_seconds": 0.12988004180151622,
-      "median_distinct_sources": 6.0,
+      "recall_at_10": 0.8633333333333333,
+      "mrr": 0.6823932886285827,
+      "hit_at_10": 0.8633333333333333,
+      "wilson_lower": 0.8198445870022494,
+      "p50_seconds": 0.12253823449282208,
+      "p95_seconds": 0.22357540469092782,
+      "median_distinct_sources": 8.0,
       "by_modality": {
-        "code": 0.953125,
-        "image": 0.75,
-        "pdf": 0.8953488372093024,
-        "ui_screenshot": 0.5833333333333334,
-        "video": 0.625
+        "code": 0.9448818897637795,
+        "conversation": 1.0,
+        "image": 0.72,
+        "pdf": 0.8846153846153846,
+        "ui_screenshot": 0.8181818181818182,
+        "video": 0.45454545454545453
       },
       "modality_counts": {
-        "code": 128,
-        "image": 26,
-        "pdf": 86,
-        "ui_screenshot": 36,
-        "video": 24
+        "code": 127,
+        "conversation": 15,
+        "image": 25,
+        "pdf": 78,
+        "ui_screenshot": 33,
+        "video": 22
+      },
+      "by_category": {
+        "Artistic Performance/Counting Problem/long": 1.0,
+        "Artistic Performance/Counting Problem/short": 0.0,
+        "Artistic Performance/Object Recognition/short": 0.0,
+        "Artistic Performance/Temporal Reasoning/medium": 0.0,
+        "Film & Television/Action Reasoning/long": 0.0,
+        "Film & Television/Action Reasoning/medium": 0.0,
+        "Film & Television/Object Recognition/short": 0.0,
+        "Film & Television/Spatial Perception/short": 0.0,
+        "Knowledge/Action Recognition/medium": 1.0,
+        "Knowledge/Attribute Perception/short": 0.0,
+        "Knowledge/Information Synopsis/short": 1.0,
+        "Knowledge/Object Reasoning/long": 1.0,
+        "Knowledge/Object Reasoning/medium": 1.0,
+        "Life Record/Action Recognition/short": 1.0,
+        "Life Record/Object Recognition/medium": 0.0,
+        "Life Record/Object Recognition/short": 1.0,
+        "Life Record/Temporal Reasoning/long": 1.0,
+        "Multilingual/Object Recognition/long": 1.0,
+        "Multilingual/Object Recognition/short": 0.0,
+        "Sports Competition/Information Synopsis/short": 0.0,
+        "Sports Competition/Object Recognition/short": 1.0,
+        "knowledge-update": 1.0,
+        "multi-session": 1.0,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 1.0,
+        "unlabelled": 0.8897338403041825
+      },
+      "category_counts": {
+        "Artistic Performance/Counting Problem/long": 1,
+        "Artistic Performance/Counting Problem/short": 2,
+        "Artistic Performance/Object Recognition/short": 1,
+        "Artistic Performance/Temporal Reasoning/medium": 1,
+        "Film & Television/Action Reasoning/long": 1,
+        "Film & Television/Action Reasoning/medium": 1,
+        "Film & Television/Object Recognition/short": 1,
+        "Film & Television/Spatial Perception/short": 1,
+        "Knowledge/Action Recognition/medium": 1,
+        "Knowledge/Attribute Perception/short": 1,
+        "Knowledge/Information Synopsis/short": 1,
+        "Knowledge/Object Reasoning/long": 1,
+        "Knowledge/Object Reasoning/medium": 1,
+        "Life Record/Action Recognition/short": 1,
+        "Life Record/Object Recognition/medium": 1,
+        "Life Record/Object Recognition/short": 1,
+        "Life Record/Temporal Reasoning/long": 1,
+        "Multilingual/Object Recognition/long": 1,
+        "Multilingual/Object Recognition/short": 1,
+        "Sports Competition/Information Synopsis/short": 1,
+        "Sports Competition/Object Recognition/short": 1,
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "single-session-assistant": 3,
+        "single-session-preference": 2,
+        "single-session-user": 3,
+        "temporal-reasoning": 2,
+        "unlabelled": 263
+      },
+      "newest_gold_first": 0.42857142857142855,
+      "newest_gold_first_by_category": {
+        "knowledge-update": 0.3333333333333333,
+        "multi-session": 0.5,
+        "temporal-reasoning": 0.5
+      },
+      "newest_gold_first_counts": {
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "temporal-reasoning": 2
+      },
+      "memory": {
+        "queries": 150,
+        "recall_at_10": 0.9158888888888889,
+        "mrr": 0.825520590023787,
+        "hit_at_10": 0.9533333333333334,
+        "wilson_lower": 0.9068135276008726,
+        "by_modality": {
+          "conversation": 0.9158888888888889
+        },
+        "modality_counts": {
+          "conversation": 150
+        },
+        "by_category": {
+          "knowledge-update": 1.0,
+          "multi-session": 0.8566666666666667,
+          "single-session-assistant": 1.0,
+          "single-session-preference": 0.8,
+          "single-session-user": 0.96,
+          "temporal-reasoning": 0.8786666666666666
+        },
+        "category_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "single-session-assistant": 25,
+          "single-session-preference": 25,
+          "single-session-user": 25,
+          "temporal-reasoning": 25
+        },
+        "newest_gold_first": 0.463768115942029,
+        "newest_gold_first_by_category": {
+          "knowledge-update": 0.52,
+          "multi-session": 0.48,
+          "temporal-reasoning": 0.3684210526315789
+        },
+        "newest_gold_first_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "temporal-reasoning": 19
+        }
       }
     },
     {
@@ -76,26 +305,139 @@
       "top_k": 30,
       "dense": false,
       "visual": false,
-      "recall_at_10": 0.855,
-      "mrr": 0.6895710215710216,
-      "hit_at_10": 0.8566666666666667,
-      "wilson_lower": 0.8124994228503402,
-      "p50_seconds": 0.07200110949634109,
-      "p95_seconds": 0.15601039270331973,
-      "median_distinct_sources": 6.0,
+      "recall_at_10": 0.8733333333333333,
+      "mrr": 0.6856373362476303,
+      "hit_at_10": 0.8733333333333333,
+      "wilson_lower": 0.8309188299507383,
+      "p50_seconds": 0.08374732300580945,
+      "p95_seconds": 0.157951294999657,
+      "median_distinct_sources": 8.0,
       "by_modality": {
-        "code": 0.953125,
-        "image": 0.75,
-        "pdf": 0.9186046511627907,
-        "ui_screenshot": 0.5833333333333334,
-        "video": 0.625
+        "code": 0.9448818897637795,
+        "conversation": 1.0,
+        "image": 0.72,
+        "pdf": 0.9102564102564102,
+        "ui_screenshot": 0.8181818181818182,
+        "video": 0.5
       },
       "modality_counts": {
-        "code": 128,
-        "image": 26,
-        "pdf": 86,
-        "ui_screenshot": 36,
-        "video": 24
+        "code": 127,
+        "conversation": 15,
+        "image": 25,
+        "pdf": 78,
+        "ui_screenshot": 33,
+        "video": 22
+      },
+      "by_category": {
+        "Artistic Performance/Counting Problem/long": 1.0,
+        "Artistic Performance/Counting Problem/short": 0.0,
+        "Artistic Performance/Object Recognition/short": 0.0,
+        "Artistic Performance/Temporal Reasoning/medium": 0.0,
+        "Film & Television/Action Reasoning/long": 0.0,
+        "Film & Television/Action Reasoning/medium": 0.0,
+        "Film & Television/Object Recognition/short": 0.0,
+        "Film & Television/Spatial Perception/short": 0.0,
+        "Knowledge/Action Recognition/medium": 1.0,
+        "Knowledge/Attribute Perception/short": 0.0,
+        "Knowledge/Information Synopsis/short": 1.0,
+        "Knowledge/Object Reasoning/long": 1.0,
+        "Knowledge/Object Reasoning/medium": 1.0,
+        "Life Record/Action Recognition/short": 1.0,
+        "Life Record/Object Recognition/medium": 0.0,
+        "Life Record/Object Recognition/short": 1.0,
+        "Life Record/Temporal Reasoning/long": 1.0,
+        "Multilingual/Object Recognition/long": 1.0,
+        "Multilingual/Object Recognition/short": 0.0,
+        "Sports Competition/Information Synopsis/short": 1.0,
+        "Sports Competition/Object Recognition/short": 1.0,
+        "knowledge-update": 1.0,
+        "multi-session": 1.0,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 1.0,
+        "unlabelled": 0.8973384030418251
+      },
+      "category_counts": {
+        "Artistic Performance/Counting Problem/long": 1,
+        "Artistic Performance/Counting Problem/short": 2,
+        "Artistic Performance/Object Recognition/short": 1,
+        "Artistic Performance/Temporal Reasoning/medium": 1,
+        "Film & Television/Action Reasoning/long": 1,
+        "Film & Television/Action Reasoning/medium": 1,
+        "Film & Television/Object Recognition/short": 1,
+        "Film & Television/Spatial Perception/short": 1,
+        "Knowledge/Action Recognition/medium": 1,
+        "Knowledge/Attribute Perception/short": 1,
+        "Knowledge/Information Synopsis/short": 1,
+        "Knowledge/Object Reasoning/long": 1,
+        "Knowledge/Object Reasoning/medium": 1,
+        "Life Record/Action Recognition/short": 1,
+        "Life Record/Object Recognition/medium": 1,
+        "Life Record/Object Recognition/short": 1,
+        "Life Record/Temporal Reasoning/long": 1,
+        "Multilingual/Object Recognition/long": 1,
+        "Multilingual/Object Recognition/short": 1,
+        "Sports Competition/Information Synopsis/short": 1,
+        "Sports Competition/Object Recognition/short": 1,
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "single-session-assistant": 3,
+        "single-session-preference": 2,
+        "single-session-user": 3,
+        "temporal-reasoning": 2,
+        "unlabelled": 263
+      },
+      "newest_gold_first": 0.42857142857142855,
+      "newest_gold_first_by_category": {
+        "knowledge-update": 0.3333333333333333,
+        "multi-session": 0.5,
+        "temporal-reasoning": 0.5
+      },
+      "newest_gold_first_counts": {
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "temporal-reasoning": 2
+      },
+      "memory": {
+        "queries": 150,
+        "recall_at_10": 0.9158888888888889,
+        "mrr": 0.8257770002801973,
+        "hit_at_10": 0.9533333333333334,
+        "wilson_lower": 0.9068135276008726,
+        "by_modality": {
+          "conversation": 0.9158888888888889
+        },
+        "modality_counts": {
+          "conversation": 150
+        },
+        "by_category": {
+          "knowledge-update": 1.0,
+          "multi-session": 0.8566666666666667,
+          "single-session-assistant": 1.0,
+          "single-session-preference": 0.8,
+          "single-session-user": 0.96,
+          "temporal-reasoning": 0.8786666666666666
+        },
+        "category_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "single-session-assistant": 25,
+          "single-session-preference": 25,
+          "single-session-user": 25,
+          "temporal-reasoning": 25
+        },
+        "newest_gold_first": 0.463768115942029,
+        "newest_gold_first_by_category": {
+          "knowledge-update": 0.52,
+          "multi-session": 0.48,
+          "temporal-reasoning": 0.3684210526315789
+        },
+        "newest_gold_first_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "temporal-reasoning": 19
+        }
       }
     },
     {
@@ -103,26 +445,139 @@
       "top_k": 10,
       "dense": true,
       "visual": false,
-      "recall_at_10": 0.845,
-      "mrr": 0.6632195767195768,
-      "hit_at_10": 0.8466666666666667,
-      "wilson_lower": 0.8015339429418983,
-      "p50_seconds": 0.4748052095019375,
-      "p95_seconds": 0.5791264187995694,
-      "median_distinct_sources": 5.0,
+      "recall_at_10": 0.86,
+      "mrr": 0.6686600529100529,
+      "hit_at_10": 0.86,
+      "wilson_lower": 0.8161683876490509,
+      "p50_seconds": 0.7133175364942872,
+      "p95_seconds": 0.8329682753508678,
+      "median_distinct_sources": 7.0,
       "by_modality": {
-        "code": 0.9375,
-        "image": 0.75,
-        "pdf": 0.8837209302325582,
-        "ui_screenshot": 0.6388888888888888,
-        "video": 0.625
+        "code": 0.9448818897637795,
+        "conversation": 1.0,
+        "image": 0.68,
+        "pdf": 0.8717948717948718,
+        "ui_screenshot": 0.8484848484848485,
+        "video": 0.45454545454545453
       },
       "modality_counts": {
-        "code": 128,
-        "image": 26,
-        "pdf": 86,
-        "ui_screenshot": 36,
-        "video": 24
+        "code": 127,
+        "conversation": 15,
+        "image": 25,
+        "pdf": 78,
+        "ui_screenshot": 33,
+        "video": 22
+      },
+      "by_category": {
+        "Artistic Performance/Counting Problem/long": 1.0,
+        "Artistic Performance/Counting Problem/short": 0.0,
+        "Artistic Performance/Object Recognition/short": 0.0,
+        "Artistic Performance/Temporal Reasoning/medium": 0.0,
+        "Film & Television/Action Reasoning/long": 1.0,
+        "Film & Television/Action Reasoning/medium": 0.0,
+        "Film & Television/Object Recognition/short": 0.0,
+        "Film & Television/Spatial Perception/short": 0.0,
+        "Knowledge/Action Recognition/medium": 1.0,
+        "Knowledge/Attribute Perception/short": 0.0,
+        "Knowledge/Information Synopsis/short": 0.0,
+        "Knowledge/Object Reasoning/long": 1.0,
+        "Knowledge/Object Reasoning/medium": 1.0,
+        "Life Record/Action Recognition/short": 1.0,
+        "Life Record/Object Recognition/medium": 0.0,
+        "Life Record/Object Recognition/short": 1.0,
+        "Life Record/Temporal Reasoning/long": 1.0,
+        "Multilingual/Object Recognition/long": 1.0,
+        "Multilingual/Object Recognition/short": 0.0,
+        "Sports Competition/Information Synopsis/short": 0.0,
+        "Sports Competition/Object Recognition/short": 1.0,
+        "knowledge-update": 1.0,
+        "multi-session": 1.0,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 1.0,
+        "unlabelled": 0.8859315589353612
+      },
+      "category_counts": {
+        "Artistic Performance/Counting Problem/long": 1,
+        "Artistic Performance/Counting Problem/short": 2,
+        "Artistic Performance/Object Recognition/short": 1,
+        "Artistic Performance/Temporal Reasoning/medium": 1,
+        "Film & Television/Action Reasoning/long": 1,
+        "Film & Television/Action Reasoning/medium": 1,
+        "Film & Television/Object Recognition/short": 1,
+        "Film & Television/Spatial Perception/short": 1,
+        "Knowledge/Action Recognition/medium": 1,
+        "Knowledge/Attribute Perception/short": 1,
+        "Knowledge/Information Synopsis/short": 1,
+        "Knowledge/Object Reasoning/long": 1,
+        "Knowledge/Object Reasoning/medium": 1,
+        "Life Record/Action Recognition/short": 1,
+        "Life Record/Object Recognition/medium": 1,
+        "Life Record/Object Recognition/short": 1,
+        "Life Record/Temporal Reasoning/long": 1,
+        "Multilingual/Object Recognition/long": 1,
+        "Multilingual/Object Recognition/short": 1,
+        "Sports Competition/Information Synopsis/short": 1,
+        "Sports Competition/Object Recognition/short": 1,
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "single-session-assistant": 3,
+        "single-session-preference": 2,
+        "single-session-user": 3,
+        "temporal-reasoning": 2,
+        "unlabelled": 263
+      },
+      "newest_gold_first": 0.42857142857142855,
+      "newest_gold_first_by_category": {
+        "knowledge-update": 0.6666666666666666,
+        "multi-session": 0.0,
+        "temporal-reasoning": 0.5
+      },
+      "newest_gold_first_counts": {
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "temporal-reasoning": 2
+      },
+      "memory": {
+        "queries": 150,
+        "recall_at_10": 0.965,
+        "mrr": 0.8735925925925926,
+        "hit_at_10": 0.98,
+        "wilson_lower": 0.9428533167296139,
+        "by_modality": {
+          "conversation": 0.965
+        },
+        "modality_counts": {
+          "conversation": 150
+        },
+        "by_category": {
+          "knowledge-update": 1.0,
+          "multi-session": 0.92,
+          "single-session-assistant": 1.0,
+          "single-session-preference": 0.96,
+          "single-session-user": 0.96,
+          "temporal-reasoning": 0.95
+        },
+        "category_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "single-session-assistant": 25,
+          "single-session-preference": 25,
+          "single-session-user": 25,
+          "temporal-reasoning": 25
+        },
+        "newest_gold_first": 0.4411764705882353,
+        "newest_gold_first_by_category": {
+          "knowledge-update": 0.4,
+          "multi-session": 0.4583333333333333,
+          "temporal-reasoning": 0.47368421052631576
+        },
+        "newest_gold_first_counts": {
+          "knowledge-update": 25,
+          "multi-session": 24,
+          "temporal-reasoning": 19
+        }
       }
     },
     {
@@ -130,26 +585,139 @@
       "top_k": 30,
       "dense": true,
       "visual": false,
-      "recall_at_10": 0.8583333333333333,
-      "mrr": 0.6686637344137344,
-      "hit_at_10": 0.86,
-      "wilson_lower": 0.8161683876490509,
-      "p50_seconds": 0.41600067100080196,
-      "p95_seconds": 0.5433694835548523,
-      "median_distinct_sources": 7.0,
+      "recall_at_10": 0.8733333333333333,
+      "mrr": 0.6752862924112923,
+      "hit_at_10": 0.8733333333333333,
+      "wilson_lower": 0.8309188299507383,
+      "p50_seconds": 0.5790213440050138,
+      "p95_seconds": 0.7566172773556901,
+      "median_distinct_sources": 9.0,
       "by_modality": {
-        "code": 0.9375,
-        "image": 0.75,
-        "pdf": 0.9186046511627907,
-        "ui_screenshot": 0.6388888888888888,
-        "video": 0.6666666666666666
+        "code": 0.9448818897637795,
+        "conversation": 1.0,
+        "image": 0.68,
+        "pdf": 0.9102564102564102,
+        "ui_screenshot": 0.8484848484848485,
+        "video": 0.5
       },
       "modality_counts": {
-        "code": 128,
-        "image": 26,
-        "pdf": 86,
-        "ui_screenshot": 36,
-        "video": 24
+        "code": 127,
+        "conversation": 15,
+        "image": 25,
+        "pdf": 78,
+        "ui_screenshot": 33,
+        "video": 22
+      },
+      "by_category": {
+        "Artistic Performance/Counting Problem/long": 1.0,
+        "Artistic Performance/Counting Problem/short": 0.0,
+        "Artistic Performance/Object Recognition/short": 0.0,
+        "Artistic Performance/Temporal Reasoning/medium": 0.0,
+        "Film & Television/Action Reasoning/long": 1.0,
+        "Film & Television/Action Reasoning/medium": 0.0,
+        "Film & Television/Object Recognition/short": 0.0,
+        "Film & Television/Spatial Perception/short": 0.0,
+        "Knowledge/Action Recognition/medium": 1.0,
+        "Knowledge/Attribute Perception/short": 0.0,
+        "Knowledge/Information Synopsis/short": 0.0,
+        "Knowledge/Object Reasoning/long": 1.0,
+        "Knowledge/Object Reasoning/medium": 1.0,
+        "Life Record/Action Recognition/short": 1.0,
+        "Life Record/Object Recognition/medium": 0.0,
+        "Life Record/Object Recognition/short": 1.0,
+        "Life Record/Temporal Reasoning/long": 1.0,
+        "Multilingual/Object Recognition/long": 1.0,
+        "Multilingual/Object Recognition/short": 0.0,
+        "Sports Competition/Information Synopsis/short": 1.0,
+        "Sports Competition/Object Recognition/short": 1.0,
+        "knowledge-update": 1.0,
+        "multi-session": 1.0,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 1.0,
+        "unlabelled": 0.8973384030418251
+      },
+      "category_counts": {
+        "Artistic Performance/Counting Problem/long": 1,
+        "Artistic Performance/Counting Problem/short": 2,
+        "Artistic Performance/Object Recognition/short": 1,
+        "Artistic Performance/Temporal Reasoning/medium": 1,
+        "Film & Television/Action Reasoning/long": 1,
+        "Film & Television/Action Reasoning/medium": 1,
+        "Film & Television/Object Recognition/short": 1,
+        "Film & Television/Spatial Perception/short": 1,
+        "Knowledge/Action Recognition/medium": 1,
+        "Knowledge/Attribute Perception/short": 1,
+        "Knowledge/Information Synopsis/short": 1,
+        "Knowledge/Object Reasoning/long": 1,
+        "Knowledge/Object Reasoning/medium": 1,
+        "Life Record/Action Recognition/short": 1,
+        "Life Record/Object Recognition/medium": 1,
+        "Life Record/Object Recognition/short": 1,
+        "Life Record/Temporal Reasoning/long": 1,
+        "Multilingual/Object Recognition/long": 1,
+        "Multilingual/Object Recognition/short": 1,
+        "Sports Competition/Information Synopsis/short": 1,
+        "Sports Competition/Object Recognition/short": 1,
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "single-session-assistant": 3,
+        "single-session-preference": 2,
+        "single-session-user": 3,
+        "temporal-reasoning": 2,
+        "unlabelled": 263
+      },
+      "newest_gold_first": 0.42857142857142855,
+      "newest_gold_first_by_category": {
+        "knowledge-update": 0.6666666666666666,
+        "multi-session": 0.0,
+        "temporal-reasoning": 0.5
+      },
+      "newest_gold_first_counts": {
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "temporal-reasoning": 2
+      },
+      "memory": {
+        "queries": 150,
+        "recall_at_10": 0.965,
+        "mrr": 0.8749183501683501,
+        "hit_at_10": 0.98,
+        "wilson_lower": 0.9428533167296139,
+        "by_modality": {
+          "conversation": 0.965
+        },
+        "modality_counts": {
+          "conversation": 150
+        },
+        "by_category": {
+          "knowledge-update": 1.0,
+          "multi-session": 0.92,
+          "single-session-assistant": 1.0,
+          "single-session-preference": 0.96,
+          "single-session-user": 0.96,
+          "temporal-reasoning": 0.95
+        },
+        "category_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "single-session-assistant": 25,
+          "single-session-preference": 25,
+          "single-session-user": 25,
+          "temporal-reasoning": 25
+        },
+        "newest_gold_first": 0.43478260869565216,
+        "newest_gold_first_by_category": {
+          "knowledge-update": 0.4,
+          "multi-session": 0.44,
+          "temporal-reasoning": 0.47368421052631576
+        },
+        "newest_gold_first_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "temporal-reasoning": 19
+        }
       }
     },
     {
@@ -157,26 +725,139 @@
       "top_k": 10,
       "dense": false,
       "visual": true,
-      "recall_at_10": 0.815,
-      "mrr": 0.5525886243386243,
+      "recall_at_10": 0.8166666666666667,
+      "mrr": 0.5646732804232805,
       "hit_at_10": 0.8166666666666667,
       "wilson_lower": 0.7689713823226987,
-      "p50_seconds": 0.1381109430003562,
-      "p95_seconds": 0.3035783412473393,
-      "median_distinct_sources": 8.0,
+      "p50_seconds": 0.14521063199208584,
+      "p95_seconds": 0.3376805504958611,
+      "median_distinct_sources": 9.0,
       "by_modality": {
-        "code": 0.9296875,
-        "image": 0.75,
-        "pdf": 0.8488372093023255,
-        "ui_screenshot": 0.5277777777777778,
-        "video": 0.5833333333333334
+        "code": 0.889763779527559,
+        "conversation": 1.0,
+        "image": 0.72,
+        "pdf": 0.8333333333333334,
+        "ui_screenshot": 0.7272727272727273,
+        "video": 0.45454545454545453
       },
       "modality_counts": {
-        "code": 128,
-        "image": 26,
-        "pdf": 86,
-        "ui_screenshot": 36,
-        "video": 24
+        "code": 127,
+        "conversation": 15,
+        "image": 25,
+        "pdf": 78,
+        "ui_screenshot": 33,
+        "video": 22
+      },
+      "by_category": {
+        "Artistic Performance/Counting Problem/long": 1.0,
+        "Artistic Performance/Counting Problem/short": 0.0,
+        "Artistic Performance/Object Recognition/short": 0.0,
+        "Artistic Performance/Temporal Reasoning/medium": 1.0,
+        "Film & Television/Action Reasoning/long": 0.0,
+        "Film & Television/Action Reasoning/medium": 0.0,
+        "Film & Television/Object Recognition/short": 0.0,
+        "Film & Television/Spatial Perception/short": 0.0,
+        "Knowledge/Action Recognition/medium": 1.0,
+        "Knowledge/Attribute Perception/short": 0.0,
+        "Knowledge/Information Synopsis/short": 0.0,
+        "Knowledge/Object Reasoning/long": 1.0,
+        "Knowledge/Object Reasoning/medium": 1.0,
+        "Life Record/Action Recognition/short": 1.0,
+        "Life Record/Object Recognition/medium": 0.0,
+        "Life Record/Object Recognition/short": 1.0,
+        "Life Record/Temporal Reasoning/long": 1.0,
+        "Multilingual/Object Recognition/long": 1.0,
+        "Multilingual/Object Recognition/short": 0.0,
+        "Sports Competition/Information Synopsis/short": 0.0,
+        "Sports Competition/Object Recognition/short": 1.0,
+        "knowledge-update": 1.0,
+        "multi-session": 1.0,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 1.0,
+        "unlabelled": 0.8365019011406845
+      },
+      "category_counts": {
+        "Artistic Performance/Counting Problem/long": 1,
+        "Artistic Performance/Counting Problem/short": 2,
+        "Artistic Performance/Object Recognition/short": 1,
+        "Artistic Performance/Temporal Reasoning/medium": 1,
+        "Film & Television/Action Reasoning/long": 1,
+        "Film & Television/Action Reasoning/medium": 1,
+        "Film & Television/Object Recognition/short": 1,
+        "Film & Television/Spatial Perception/short": 1,
+        "Knowledge/Action Recognition/medium": 1,
+        "Knowledge/Attribute Perception/short": 1,
+        "Knowledge/Information Synopsis/short": 1,
+        "Knowledge/Object Reasoning/long": 1,
+        "Knowledge/Object Reasoning/medium": 1,
+        "Life Record/Action Recognition/short": 1,
+        "Life Record/Object Recognition/medium": 1,
+        "Life Record/Object Recognition/short": 1,
+        "Life Record/Temporal Reasoning/long": 1,
+        "Multilingual/Object Recognition/long": 1,
+        "Multilingual/Object Recognition/short": 1,
+        "Sports Competition/Information Synopsis/short": 1,
+        "Sports Competition/Object Recognition/short": 1,
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "single-session-assistant": 3,
+        "single-session-preference": 2,
+        "single-session-user": 3,
+        "temporal-reasoning": 2,
+        "unlabelled": 263
+      },
+      "newest_gold_first": 0.42857142857142855,
+      "newest_gold_first_by_category": {
+        "knowledge-update": 0.3333333333333333,
+        "multi-session": 0.5,
+        "temporal-reasoning": 0.5
+      },
+      "newest_gold_first_counts": {
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "temporal-reasoning": 2
+      },
+      "memory": {
+        "queries": 150,
+        "recall_at_10": 0.9158888888888889,
+        "mrr": 0.8230000000000001,
+        "hit_at_10": 0.9533333333333334,
+        "wilson_lower": 0.9068135276008726,
+        "by_modality": {
+          "conversation": 0.9158888888888889
+        },
+        "modality_counts": {
+          "conversation": 150
+        },
+        "by_category": {
+          "knowledge-update": 1.0,
+          "multi-session": 0.8566666666666667,
+          "single-session-assistant": 1.0,
+          "single-session-preference": 0.8,
+          "single-session-user": 0.96,
+          "temporal-reasoning": 0.8786666666666666
+        },
+        "category_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "single-session-assistant": 25,
+          "single-session-preference": 25,
+          "single-session-user": 25,
+          "temporal-reasoning": 25
+        },
+        "newest_gold_first": 0.45588235294117646,
+        "newest_gold_first_by_category": {
+          "knowledge-update": 0.52,
+          "multi-session": 0.4583333333333333,
+          "temporal-reasoning": 0.3684210526315789
+        },
+        "newest_gold_first_counts": {
+          "knowledge-update": 25,
+          "multi-session": 24,
+          "temporal-reasoning": 19
+        }
       }
     },
     {
@@ -184,26 +865,139 @@
       "top_k": 30,
       "dense": false,
       "visual": true,
-      "recall_at_10": 0.825,
-      "mrr": 0.5507809648412589,
-      "hit_at_10": 0.8266666666666667,
-      "wilson_lower": 0.7797738592974309,
-      "p50_seconds": 0.16669872149941511,
-      "p95_seconds": 0.3142305556466454,
-      "median_distinct_sources": 20.0,
+      "recall_at_10": 0.8476666666666667,
+      "mrr": 0.5375587247956174,
+      "hit_at_10": 0.85,
+      "wilson_lower": 0.8051823888546709,
+      "p50_seconds": 0.21949212049366906,
+      "p95_seconds": 0.36040221269940964,
+      "median_distinct_sources": 22.0,
       "by_modality": {
-        "code": 0.8984375,
-        "image": 0.75,
-        "pdf": 0.9069767441860465,
-        "ui_screenshot": 0.5,
-        "video": 0.7083333333333334
+        "code": 0.889763779527559,
+        "conversation": 0.9533333333333334,
+        "image": 0.72,
+        "pdf": 0.8974358974358975,
+        "ui_screenshot": 0.7878787878787878,
+        "video": 0.5909090909090909
       },
       "modality_counts": {
-        "code": 128,
-        "image": 26,
-        "pdf": 86,
-        "ui_screenshot": 36,
-        "video": 24
+        "code": 127,
+        "conversation": 15,
+        "image": 25,
+        "pdf": 78,
+        "ui_screenshot": 33,
+        "video": 22
+      },
+      "by_category": {
+        "Artistic Performance/Counting Problem/long": 1.0,
+        "Artistic Performance/Counting Problem/short": 0.0,
+        "Artistic Performance/Object Recognition/short": 0.0,
+        "Artistic Performance/Temporal Reasoning/medium": 1.0,
+        "Film & Television/Action Reasoning/long": 0.0,
+        "Film & Television/Action Reasoning/medium": 0.0,
+        "Film & Television/Object Recognition/short": 0.0,
+        "Film & Television/Spatial Perception/short": 1.0,
+        "Knowledge/Action Recognition/medium": 1.0,
+        "Knowledge/Attribute Perception/short": 0.0,
+        "Knowledge/Information Synopsis/short": 1.0,
+        "Knowledge/Object Reasoning/long": 1.0,
+        "Knowledge/Object Reasoning/medium": 1.0,
+        "Life Record/Action Recognition/short": 1.0,
+        "Life Record/Object Recognition/medium": 0.0,
+        "Life Record/Object Recognition/short": 1.0,
+        "Life Record/Temporal Reasoning/long": 1.0,
+        "Multilingual/Object Recognition/long": 1.0,
+        "Multilingual/Object Recognition/short": 0.0,
+        "Sports Competition/Information Synopsis/short": 1.0,
+        "Sports Competition/Object Recognition/short": 1.0,
+        "knowledge-update": 1.0,
+        "multi-session": 0.75,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 0.9,
+        "unlabelled": 0.8631178707224335
+      },
+      "category_counts": {
+        "Artistic Performance/Counting Problem/long": 1,
+        "Artistic Performance/Counting Problem/short": 2,
+        "Artistic Performance/Object Recognition/short": 1,
+        "Artistic Performance/Temporal Reasoning/medium": 1,
+        "Film & Television/Action Reasoning/long": 1,
+        "Film & Television/Action Reasoning/medium": 1,
+        "Film & Television/Object Recognition/short": 1,
+        "Film & Television/Spatial Perception/short": 1,
+        "Knowledge/Action Recognition/medium": 1,
+        "Knowledge/Attribute Perception/short": 1,
+        "Knowledge/Information Synopsis/short": 1,
+        "Knowledge/Object Reasoning/long": 1,
+        "Knowledge/Object Reasoning/medium": 1,
+        "Life Record/Action Recognition/short": 1,
+        "Life Record/Object Recognition/medium": 1,
+        "Life Record/Object Recognition/short": 1,
+        "Life Record/Temporal Reasoning/long": 1,
+        "Multilingual/Object Recognition/long": 1,
+        "Multilingual/Object Recognition/short": 1,
+        "Sports Competition/Information Synopsis/short": 1,
+        "Sports Competition/Object Recognition/short": 1,
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "single-session-assistant": 3,
+        "single-session-preference": 2,
+        "single-session-user": 3,
+        "temporal-reasoning": 2,
+        "unlabelled": 263
+      },
+      "newest_gold_first": 0.42857142857142855,
+      "newest_gold_first_by_category": {
+        "knowledge-update": 0.3333333333333333,
+        "multi-session": 0.5,
+        "temporal-reasoning": 0.5
+      },
+      "newest_gold_first_counts": {
+        "knowledge-update": 3,
+        "multi-session": 2,
+        "temporal-reasoning": 2
+      },
+      "memory": {
+        "queries": 150,
+        "recall_at_10": 0.8662222222222222,
+        "mrr": 0.5736806113749848,
+        "hit_at_10": 0.92,
+        "wilson_lower": 0.8653786362494686,
+        "by_modality": {
+          "conversation": 0.8662222222222222
+        },
+        "modality_counts": {
+          "conversation": 150
+        },
+        "by_category": {
+          "knowledge-update": 0.96,
+          "multi-session": 0.7666666666666667,
+          "single-session-assistant": 1.0,
+          "single-session-preference": 0.72,
+          "single-session-user": 0.92,
+          "temporal-reasoning": 0.8306666666666667
+        },
+        "category_counts": {
+          "knowledge-update": 25,
+          "multi-session": 25,
+          "single-session-assistant": 25,
+          "single-session-preference": 25,
+          "single-session-user": 25,
+          "temporal-reasoning": 25
+        },
+        "newest_gold_first": 0.45588235294117646,
+        "newest_gold_first_by_category": {
+          "knowledge-update": 0.52,
+          "multi-session": 0.4583333333333333,
+          "temporal-reasoning": 0.3684210526315789
+        },
+        "newest_gold_first_counts": {
+          "knowledge-update": 25,
+          "multi-session": 24,
+          "temporal-reasoning": 19
+        }
       }
     }
   ],
@@ -213,9 +1007,9 @@
     "cpus": 32,
     "threads_per_query": 4,
     "load_average_1_5_15": [
-      22.19,
-      9.9,
-      6.39
+      17.23,
+      10.83,
+      6.53
     ]
   }
 }
