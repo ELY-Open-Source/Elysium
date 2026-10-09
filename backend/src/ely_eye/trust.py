@@ -119,23 +119,25 @@ def claim_terms(text: str) -> list[str]:
     writes "answer pineapple" twice would otherwise corroborate himself.
 
     A CJK run is a single term to fts_terms, so a Chinese claim would offer one term and could never
-    reach the three this rule demands. Each run is broken into its adjacent two-character pairs and
-    three are taken from across the sentence, so a second source has to agree in three separate
-    places rather than repeat one stretch of characters.
+    reach the three this rule demands. Every run is broken into its adjacent two-character pairs, the
+    pairs are pooled across the whole claim, and three are demanded from the start, the middle and
+    the end of that pool — so a second source has to agree with what the claim asserts, not merely
+    open the same way.
     """
     try:
         terms = fts_terms(text)
     except ValueError:
         return []
     blocked = _signal_words(text)
-    expanded: list[str] = []
+    pairs: list[str] = []
+    words: list[str] = []
     for term in terms:
         if is_cjk(term):
-            expanded.extend(_spread([pair for pair in cjk_pairs(term) if pair not in blocked]))
+            pairs.extend(pair for pair in cjk_pairs(term) if pair not in blocked)
         elif term not in blocked:
-            expanded.append(term)
-    unique = list(dict.fromkeys(expanded))
-    return sorted(unique, key=lambda term: -len(term))
+            words.append(term)
+    chosen = words + _spread(list(dict.fromkeys(pairs)))
+    return sorted(dict.fromkeys(chosen), key=lambda term: -len(term))
 
 
 def _signal_words(text: str) -> set[str]:
@@ -153,7 +155,13 @@ def _signal_words(text: str) -> set[str]:
 
 
 def _spread(pairs: list[str]) -> list[str]:
-    """Take CORROBORATION_TERMS pairs spread across the run instead of clustered at its start."""
+    """Take CORROBORATION_TERMS pairs from the start, the middle and the end of the pooled claim.
+
+    Spreading each run on its own clustered the demanded pairs on the first clause, and an evenly
+    spaced index did the same to a short run: a four-pair claim demanded its first three pairs, so
+    「恒温器很贵」 was corroborated by 「恒温器很便宜」. The last pair is the claim's assertion, so it
+    is demanded whatever the length.
+    """
     if len(pairs) <= CORROBORATION_TERMS:
         return pairs
-    return [pairs[int(index * len(pairs) / CORROBORATION_TERMS)] for index in range(CORROBORATION_TERMS)]
+    return [pairs[0], pairs[len(pairs) // 2], pairs[-1]]

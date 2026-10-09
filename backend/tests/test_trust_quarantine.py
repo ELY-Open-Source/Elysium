@@ -176,10 +176,43 @@ def test_a_chinese_claim_becomes_citable_when_another_source_repeats_it(settings
     assert is_citable(stranger, Database(settings)), "a Chinese sentence is compared by its characters"
 
 
-def test_a_chinese_paraphrase_that_rewords_the_claim_is_not_a_second_witness(settings: Settings) -> None:
+def test_a_chinese_restatement_that_keeps_the_compared_pairs_is_a_second_witness(settings: Settings) -> None:
     stranger = remember(settings, CHINESE_CLAIM, origin=MemoryOrigin.third_party, holder="vendor")
     remember(settings, "恒温器一直放在档案室，读数十八度", holder="husband")
+    assert is_citable(stranger, Database(settings)), "a second source that keeps the opening, the middle and the tail agrees in three places"
+
+
+def test_a_chinese_rewording_that_replaces_the_compared_pairs_is_not_a_second_witness(settings: Settings) -> None:
+    stranger = remember(settings, CHINESE_CLAIM, origin=MemoryOrigin.third_party, holder="vendor")
+    remember(settings, "档案室里的温控装置固定在十八摄氏度", holder="husband")
     assert not is_citable(stranger, Database(settings)), "corroboration weighs shared wording, not shared meaning"
+
+
+def test_a_witness_that_denies_the_claim_does_not_vouch_for_it(settings: Settings) -> None:
+    expensive = remember(settings, "恒温器很贵", origin=MemoryOrigin.third_party, holder="vendor")
+    remember(settings, "恒温器很便宜", holder="husband")
+    worth_it = remember(settings, "这房子值得买", origin=MemoryOrigin.third_party, holder="dealer")
+    remember(settings, "这房子不值得买", holder="wife")
+    assert not is_citable(expensive, Database(settings)), "the demanded pairs include the assertion, not only the topic"
+    assert not is_citable(worth_it, Database(settings)), "a witness that denies the claim is not a second witness"
+
+
+def test_a_witness_that_only_repeats_the_opening_of_a_claim_does_not_vouch_for_it(settings: Settings) -> None:
+    claim = "今天天气很好，股票涨了三千点，我全仓买入"
+    stranger = remember(settings, claim, origin=MemoryOrigin.third_party, holder="vendor")
+    remember(settings, "今天天气很好", holder="husband")
+    assert not is_citable(stranger, Database(settings)), "an unrelated memory that merely opens the same way is not agreement"
+
+
+def test_a_witness_that_negates_one_word_is_still_read_as_agreement(settings: Settings) -> None:
+    stranger = remember(
+        settings,
+        "The thermostat in the archive holds eighteen degrees",
+        origin=MemoryOrigin.third_party,
+        holder="vendor",
+    )
+    remember(settings, "The thermostat in the archive does not hold eighteen degrees", holder="husband")
+    assert is_citable(stranger, Database(settings)), "the rule compares words, and a denial differs from its claim by one of them"
 
 
 def test_a_chinese_instruction_cannot_vouch_for_its_own_characters(settings: Settings) -> None:
