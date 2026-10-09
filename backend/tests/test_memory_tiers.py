@@ -204,3 +204,19 @@ def test_importance_is_a_stated_value_and_not_a_free_number(tmp_path) -> None:
             holder_id="wife",
             importance=1.5,
         )
+
+
+def test_a_restore_counts_the_memories_it_brought_back_and_only_those(tmp_path) -> None:
+    service, database = _service(tmp_path)
+    settings = Settings(home=tmp_path, default_holder="wife")
+    retrieval = RetrievalService(settings=settings, database=database)
+    archived = _remember(service, "我们的钥匙放在玄关抽屉里")
+    standing = _remember(service, "恒温器设定 22 度", importance=0.9)
+
+    service.archive_stale(older_than_days=0, at=NOW + timedelta(days=365), max_importance=0.5)
+
+    assert service.restore([archived]) == 1
+    assert [hit.atom.atom_id for hit in retrieval.search("钥匙", filters=SearchFilters(as_holder="wife")).hits] == [archived]
+    assert service.restore([standing, archived]) == 0, (
+        "a memory that was never archived, or came back already, changed nothing and says so"
+    )

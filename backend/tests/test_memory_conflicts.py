@@ -147,3 +147,77 @@ def test_a_conflict_belongs_to_the_memory_it_was_found_in(tmp_path) -> None:
     assert service.conflicts("wife") == [], (
         "one side is gone, so there is nothing left to settle and no ghost row to list"
     )
+
+
+def _lane(tmp_path, texts: list[str], *, scenario: str = "home") -> tuple[MemoryService, Database]:
+    settings = Settings(home=tmp_path, default_holder="wife")
+    database = Database(settings)
+    database.init()
+    service = MemoryService(settings=settings, database=database)
+    for text in texts:
+        service.remember(text, holder_id="wife", origin=MemoryOrigin.self_, scenario=scenario)
+    return service, database
+
+
+def _search(tmp_path, database: Database, query: str) -> list[str]:
+    retrieval = RetrievalService(settings=Settings(home=tmp_path, default_holder="wife"), database=database)
+    return [hit.atom.text for hit in retrieval.search(query, filters=SearchFilters(as_holder="wife")).hits]
+
+
+def test_two_rooms_each_keep_their_own_number(tmp_path) -> None:
+    service, database = _lane(tmp_path, ["客厅的恒温器调到 22 度", "卧室的恒温器调到 24 度"])
+
+    assert service.conflicts("wife") == [], "they share the verb 调到 and disagree about nothing"
+    assert _search(tmp_path, database, "客厅") == ["客厅的恒温器调到 22 度"], (
+        "asking about the living room must not answer with the bedroom's reading"
+    )
+
+
+def test_two_people_each_keep_their_own_count(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["她买了 3 本书", "他买了 5 本书"])
+
+    assert service.conflicts("wife") == [], "two buyers are two facts, not one moving count"
+
+
+def test_one_router_moving_its_counter_is_a_conflict(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["The router forwards 220 packets", "The router forwards 240 packets"])
+
+    clashes = service.conflicts("wife")
+
+    assert len(clashes) == 1
+    assert clashes[0].terms == ["router"], "the subject both memories lead with is what the pair disagrees about"
+    assert (clashes[0].older_value, clashes[0].newer_value) == ("220", "240")
+
+
+def test_the_same_subject_measuring_two_things_still_reads_as_one_quantity(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["恒温器设定 22 度", "恒温器功率 100 瓦"])
+
+    assert len(service.conflicts("wife")) == 1, (
+        "the store compares labels, not meanings: 设定 and 功率 both hang off 恒温, so this pair is "
+        "recorded as one moving quantity and the holder is the one who settles it"
+    )
+
+
+def test_a_memory_that_leads_with_a_number_has_no_subject_to_conflict_on(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["22 度", "24 度"])
+
+    assert service.conflicts("wife") == [], "with no subject named the store cannot claim they are one thing"
+
+
+def test_a_qualifier_on_the_subject_reads_as_a_different_thing(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["恒温器调到 22 度", "客厅的恒温器调到 24 度"])
+
+    assert service.conflicts("wife") == [], (
+        "the store compares labels, not meanings: adding 客厅 moves the subject, so the update is "
+        "kept as a second fact rather than noticed as a disagreement — nothing is hidden, and "
+        "supersede is still how the holder says which one stands"
+    )
+
+
+def test_the_first_number_under_a_label_is_the_value_that_is_compared(tmp_path) -> None:
+    service, _ = _lane(tmp_path, ["2026 saw 3 releases", "2026 saw 5 releases"])
+
+    assert service.conflicts("wife") == [], (
+        "the year leads, so it is what the subject's value records; a count that moves behind it "
+        "is not noticed — the store names one quantity per label, not every quantity in a sentence"
+    )

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from unicodedata import normalize
 
@@ -195,7 +196,28 @@ def _spread(pairs: list[str]) -> list[str]:
     return [pairs[0], pairs[len(pairs) // 2], pairs[-1]]
 
 
-def numeric_values(text: str) -> dict[str, str]:
+@dataclass(frozen=True)
+class StatedNumbers:
+    """What a memory leads with, and every number it states keyed by the label it hangs on.
+
+    The subject is kept apart from the other labels because a shared label alone does not make two
+    memories disagree about one thing: see ``quantity_conflict``.
+    """
+
+    subject: str
+    values: dict[str, str]
+
+
+@dataclass(frozen=True)
+class QuantityConflict:
+    """One quantity two memories state differently, named by its label and both values."""
+
+    term: str
+    older_value: str
+    newer_value: str
+
+
+def numeric_values(text: str) -> StatedNumbers:
     """Every number a memory states, keyed by what it measures, so a moving value can be named.
 
     A number is attributed twice: to the subject the memory leads with, and to the content word
@@ -206,8 +228,14 @@ def numeric_values(text: str) -> dict[str, str]:
     try:
         tokens = fts_terms(text)
     except ValueError:
-        return {}
-    subject = _label(tokens[0], first=True) if tokens else ""
+        return StatedNumbers(subject="", values={})
+    subject = ""
+    for token in tokens:
+        # An English memory usually opens with an article, and a subject behind one is still the
+        # subject: 「The router forwards 220 packets」 leads with its router, not with 「the」.
+        subject = _label(token, first=True)
+        if subject:
+            break
     values: dict[str, str] = {}
     beside = ""
     for token in tokens:
@@ -220,11 +248,36 @@ def numeric_values(text: str) -> dict[str, str]:
                 values.setdefault(subject, value)
             if beside:
                 values.setdefault(beside, value)
-    return values
+    return StatedNumbers(subject=subject, values=values)
+
+
+def quantity_conflict(older_text: str, newer_text: str) -> QuantityConflict | None:
+    """The quantity two memories state differently, but only while they lead with the same subject.
+
+    A shared predicate is not enough. 「客厅的恒温器调到 22 度」 and 「卧室的恒温器调到 24 度」
+    share 「调到」 and disagree about nothing: they are two thermostats, each steady at its own
+    number. Requiring the same leading subject lets each keep its own reading and still catches one
+    thermostat moving. What that does not buy: two memories that lead with the same subject and
+    measure different things — 「恒温器设定 22 度」 and 「恒温器功率 100 瓦」 — still read as one
+    moving quantity, because the store compares labels, not meanings.
+    """
+    older = numeric_values(older_text)
+    newer = numeric_values(newer_text)
+    if not older.subject or older.subject != newer.subject:
+        return None
+    subject = older.subject
+    if subject in newer.values and _as_float(older.values[subject]) != _as_float(newer.values[subject]):
+        # The subject carries the value here, so it is named rather than whichever shared label
+        # sorts first: 「router」 is what the pair disagrees about, not the verb beside it.
+        return QuantityConflict(term=subject, older_value=older.values[subject], newer_value=newer.values[subject])
+    term = conflicting_number(older.values, newer.values)
+    if term is None:
+        return None
+    return QuantityConflict(term=term, older_value=older.values[term], newer_value=newer.values[term])
 
 
 def conflicting_number(older: dict[str, str], newer: dict[str, str]) -> str | None:
-    """The one quantity both memories state a different value for, or None if they do not disagree.
+    """The one label both sides state a different value for, or None if they do not disagree.
 
     Only a shared label counts: two memories that each mention a number are not in conflict until
     they name the same thing. The label is reported, not the verdict — which side is current is a
@@ -244,9 +297,10 @@ def _as_float(value: str) -> float:
 def _label(token: str, *, first: bool = False) -> str:
     """The content word a number hangs on: a CJK run's two-character tail, or a plain Latin word.
 
-    The subject of a memory is read from the head of its first run instead, because two memories
-    about the same thing usually phrase the rest differently: 「恒温器放在书房，设定 22 度」 and
-    「恒温器调到 24 度」 share only their subject, and that is the label which makes them disagree.
+    The subject of a memory is read from the head of its first content run instead, because two
+    memories about the same thing usually phrase the rest differently: 「恒温器放在书房，设定 22 度」
+    and 「恒温器调到 24 度」 share only their subject, and that is the label which makes them
+    disagree.
     """
     letters = "".join(char for char in token if is_cjk(char))
     if letters:

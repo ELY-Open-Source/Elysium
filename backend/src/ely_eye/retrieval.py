@@ -185,7 +185,10 @@ class RetrievalService:
 
         Both memories stay in the store and this only filters the page; the conflict row names
         which side was dropped and why. Settling is the holder's call, and until it happens the
-        newer statement is what a reader should be shown.
+        newer statement is what a reader should be shown. Only a pair seen whole is settled: the
+        page is ranked from a window wider than itself, so both sides normally arrive together,
+        and an answer that never recalled the newer memory leaves the older value standing —
+        stale, but not silently contradicted by nothing.
         """
         losers = lifecycle_store.losing_sides(self.db, [hit.atom.atom_id for hit in hits])
         if not losers:

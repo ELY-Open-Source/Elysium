@@ -137,18 +137,18 @@ class MemoryService:
         """A number that moves inside one holder's scenario is a disagreement, not a second fact.
 
         Only a memory that replaces nothing can start a conflict: a supersede has already
-        picked a side, and recording it as unresolved would contradict that.
+        picked a side, and recording it as unresolved would contradict that. And only a memory that
+        leads with the same subject as its neighbour: two rooms' thermostats are two facts.
         """
         if atom.supersedes:
             return
-        stated = trust.numeric_values(atom.text)
-        if not stated:
+        if not trust.numeric_values(atom.text).values:
             return
         for earlier in lifecycle_store.lane_atoms(self.db, atom.holder_id, atom.scenario):
             if earlier.atom_id == atom.atom_id:
                 continue
-            term = trust.conflicting_number(trust.numeric_values(earlier.text), stated)
-            if term is None:
+            clash = trust.quantity_conflict(earlier.text, atom.text)
+            if clash is None:
                 continue
             lifecycle_store.record_conflict(
                 self.db,
@@ -156,9 +156,9 @@ class MemoryService:
                 newer_atom_id=atom.atom_id,
                 holder_id=atom.holder_id,
                 scenario=atom.scenario,
-                terms=[term],
-                older_value=trust.numeric_values(earlier.text)[term],
-                newer_value=stated[term],
+                terms=[clash.term],
+                older_value=clash.older_value,
+                newer_value=clash.newer_value,
                 detected_at=utc_now(),
             )
 
@@ -360,7 +360,7 @@ class MemoryService:
         moved = 0 if dry_run else lifecycle_store.archive_atoms(self.db, candidates, moment)
         if not dry_run and moved != len(candidates):
             raise ValueError(f"{len(candidates)} memories were chosen for the archive but {moved} were moved")
-        floor = "any importance" if max_importance is None else f"importance at or under {max_importance}"
+        floor = "any importance" if max_importance is None else f"importance unset or at or under {max_importance}"
         return ArchiveReport(
             atom_ids=candidates,
             archived_at=moment,

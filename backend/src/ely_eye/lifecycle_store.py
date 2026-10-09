@@ -163,7 +163,12 @@ def open_conflicts(database: Database, holder_id: str | None = None) -> list[Con
 
 
 def losing_sides(database: Database, atom_ids: list[str]) -> dict[str, str]:
-    """Among these atoms, which lost to a newer one in a conflict nobody resolved."""
+    """Among these atoms, which lost to a newer one in a conflict nobody resolved.
+
+    Both sides have to be in the list. A conflict is a claim about a pair, so an unresolved pair
+    that arrives whole is settled by dropping the older side; if only the older side turned up, the
+    store has not seen the replacement in this answer and says nothing about it.
+    """
     if not atom_ids:
         return {}
     payload = to_json(atom_ids)
@@ -211,11 +216,17 @@ def archive_atoms(database: Database, atom_ids: list[str], at: datetime) -> int:
 
 
 def restore_atoms(database: Database, atom_ids: list[str]) -> int:
+    """Bring archived memories back, counting only the rows that were actually archived.
+
+    An id that was never archived changed nothing, so it is not counted: a report that says
+    「restored 1」 has to mean one memory came back.
+    """
     if not atom_ids:
         return 0
     with database.connect() as connection:
         cursor = connection.execute(
-            "UPDATE atoms SET archived_at = NULL WHERE atom_id IN (SELECT value FROM json_each(?))",
+            "UPDATE atoms SET archived_at = NULL"
+            " WHERE archived_at IS NOT NULL AND atom_id IN (SELECT value FROM json_each(?))",
             (to_json(atom_ids),),
         )
     return int(cursor.rowcount)
