@@ -36,29 +36,50 @@ def search_atoms(
     modality: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    as_of: datetime | None = None,
     min_trust: float | None = None,
     cartridge_ids: list[str] | None = None,
     as_holder: str | None = None,
 ) -> FtsPage:
-    """BM25 over the FTS index joined to memories that are open right now and readable by the asker.
+    """BM25 over the FTS index joined to memories that answer for the moment being asked about.
 
     Every filter is a `? IS NULL OR` predicate in one literal statement: the ranking never
     depends on string-built SQL, and the planner sees one shape. A memory with no event time
     cannot answer a time filter, so it drops out when one is asked for.
+
+    With no `as_of` the join repeats `v_atoms_current` in place of the view — same rule, asked
+    through the atom_id index instead of a scan. With one, the question is what was true then,
+    so a memory retired since still answers and `archived_at` (a storage tier, not a claim about
+    the world) is ignored.
 
     `as_holder` applies the sharing rule in three states: a holder id sees its own memories, the
     ones naming it in visible_to, the ones marked for everyone, and the ones nobody owns; the
     empty string is a caller who is nobody, so only the last two; None runs over the whole
     library, which is what an operator or a process that owns the store reads with. A memory with
     no holder cannot be private to a holder that does not exist."""
+    as_of_iso = None if as_of is None else as_of.isoformat()
     with database.connect() as connection:
         expression = fts_expression(rare_terms(connection, fts_terms(query)))
         rows = connection.execute(
             """
             SELECT f.atom_id, bm25(atom_fts) AS score
             FROM atom_fts AS f
-            JOIN v_atoms_current AS a ON a.atom_id = f.atom_id
+            JOIN atoms AS a ON a.atom_id = f.atom_id
             WHERE atom_fts MATCH ?
+              AND (
+                    (? IS NULL
+                        AND a.valid_to IS NULL
+                        AND a.archived_at IS NULL
+                        AND (a.valid_from IS NULL
+                             OR a.valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
+                        AND (a.retention_until IS NULL
+                             OR a.retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')))
+                    OR (? IS NOT NULL
+                        AND (a.valid_from IS NULL OR a.valid_from <= ?)
+                        AND (a.valid_to IS NULL OR a.valid_to > ?)
+                        AND (a.event_time IS NULL OR a.event_time <= ?)
+                        AND (a.retention_until IS NULL OR a.retention_until > ?))
+              )
               AND (? IS NULL OR a.holder_id = ?)
               AND (? IS NULL OR a.scenario = ?)
               AND (? IS NULL OR a.source_id = ?)
@@ -91,6 +112,12 @@ def search_atoms(
             """,
             (
                 expression,
+                as_of_iso,
+                as_of_iso,
+                as_of_iso,
+                as_of_iso,
+                as_of_iso,
+                as_of_iso,
                 holder,
                 holder,
                 scenario,

@@ -61,7 +61,10 @@ class VectorIndex:
     """One float32 vector per current atom: the writer keeps it, the reader asks it questions."""
 
     def __init__(
-        self, settings: Settings | None = None, database: Database | None = None, embeddings: EmbeddingService | None = None
+        self,
+        settings: Settings | None = None,
+        database: Database | None = None,
+        embeddings: EmbeddingService | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
@@ -99,7 +102,12 @@ class VectorIndex:
             self.ensure(connection, dim)
             stale = self._stale(connection)
             if not stale:
-                return {"encoded": 0, "dim": dim, "model": self.settings.embedding_model_id, "seconds": 0.0}
+                return {
+                    "encoded": 0,
+                    "dim": dim,
+                    "model": self.settings.embedding_model_id,
+                    "seconds": 0.0,
+                }
             vectors = self.embeddings.encode_atoms([atom for _, atom in stale])
             self._write(connection, stale, vectors)
         return {
@@ -124,10 +132,18 @@ class VectorIndex:
             self.ensure(connection, dim)
             current = self._current(connection, wanted)
             kept = {atom_id for atom_id, _ in current}
-            dropped = self._delete(connection, [atom_id for atom_id in wanted if atom_id not in kept])
+            dropped = self._delete(
+                connection, [atom_id for atom_id in wanted if atom_id not in kept]
+            )
             if current:
-                self._write(connection, current, self.embeddings.encode_atoms([atom for _, atom in current]))
-        return {"encoded": len(current), "dropped": dropped, "seconds": round(time.monotonic() - started, 3)}
+                self._write(
+                    connection, current, self.embeddings.encode_atoms([atom for _, atom in current])
+                )
+        return {
+            "encoded": len(current),
+            "dropped": dropped,
+            "seconds": round(time.monotonic() - started, 3),
+        }
 
     def search(
         self,
@@ -140,6 +156,7 @@ class VectorIndex:
         modality: str | None = None,
         since: str | None = None,
         until: str | None = None,
+        as_of: str | None = None,
         cartridge_ids: list[str] | None = None,
         as_holder: str | None = None,
     ) -> dict[str, float]:
@@ -156,7 +173,9 @@ class VectorIndex:
         """
         if limit <= 0:
             raise ValueError(f"dense search needs a positive limit, got {limit}")
-        scope = None if cartridge_ids is None else sorted(atoms_of_cartridges(self.db, cartridge_ids))
+        scope = (
+            None if cartridge_ids is None else sorted(atoms_of_cartridges(self.db, cartridge_ids))
+        )
         if scope == []:
             return {}
         narrow = to_json(scope) if scope is not None and len(scope) <= SCOPE_NARROW_MAX else None
@@ -178,10 +197,13 @@ class VectorIndex:
                     modality=modality,
                     since=since,
                     until=until,
+                    as_of=as_of,
                     cartridge_ids=cartridge_ids,
                     as_holder=as_holder,
                 )
-                hits = {atom_id: 1.0 - distance for atom_id, distance in ranked if atom_id in allowed}
+                hits = {
+                    atom_id: 1.0 - distance for atom_id, distance in ranked if atom_id in allowed
+                }
                 # A filter that keeps little of the ask means more answers sit further out; one wider round buys them, bounded by the ceiling.
                 if len(hits) >= limit or len(ranked) < asked or asked >= CANDIDATE_CEILING:
                     break
@@ -216,6 +238,7 @@ class VectorIndex:
         modality: str | None,
         since: str | None,
         until: str | None,
+        as_of: str | None,
         cartridge_ids: list[str] | None,
         as_holder: str | None,
     ) -> set[str]:
@@ -223,7 +246,10 @@ class VectorIndex:
 
         The currency rules repeat `v_atoms_current` here on purpose: the view answers this
         question with a full scan (77ms over 153,857 atoms) while the atoms table answers it
-        through the atom_id index in 0.2ms, and a search cannot afford the scan. The scope is
+        through the atom_id index in 0.2ms, and a search cannot afford the scan. An `as_of`
+        replaces that rule with the window that was true then, retired memories included, and
+        ignores `archived_at` because archival is a storage tier rather than a claim about the
+        world. The scope is
         checked here rather than in the engine so the rule lives in one place; the engine's id
         list is only a narrowing. Visibility is here too, and it reads the same three states the
         words leg reads: a holder id, the empty string for a caller who is nobody (unowned rows
@@ -233,10 +259,20 @@ class VectorIndex:
             """
             SELECT atom_id FROM atoms
             WHERE atom_id IN (SELECT value FROM json_each(?))
-              AND archived_at IS NULL
-              AND (valid_to IS NULL OR valid_to > strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
-              AND (valid_from IS NULL OR valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
-              AND (retention_until IS NULL OR retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
+              AND (
+                    (? IS NULL
+                        AND archived_at IS NULL
+                        AND (valid_to IS NULL OR valid_to > strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
+                        AND (valid_from IS NULL
+                             OR valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
+                        AND (retention_until IS NULL
+                             OR retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')))
+                    OR (? IS NOT NULL
+                        AND (valid_from IS NULL OR valid_from <= ?)
+                        AND (valid_to IS NULL OR valid_to > ?)
+                        AND (event_time IS NULL OR event_time <= ?)
+                        AND (retention_until IS NULL OR retention_until > ?))
+              )
               AND (? IS NULL OR holder_id = ?)
               AND (? IS NULL OR scenario = ?)
               AND (? IS NULL OR source_id = ?)
@@ -259,6 +295,12 @@ class VectorIndex:
             """,
             (
                 to_json(atom_ids),
+                as_of,
+                as_of,
+                as_of,
+                as_of,
+                as_of,
+                as_of,
                 holder,
                 holder,
                 scenario,
@@ -290,7 +332,14 @@ class VectorIndex:
         with self.db.connect() as connection:
             meta = self._meta(connection)
             if not meta:
-                return {"built": False, "format": None, "dim": 0, "vectors": 0, "expected": 0, "pending": 0}
+                return {
+                    "built": False,
+                    "format": None,
+                    "dim": 0,
+                    "vectors": 0,
+                    "expected": 0,
+                    "pending": 0,
+                }
             rows = connection.execute("SELECT count(*) AS n FROM vec_atoms").fetchone()["n"]
             expected = _expected(connection)
             pending = len(self._stale(connection))
@@ -355,12 +404,15 @@ class VectorIndex:
             raise ValueError(f"sync encoded {len(vectors)} vectors for {len(items)} atoms")
         matrix = np.asarray(vectors, dtype=np.float32)
         if matrix.ndim != 2 or matrix.shape[1] != self._dim(connection):
-            raise ValueError(f"sync produced a {matrix.shape} matrix, expected one row per atom at the stored width")
+            raise ValueError(
+                f"sync produced a {matrix.shape} matrix, expected one row per atom at the stored width"
+            )
         ids = [atom_id for atom_id, _ in items]
         for start in range(0, len(ids), DELETE_CHUNK):
             stop = min(start + DELETE_CHUNK, len(ids))
             connection.execute(
-                "DELETE FROM vec_atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(ids[start:stop]),)
+                "DELETE FROM vec_atoms WHERE atom_id IN (SELECT value FROM json_each(?))",
+                (to_json(ids[start:stop]),),
             )
         for start in range(0, len(items), BATCH):
             stop = min(start + BATCH, len(items))

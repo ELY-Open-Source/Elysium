@@ -125,7 +125,16 @@ class EvidenceAtom(BaseModel):
             raise ValueError(f"{self.atom_id}: an atom cannot supersede itself")
         return self
 
-    @field_validator("ingested_at", "event_time", "event_time_end", "valid_from", "valid_to", "retention_until", "last_recalled_at", "archived_at")
+    @field_validator(
+        "ingested_at",
+        "event_time",
+        "event_time_end",
+        "valid_from",
+        "valid_to",
+        "retention_until",
+        "last_recalled_at",
+        "archived_at",
+    )
     @classmethod
     def _times_are_aware(cls, value: datetime | None) -> datetime | None:
         if value is not None and value.tzinfo is None:
@@ -172,6 +181,13 @@ class SearchFilters(BaseModel):
     A memory with no event time cannot satisfy since/until, so it drops out when a time bound is
     asked for rather than passing as unknown. `holder` restricts the answer to one holder's
     memories; `as_holder` is the identity asking, and applies the sharing rule instead.
+
+    `since`/`until` bound *when a memory was true*; `as_of` moves the moment the store answers
+    from, which is a different question. Asked as of last Tuesday, a memory that was true then
+    may answer even if it has been retired since, and a memory whose event time falls after that
+    moment had not happened yet, so it may not. Archival is a storage tier rather than a claim
+    about the world, so an archived memory still answers a question about the time before it was
+    archived. Without `as_of` only memories open right now may answer.
     """
 
     holder: str | None = None
@@ -180,6 +196,7 @@ class SearchFilters(BaseModel):
     source_id: str | None = None
     modality: Modality | None = None
     cartridge_ids: list[str] | None = None
+    as_of: datetime | None = None
     since: datetime | None = None
     until: datetime | None = None
     min_trust: float | None = Field(default=None, ge=0.0, le=1.0)

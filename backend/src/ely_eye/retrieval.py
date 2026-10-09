@@ -116,6 +116,7 @@ class RetrievalService:
             modality=criteria.get("modality"),
             since=_text(criteria.get("since")),
             until=_text(criteria.get("until")),
+            as_of=_text(criteria.get("as_of")),
             cartridge_ids=criteria.get("cartridge_ids"),
             as_holder=criteria.get("as_holder"),
         )

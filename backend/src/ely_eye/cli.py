@@ -88,14 +88,25 @@ def search(
     query: str,
     top_k: int = typer.Option(0, "--top-k", help="hits to return; 0 uses the configured default"),
     holder: str = typer.Option("", "--holder", help="only this holder's memories may answer"),
-    as_holder: str = typer.Option("", "--as-holder", help="see the store through this holder's eyes, the way their agent would"),
+    as_holder: str = typer.Option(
+        "",
+        "--as-holder",
+        help="see the store through this holder's eyes, the way their agent would",
+    ),
     scenario: str = typer.Option("", "--scenario"),
     source_id: str = typer.Option("", "--source-id"),
     since: str = typer.Option("", "--since", help="event time at or after, ISO with offset"),
     until: str = typer.Option("", "--until"),
-    min_trust: float = typer.Option(-1.0, "--min-trust", help="drop memories whose trust falls below this"),
+    as_of: str = typer.Option(
+        "", "--as-of", help="answer as if it were this moment; memories retired since still answer"
+    ),
+    min_trust: float = typer.Option(
+        -1.0, "--min-trust", help="drop memories whose trust falls below this"
+    ),
     cursor: str = typer.Option("", "--cursor", help="next_cursor from the previous page"),
-    image: str = typer.Option("", "--image", help="a picture to search with, instead of only words"),
+    image: str = typer.Option(
+        "", "--image", help="a picture to search with, instead of only words"
+    ),
 ) -> None:
     """Rank the memories that may answer, and say so when none may."""
     settings = get_settings()
@@ -109,6 +120,7 @@ def search(
             source_id=source_id or None,
             since=moment(since, "--since"),
             until=moment(until, "--until"),
+            as_of=moment(as_of, "--as-of"),
             min_trust=None if min_trust < 0 else min_trust,
         ),
         cursor=cursor or None,
@@ -275,7 +287,9 @@ def runtime_profiles() -> None:
 
 
 @app.command("research-modules")
-def research_modules(query: str = "Ely-Eye V-NSA DVKV x-modal KV speculative prefetch evidence graph") -> None:
+def research_modules(
+    query: str = "Ely-Eye V-NSA DVKV x-modal KV speculative prefetch evidence graph",
+) -> None:
     settings = get_settings()
     db = Database(settings)
     from .compiler import ContextCompiler
