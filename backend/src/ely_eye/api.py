@@ -16,6 +16,7 @@ from .adapters import plan as adapter_plan
 from .api_auth import require_write
 from .api_cartridges import register as register_cartridge_routes
 from .api_holders import register as register_holder_routes
+from .api_memory import register as register_memory_routes
 from .browse import browse, picture
 from .cache_fabric import CacheFabric
 from .cartridge import CartridgeService
@@ -219,6 +220,8 @@ def create_app() -> FastAPI:
                 event_time_precision=request.event_time_precision,
                 event_time_source=request.event_time_source,
                 retention_until=request.retention_until,
+                session_id=request.session_id,
+                importance=request.importance,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -238,6 +241,8 @@ def create_app() -> FastAPI:
                 event_time=request.event_time,
                 event_time_precision=request.event_time_precision,
                 event_time_source=request.event_time_source,
+                session_id=request.session_id,
+                importance=request.importance,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -257,6 +262,7 @@ def create_app() -> FastAPI:
 
     register_cartridge_routes(app, settings_dep)
     register_holder_routes(app, settings_dep)
+    register_memory_routes(app, settings_dep)
 
     @app.get("/api/adapters", response_model=list[AdapterStatus])
     def adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> list[AdapterStatus]:

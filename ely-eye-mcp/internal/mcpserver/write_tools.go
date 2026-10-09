@@ -11,6 +11,7 @@ import (
 type RememberInput struct {
 	Text               string `json:"text" jsonschema:"the statement to remember, kept verbatim"`
 	Scenario           string `json:"scenario,omitempty" jsonschema:"optional context label such as home or work"`
+	Session            string `json:"session_id,omitempty" jsonschema:"the conversation this belongs to; working_set reloads a session in order"`
 	EventTime          string `json:"event_time,omitempty" jsonschema:"when it was true, ISO 8601 with offset, e.g. 2026-05-01T12:00:00+08:00"`
 	EventTimePrecision string `json:"event_time_precision,omitempty" jsonschema:"instant, minute, hour, day, month, or year; required with event_time"`
 	RetentionUntil     string `json:"retention_until,omitempty" jsonschema:"ISO 8601 with offset; the memory stops being retrievable after this"`
@@ -20,6 +21,7 @@ type SupersedeInput struct {
 	AtomID             string `json:"atom_id" jsonschema:"exact Evidence Atom id being replaced"`
 	Text               string `json:"text" jsonschema:"the newer statement, kept verbatim"`
 	Scenario           string `json:"scenario,omitempty" jsonschema:"optional context label such as home or work"`
+	Session            string `json:"session_id,omitempty" jsonschema:"the conversation this belongs to; working_set reloads a session in order"`
 	EventTime          string `json:"event_time,omitempty" jsonschema:"when the new statement became true, ISO 8601 with offset"`
 	EventTimePrecision string `json:"event_time_precision,omitempty" jsonschema:"instant, minute, hour, day, month, or year; required with event_time"`
 }

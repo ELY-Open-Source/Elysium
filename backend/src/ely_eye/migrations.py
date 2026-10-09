@@ -16,7 +16,7 @@ import sqlite3
 from .storage import token_equivalent, visual_token_equivalent
 from .text_index import index_text
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -100,6 +100,37 @@ _BASE_TABLES = """
         updated_at TEXT NOT NULL
     );
 
+    -- What has already been folded into a rollup, one row per holder and scenario. The
+    -- watermark is what makes consolidation replayable: the next pass starts where the last one
+    -- stopped, so the same memory is never counted into two rollups.
+    CREATE TABLE IF NOT EXISTS consolidations (
+        holder_id TEXT NOT NULL,
+        scenario TEXT NOT NULL DEFAULT '',
+        watermark_at TEXT NOT NULL,
+        rollup_atom_id TEXT NOT NULL REFERENCES atoms(atom_id) ON DELETE CASCADE,
+        atom_count INTEGER NOT NULL,
+        token_equivalent INTEGER NOT NULL,
+        consolidated_at TEXT NOT NULL,
+        PRIMARY KEY (holder_id, scenario)
+    );
+
+    -- Two memories that cannot both be current. The store records the disagreement even when no
+    -- person has picked a winner; retrieval reads this table to keep the newer side instead of
+    -- packing both numbers into the same prompt.
+    CREATE TABLE IF NOT EXISTS conflicts (
+        conflict_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        older_atom_id TEXT NOT NULL REFERENCES atoms(atom_id) ON DELETE CASCADE,
+        newer_atom_id TEXT NOT NULL REFERENCES atoms(atom_id) ON DELETE CASCADE,
+        holder_id TEXT NOT NULL,
+        scenario TEXT NOT NULL DEFAULT '',
+        terms_json TEXT NOT NULL,
+        older_value TEXT NOT NULL,
+        newer_value TEXT NOT NULL,
+        detected_at TEXT NOT NULL,
+        resolved_at TEXT,
+        UNIQUE (older_atom_id, newer_atom_id)
+    );
+
     CREATE TABLE IF NOT EXISTS cache_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ts TEXT NOT NULL,
@@ -151,11 +182,12 @@ tokenize = 'unicode61'
 -- per CJK character and per identifier fragment, which is what makes those queries match.
 """
 
-# A memory is usable now when nothing closed it, it had begun by now, and its retention has not lapsed; unknown bounds read as visible, because silence about when a legacy row was true is not evidence that it is false.
+# A memory is usable now when nothing closed it, it had begun by now, its retention has not lapsed, and nobody archived it away from the current tier; unknown bounds read as visible, because silence about when a legacy row was true is not evidence that it is false.
 VIEWS = """
     CREATE VIEW IF NOT EXISTS v_atoms_current AS
     SELECT * FROM atoms
     WHERE valid_to IS NULL
+      AND archived_at IS NULL
       AND (valid_from IS NULL OR valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
       AND (retention_until IS NULL OR retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'));
 
@@ -164,6 +196,8 @@ VIEWS = """
     CREATE INDEX IF NOT EXISTS idx_atoms_holder ON atoms(holder_id);
     CREATE INDEX IF NOT EXISTS idx_atoms_scenario ON atoms(scenario);
     CREATE INDEX IF NOT EXISTS idx_atoms_valid_to ON atoms(valid_to);
+    CREATE INDEX IF NOT EXISTS idx_atoms_session ON atoms(session_id);
+    CREATE INDEX IF NOT EXISTS idx_atoms_archived ON atoms(archived_at);
 """
 
 # Columns the first version lacked, in the order added; each is nullable or defaulted so an existing row keeps its meaning.
@@ -185,6 +219,16 @@ _V1_TO_V2_COLUMNS = (
 # Columns added after the second version, grouped by the schema version that introduced them.
 _NEW_ATOM_COLUMNS: tuple[tuple[int, tuple[tuple[str, str], ...]], ...] = (
     (9, (("quarantined", "INTEGER NOT NULL DEFAULT 0"),)),
+    (
+        10,
+        (
+            ("session_id", "TEXT NOT NULL DEFAULT ''"),
+            ("importance", "REAL"),
+            ("recall_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("last_recalled_at", "TEXT"),
+            ("archived_at", "TEXT"),
+        ),
+    ),
 )
 
 
@@ -270,6 +314,10 @@ def apply(connection: sqlite3.Connection) -> None:
             for name, definition in columns:
                 if name not in existing:
                     connection.execute(f"ALTER TABLE atoms ADD COLUMN {name} {definition}")
+    if version < 10:
+        # CREATE VIEW IF NOT EXISTS keeps the old body, and the tenth version changed which rows
+        # the current tier contains, so an upgraded database has to be told to look again.
+        connection.execute("DROP VIEW IF EXISTS v_atoms_current")
 
     connection.executescript(VIEWS)
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")

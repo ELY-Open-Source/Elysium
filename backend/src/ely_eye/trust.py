@@ -8,6 +8,7 @@ second, non-quarantined source says it too.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 from unicodedata import normalize
@@ -192,3 +193,72 @@ def _spread(pairs: list[str]) -> list[str]:
     if len(pairs) <= CORROBORATION_TERMS:
         return pairs
     return [pairs[0], pairs[len(pairs) // 2], pairs[-1]]
+
+
+def numeric_values(text: str) -> dict[str, str]:
+    """Every number a memory states, keyed by what it measures, so a moving value can be named.
+
+    A number is attributed twice: to the subject the memory leads with, and to the content word
+    standing beside it. 「恒温器放在书房，设定 22 度」 and 「恒温器调到 24 度」 phrase the setting
+    differently but lead with the same thing, and it is that shared label which makes the pair one
+    disagreement about one quantity rather than two unrelated counts.
+    """
+    try:
+        tokens = fts_terms(text)
+    except ValueError:
+        return {}
+    subject = _label(tokens[0], first=True) if tokens else ""
+    values: dict[str, str] = {}
+    beside = ""
+    for token in tokens:
+        stated = _NUMBER.findall(token)
+        if not stated:
+            beside = _label(token) or beside
+            continue
+        for value in stated:
+            if subject:
+                values.setdefault(subject, value)
+            if beside:
+                values.setdefault(beside, value)
+    return values
+
+
+def conflicting_number(older: dict[str, str], newer: dict[str, str]) -> str | None:
+    """The one quantity both memories state a different value for, or None if they do not disagree.
+
+    Only a shared label counts: two memories that each mention a number are not in conflict until
+    they name the same thing. The label is reported, not the verdict — which side is current is a
+    decision for the holder, and retrieval only drops the older side while the disagreement stands.
+    """
+    for label in sorted(set(older) & set(newer)):
+        if _as_float(older[label]) != _as_float(newer[label]):
+            return label
+    return None
+
+
+def _as_float(value: str) -> float:
+    # The regex only accepts numbers, so a value that will not parse means the pattern changed.
+    return float(value)
+
+
+def _label(token: str, *, first: bool = False) -> str:
+    """The content word a number hangs on: a CJK run's two-character tail, or a plain Latin word.
+
+    The subject of a memory is read from the head of its first run instead, because two memories
+    about the same thing usually phrase the rest differently: 「恒温器放在书房，设定 22 度」 and
+    「恒温器调到 24 度」 share only their subject, and that is the label which makes them disagree.
+    """
+    letters = "".join(char for char in token if is_cjk(char))
+    if letters:
+        pairs = cjk_pairs(letters)
+        if not pairs:
+            return ""
+        return pairs[0] if first else pairs[-1]
+    word = token.strip(_PUNCTUATION).lower()
+    if not word or word in STOPWORDS or any(char.isdigit() for char in word):
+        return ""
+    return word
+
+
+_PUNCTUATION = " \t\n.,;:!?。，；：！？、"
+_NUMBER = re.compile(r"[-+]?\d+(?:\.\d+)?")

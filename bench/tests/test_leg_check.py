@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from bench import leg_check
+from bench import leg_check, leg_report
 
 
 def test_every_leg_appears_switched_both_ways() -> None:
@@ -32,11 +32,19 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "median_distinct_sources": 4,
         "by_modality": {"code": 0.953, "pdf": 0.849},
         "modality_counts": {"code": 128, "pdf": 86},
-        "by_category": {"knowledge-update": 1.0, "temporal-reasoning": 0.947, "unlabelled": 0.84},
-        "category_counts": {"knowledge-update": 25, "temporal-reasoning": 19, "unlabelled": 256},
         "newest_gold_first": 0.44,
-        "newest_gold_first_by_category": {"knowledge-update": 0.4, "temporal-reasoning": 0.526},
-        "newest_gold_first_counts": {"knowledge-update": 25, "temporal-reasoning": 19},
+        "memory": {
+            "queries": 150,
+            "recall_at_10": 0.965,
+            "mrr": 0.875,
+            "hit_at_10": 0.98,
+            "wilson_lower": 0.921,
+            "by_category": {"knowledge-update": 1.0, "temporal-reasoning": 0.947},
+            "category_counts": {"knowledge-update": 25, "temporal-reasoning": 25},
+            "newest_gold_first": 0.4,
+            "newest_gold_first_by_category": {"knowledge-update": 0.4, "temporal-reasoning": 0.526},
+            "newest_gold_first_counts": {"knowledge-update": 19, "temporal-reasoning": 21},
+        },
     }
     report: dict[str, Any] = {
         "commit": "abcdef123456",
@@ -47,6 +55,8 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "picture_index": {"path": "bench/runs/leg_check_index", "atoms": 53668, "dim": 512, "bytes": 109912192},
         "encode_rate": {"pictures": 200, "seconds": 10.0, "per_second": 20.0},
         "probes": 300,
+        "memory_queries": 150,
+        "memory_modality": "conversation",
         "arms": [arm],
         "machine": {
             "system": "Linux",
@@ -57,7 +67,7 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         },
     }
     out = tmp_path / "LEGS.md"
-    leg_check.write_markdown(report, out)
+    leg_report.write_markdown(report, out)
     text = out.read_text(encoding="utf-8")
     assert "words only" in text
     assert "0.832" in text and "63.7" in text, "recall and latency must sit in the same row"
@@ -69,7 +79,11 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "53,668 atoms at 512 dimensions" in text and "44.7" in text
     ), "the picture index needs its shape in the report, and its build cost derived from a measured rate"
     assert (
-        "knowledge-update" in text and "1.000" in text and "0.40 (25)" in text
+        "knowledge-update" in text and "1.000" in text and "0.40 (19)" in text
     ), "the two question types the contract names need their own recall and their own n"
+    assert (
+        "every answerable conversation query (150) measured whole" in text
+    ), "a 15-probe sample cannot separate six question types, and the report must say which set the table used"
+    assert "| 0.44 |" in text, "the probe table needs its own newest-first column"
     assert "unlabelled" not in text, "an unlabelled bucket would hide which set a number came from"
     assert "abcdef123456" in text and "load_average" not in text

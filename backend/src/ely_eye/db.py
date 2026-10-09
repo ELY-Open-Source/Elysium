@@ -82,9 +82,9 @@ class Database:
                     token_equivalent, metadata_json, holder_id, origin, scenario,
                     event_time, event_time_end, event_time_precision, event_time_source,
                     valid_from, valid_to, supersedes_json, visibility_json, retention_until,
-                    quarantined
+                    quarantined, session_id, importance, recall_count, last_recalled_at, archived_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(atom_id) DO UPDATE SET
                     modality=excluded.modality,
                     source=excluded.source,
@@ -109,7 +109,11 @@ class Database:
                     supersedes_json=excluded.supersedes_json,
                     visibility_json=excluded.visibility_json,
                     retention_until=excluded.retention_until,
-                    quarantined=excluded.quarantined
+                    quarantined=excluded.quarantined,
+                    session_id=excluded.session_id,
+                    importance=excluded.importance
+                    -- recall_count, last_recalled_at and archived_at stay as the store has them: a
+                    -- re-ingested copy of the same atom cannot erase how often it was used.
                 """,
                 [atom_params(atom) for atom in atoms],
             )

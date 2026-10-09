@@ -70,6 +70,11 @@ def atom_params(atom: EvidenceAtom) -> tuple[Any, ...]:
         to_json(atom.visibility.model_dump()),
         atom.retention_until.isoformat() if atom.retention_until else None,
         1 if atom.quarantined else 0,
+        atom.session_id,
+        atom.importance,
+        atom.recall_count,
+        atom.last_recalled_at.isoformat() if atom.last_recalled_at else None,
+        atom.archived_at.isoformat() if atom.archived_at else None,
     )
 
 
@@ -102,6 +107,11 @@ def row_to_atom(row: sqlite3.Row) -> EvidenceAtom:
         visibility=Visibility(**from_json(row["visibility_json"], {})),
         retention_until=from_iso(row["retention_until"]),
         quarantined=bool(row["quarantined"]),
+        session_id=row["session_id"],
+        importance=None if row["importance"] is None else float(row["importance"]),
+        recall_count=int(row["recall_count"]),
+        last_recalled_at=from_iso(row["last_recalled_at"]),
+        archived_at=from_iso(row["archived_at"]),
     )
 
 

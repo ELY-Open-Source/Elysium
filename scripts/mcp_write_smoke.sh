@@ -166,7 +166,7 @@ send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 names = [item["name"] for item in call(2, "tools/list", {})["tools"]]
 for required in ("remember", "supersede_memory", "forget_memory", "mounted_cartridges",
                  "mount_cartridge", "switch_cartridge", "unmount_cartridge", "append_to_cartridge",
-                 "who_knows", "ask", "list_holders"):
+                 "who_knows", "ask", "list_holders", "working_set", "memory_conflicts"):
     if required not in names:
         raise SystemExit(f"FAIL: {required} is not registered; tools are {names}")
 
@@ -273,5 +273,30 @@ nobody = tool("ask", {"question": "潜水镜", "as_holder": "local"})["answer"]
 if nobody["status"] != "no_holder_knows" or nobody.get("answer"):
     raise SystemExit(f"FAIL: nobody knowing was reported as an answer: {nobody}")
 
-print("PASS: remember, supersede, search, forget, cartridge mounting and the transactive referral work through MCP")
+# The tier proof. A session is what makes working memory a thing you can reload in
+# order, and a disagreement is what makes an answer a choice rather than a coincidence.
+session = "cooking-2026-10"
+first = tool("remember", {"text": "the oven needs descaling", "session_id": session})["atom"]
+second = tool("remember", {"text": "the pantry shelf holds flour", "session_id": session})["atom"]
+if first["session_id"] != session:
+    raise SystemExit(f"FAIL: the server dropped the session: {first}")
+reloaded = tool("working_set", {"holder": "local", "session": session})["atoms"]
+if [item["atom_id"] for item in reloaded] != [first["atom_id"], second["atom_id"]]:
+    raise SystemExit(f"FAIL: the session did not reload in the order it was recorded: {reloaded}")
+if tool("working_set", {"holder": "local", "session": "never-opened"})["atoms"]:
+    raise SystemExit("FAIL: a session nobody recorded answered with somebody else's memories")
+
+older = tool("remember", {"text": "the thermostat is set to 24 degrees", "scenario": "home"})["atom"]
+newer = tool("remember", {"text": "the thermostat is set to 22 degrees", "scenario": "home"})["atom"]
+clashes = tool("memory_conflicts", {"holder": "local"})["conflicts"]
+if not any(item["older_atom_id"] == older["atom_id"] and item["newer_atom_id"] == newer["atom_id"]
+           and item["older_value"] == "24" and item["newer_value"] == "22" for item in clashes):
+    raise SystemExit(f"FAIL: the store never noticed that 24 degrees and 22 degrees cannot both hold: {clashes}")
+settled = tool("search_atoms", {"query": "thermostat"})["hits"]
+if any(hit["atom"]["atom_id"] == older["atom_id"] for hit in settled):
+    raise SystemExit(f"FAIL: an unsettled conflict let the older side answer: {settled}")
+if not any(hit["atom"]["atom_id"] == newer["atom_id"] for hit in settled):
+    raise SystemExit(f"FAIL: the newer side of the conflict went missing: {settled}")
+
+print("PASS: remember, supersede, search, forget, cartridge mounting, the transactive referral and the memory tiers work through MCP")
 PY

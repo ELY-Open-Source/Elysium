@@ -242,3 +242,73 @@ def test_a_second_version_database_rebuilds_its_index_on_upgrade(tmp_path: Path)
     assert [atom_id for atom_id, _ in search_fts(upgraded, "钥匙", 5)] == ["key"]
     with upgraded.connect() as connection:
         assert int(connection.execute("PRAGMA user_version").fetchone()[0]) == SCHEMA_VERSION
+
+
+def test_a_fresh_database_carries_the_tier_columns_and_their_tables(tmp_path: Path) -> None:
+    database = _database(tmp_path)
+    columns = _atom_columns(database)
+    for column in (
+        "session_id",
+        "importance",
+        "recall_count",
+        "last_recalled_at",
+        "archived_at",
+    ):
+        assert column in columns, column
+    with database.connect() as connection:
+        tables = {
+            row[0]
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        }
+    assert {"consolidations", "conflicts"} <= tables, (
+        "a lane's watermark and a store's disagreements are state, so they live in tables"
+    )
+
+
+def test_the_current_view_hides_an_archived_memory_without_deleting_it(tmp_path: Path) -> None:
+    database = _database(tmp_path)
+    _seed_source(database)
+    database.upsert_atoms([_atom("kept"), _atom("archived")])
+    with database.connect() as connection:
+        connection.execute(
+            "UPDATE atoms SET archived_at = ? WHERE atom_id = 'archived'", (NOW.isoformat(),)
+        )
+        visible = connection.execute("SELECT atom_id FROM v_atoms_current ORDER BY atom_id").fetchall()
+    assert [row[0] for row in visible] == ["kept"], "the archive is a tier, not a deletion"
+    assert database.atom_count() == 2
+
+
+def test_a_ninth_version_database_gains_the_tiers_in_place(tmp_path: Path) -> None:
+    """A ninth-version store had no tiers at all; the upgrade must add them and rebuild the view."""
+    database = _database(tmp_path)
+    _seed_source(database)
+    database.upsert_atoms([_atom("key")])
+    with database.connect() as connection:
+        # The downgrade removes what a ninth build never had, including the view and indexes
+        # that reference those columns, so the reopened store really is a ninth-version one.
+        connection.executescript(
+            """
+            DROP VIEW IF EXISTS v_atoms_current;
+            DROP INDEX IF EXISTS idx_atoms_session;
+            DROP INDEX IF EXISTS idx_atoms_archived;
+            ALTER TABLE atoms DROP COLUMN session_id;
+            ALTER TABLE atoms DROP COLUMN importance;
+            ALTER TABLE atoms DROP COLUMN recall_count;
+            ALTER TABLE atoms DROP COLUMN last_recalled_at;
+            ALTER TABLE atoms DROP COLUMN archived_at;
+            DROP TABLE consolidations;
+            DROP TABLE conflicts;
+            PRAGMA user_version = 9;
+            """
+        )
+
+    upgraded = _database(tmp_path)
+    assert "archived_at" in _atom_columns(upgraded)
+    assert [atom.atom_id for atom in upgraded.list_atoms()] == ["key"], "the upgrade kept the memories"
+    with upgraded.connect() as connection:
+        assert int(connection.execute("PRAGMA user_version").fetchone()[0]) == SCHEMA_VERSION
+        connection.execute("UPDATE atoms SET archived_at = ? WHERE atom_id = 'key'", (NOW.isoformat(),))
+        hidden = connection.execute("SELECT count(*) FROM v_atoms_current").fetchone()[0]
+    assert hidden == 0, (
+        "the old view body survived the upgrade, so an archived memory would still answer"
+    )

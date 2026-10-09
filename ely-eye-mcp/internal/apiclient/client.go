@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -107,6 +108,39 @@ func serverReason(status int, data []byte) string {
 		return fmt.Sprintf("HTTP %d with no reason", status)
 	}
 	return trimmed
+}
+
+// WorkingSet asks for what one session recorded, in the order it recorded it,
+// with no ranking involved. The session is required: without one, every memory
+// in the store would be working memory.
+func (c *Client) WorkingSet(ctx context.Context, holder, session string) ([]domain.Memory, error) {
+	if strings.TrimSpace(holder) == "" {
+		return nil, errors.New("holder is required")
+	}
+	if strings.TrimSpace(session) == "" {
+		return nil, errors.New("session is required")
+	}
+	path := "/api/memory/working?holder=" + url.QueryEscape(holder) + "&session=" + url.QueryEscape(session)
+	var atoms []domain.Memory
+	if err := c.Get(ctx, path, &atoms); err != nil {
+		return nil, err
+	}
+	return atoms, nil
+}
+
+// Conflicts lists the disagreements the store noticed and nobody has settled.
+// An empty holder asks for every holder's, which is what an operator reviewing
+// the whole store wants.
+func (c *Client) Conflicts(ctx context.Context, holder string) ([]domain.ConflictRecord, error) {
+	path := "/api/memory/conflicts"
+	if strings.TrimSpace(holder) != "" {
+		path += "?holder=" + url.QueryEscape(holder)
+	}
+	var records []domain.ConflictRecord
+	if err := c.Get(ctx, path, &records); err != nil {
+		return nil, err
+	}
+	return records, nil
 }
 
 // SearchOptions is one ranked query. Empty optional fields are omitted, so the

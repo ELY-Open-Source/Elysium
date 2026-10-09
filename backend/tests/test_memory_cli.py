@@ -106,3 +106,55 @@ def test_the_cli_answers_in_json_a_machine_can_read(db: Database) -> None:
     result = runner.invoke(app, ["remember", "钥匙在玄关抽屉", "--holder", "wife"])
     assert result.exit_code == 0
     assert json.loads(result.output)["text"] == "钥匙在玄关抽屉"
+
+
+def test_working_lists_one_session_in_the_order_it_was_recorded(db: Database) -> None:
+    first = run("remember", "烤箱要除垢", "--session", "cooking")
+    second = run("remember", "面粉在储物架第二层", "--session", "cooking")
+    run("remember", "周报周五交")
+
+    working = run("working", "husband", "cooking")
+
+    assert [atom["atom_id"] for atom in working] == [first["atom_id"], second["atom_id"]]
+
+
+def test_working_refuses_to_guess_which_session_is_working(db: Database) -> None:
+    result = runner.invoke(app, ["working", "husband", ""])
+    assert result.exit_code != 0
+    assert "a working set needs a session" in str(result.exception)
+
+
+def test_consolidate_rolls_a_lane_up_once_and_then_says_nothing_new(db: Database) -> None:
+    run("remember", "烤箱要除垢", "--scenario", "home")
+    record = run("consolidate", "--scenario", "home", "--holder", "husband")
+    assert record["atom_count"] == 1 and record["rollup_atom_id"]
+
+    result = runner.invoke(app, ["consolidate", "--scenario", "home", "--holder", "husband"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "nothing new to roll up"
+
+
+def test_the_archive_can_be_read_before_it_moves_anything(db: Database) -> None:
+    atom = run("remember", "前租户的 wifi 密码")
+
+    preview = run("archive", "--older-than-days", "0", "--dry-run")
+    assert preview["dry_run"] is True and preview["atom_ids"] == [atom["atom_id"]]
+    assert run("archived") == []
+
+    moved = run("archive", "--older-than-days", "0")
+    assert moved["dry_run"] is False and moved["atom_ids"] == [atom["atom_id"]]
+    assert [row["atom_id"] for row in run("archived")] == [atom["atom_id"]]
+    assert run("memory-restore", atom["atom_id"]) == {"restored": 1}
+    assert run("archived") == []
+
+
+def test_the_cli_shows_and_settles_a_disagreement(db: Database) -> None:
+    run("remember", "恒温器放在书房，设定 22 度", "--scenario", "home")
+    run("remember", "恒温器调到 24 度", "--scenario", "home")
+
+    listed = run("conflicts", "--holder", "husband")
+    assert len(listed) == 1
+    assert listed[0]["older_value"] == "22" and listed[0]["newer_value"] == "24"
+
+    assert run("resolve-conflicts", str(listed[0]["conflict_id"])) == {"resolved": 1}
+    assert run("conflicts", "--holder", "husband") == []

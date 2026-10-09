@@ -231,6 +231,7 @@ class VectorIndex:
             """
             SELECT atom_id FROM atoms
             WHERE atom_id IN (SELECT value FROM json_each(?))
+              AND archived_at IS NULL
               AND (valid_to IS NULL OR valid_to > strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
               AND (valid_from IS NULL OR valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
               AND (retention_until IS NULL OR retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))

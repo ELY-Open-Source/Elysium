@@ -14,11 +14,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import cartridge_store
+from . import cartridge_store, lifecycle_store
 from .config import Settings, get_settings
 from .db import Database
 from .embeddings import EmbeddingService
-from .schemas import EvidenceAtom, RetrievalHit, SearchFilters, SearchResult
+from .schemas import EvidenceAtom, RetrievalHit, SearchFilters, SearchResult, utc_now
 from .store_search import FtsPage, search_atoms
 from .vector_index import VectorIndex
 from .visual_index import VisualIndex
@@ -89,7 +89,8 @@ class RetrievalService:
             rankings.append(list(visual))
             for atom_id, cosine in visual.items():
                 scores[atom_id]["visual_score"] = cosine
-        hits = self._rank(rankings, scores, limit)
+        hits = self._settle_conflicts(self._rank(rankings, scores, limit * CANDIDATE_WINDOW))[:limit]
+        lifecycle_store.touch_recalls(self.db, [hit.atom.atom_id for hit in hits], utc_now())
         more = page.has_more or len(rankings[0]) > limit
         return SearchResult(
             query=query,
@@ -178,6 +179,18 @@ class RetrievalService:
                 )
             )
         return hits
+
+    def _settle_conflicts(self, hits: list[RetrievalHit]) -> list[RetrievalHit]:
+        """Drop the older side of a disagreement nobody settled, so one page cannot contradict itself.
+
+        Both memories stay in the store and this only filters the page; the conflict row names
+        which side was dropped and why. Settling is the holder's call, and until it happens the
+        newer statement is what a reader should be shown.
+        """
+        losers = lifecycle_store.losing_sides(self.db, [hit.atom.atom_id for hit in hits])
+        if not losers:
+            return hits
+        return [hit for hit in hits if hit.atom.atom_id not in losers]
 
     def recall(self, query: str, top_k: int | None = None, *, filters: SearchFilters | None = None) -> list[EvidenceAtom]:
         """The atoms a search would put in front of a model, no scoring attached."""

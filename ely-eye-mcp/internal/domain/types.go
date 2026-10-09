@@ -10,6 +10,7 @@ type Memory struct {
 	HolderID           string   `json:"holder_id"`
 	Origin             string   `json:"origin"`
 	Scenario           string   `json:"scenario"`
+	SessionID          string   `json:"session_id,omitempty"`
 	Text               string   `json:"text"`
 	IngestedAt         string   `json:"ingested_at"`
 	EventTime          string   `json:"event_time,omitempty"`
@@ -19,6 +20,27 @@ type Memory struct {
 	RetentionUntil     string   `json:"retention_until,omitempty"`
 	Supersedes         []string `json:"supersedes"`
 	TokenEquivalent    int64    `json:"token_equivalent"`
+	// RecallCount is what the store observed: how many searches handed this memory
+	// back. A caller cannot set it, which is why an archive rule can trust it.
+	RecallCount    int      `json:"recall_count"`
+	Importance     *float64 `json:"importance,omitempty"`
+	LastRecalledAt string   `json:"last_recalled_at,omitempty"`
+}
+
+// ConflictRecord is one disagreement the store noticed between two of a holder's
+// memories and nobody has settled. While it stands the store drops the older side
+// from a page; settling it stays the holder's decision.
+type ConflictRecord struct {
+	ConflictID  int      `json:"conflict_id"`
+	OlderAtomID string   `json:"older_atom_id"`
+	NewerAtomID string   `json:"newer_atom_id"`
+	HolderID    string   `json:"holder_id"`
+	Scenario    string   `json:"scenario"`
+	Terms       []string `json:"terms"`
+	OlderValue  string   `json:"older_value"`
+	NewerValue  string   `json:"newer_value"`
+	DetectedAt  string   `json:"detected_at"`
+	ResolvedAt  string   `json:"resolved_at,omitempty"`
 }
 
 type ForgetReport struct {

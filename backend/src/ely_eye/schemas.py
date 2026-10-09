@@ -109,6 +109,11 @@ class EvidenceAtom(BaseModel):
     visibility: Visibility = Field(default_factory=Visibility)
     retention_until: datetime | None = None
     quarantined: bool = False
+    session_id: str = ""
+    importance: float | None = Field(default=None, ge=0.0, le=1.0)
+    recall_count: int = Field(default=0, ge=0)
+    last_recalled_at: datetime | None = None
+    archived_at: datetime | None = None
 
     @model_validator(mode="after")
     def _times_are_ordered(self) -> EvidenceAtom:
@@ -120,7 +125,7 @@ class EvidenceAtom(BaseModel):
             raise ValueError(f"{self.atom_id}: an atom cannot supersede itself")
         return self
 
-    @field_validator("ingested_at", "event_time", "event_time_end", "valid_from", "valid_to", "retention_until")
+    @field_validator("ingested_at", "event_time", "event_time_end", "valid_from", "valid_to", "retention_until", "last_recalled_at", "archived_at")
     @classmethod
     def _times_are_aware(cls, value: datetime | None) -> datetime | None:
         if value is not None and value.tzinfo is None:
@@ -281,6 +286,48 @@ class ForgetReport(BaseModel):
     reason: str
 
 
+class ConsolidationRecord(BaseModel):
+    """One lane of the long-term ledger: everything up to the watermark has been rolled up, and
+    the next pass starts there so no memory is counted into two rollups.
+    """
+
+    holder_id: str
+    scenario: str = ""
+    watermark_at: datetime
+    rollup_atom_id: str
+    atom_count: int = Field(ge=0)
+    token_equivalent: int = Field(ge=0)
+    consolidated_at: datetime
+
+
+class ConflictRecord(BaseModel):
+    """Two memories of one holder that cannot both be current, with the value each side states."""
+
+    conflict_id: int
+    older_atom_id: str
+    newer_atom_id: str
+    holder_id: str
+    scenario: str = ""
+    terms: list[str] = Field(default_factory=list)
+    older_value: str
+    newer_value: str
+    detected_at: datetime
+    resolved_at: datetime | None = None
+
+
+class ArchiveReport(BaseModel):
+    """Which memories left the current tier, and the rule that moved them.
+
+    `archived_at` is the moment the rule stamps; on a dry run it is the moment it would
+    stamp, and `atom_ids` is the list the sentence would fall on.
+    """
+
+    atom_ids: list[str]
+    archived_at: datetime
+    rule: str
+    dry_run: bool = False
+
+
 class RememberRequest(BaseModel):
     """A memory as a caller states it. Holder, origin and ingestion time are stamped by the
     server, so they are absent here on purpose: a client cannot claim to be somebody else.
@@ -292,6 +339,8 @@ class RememberRequest(BaseModel):
     event_time_precision: TimePrecision = TimePrecision.unknown
     event_time_source: str = ""
     retention_until: datetime | None = None
+    session_id: str = ""
+    importance: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class SupersedeRequest(RememberRequest):

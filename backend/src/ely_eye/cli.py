@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -17,15 +16,15 @@ from .benchmarks import (
 )
 from .cartridge import CartridgeService
 from .cartridge_assets import CartridgeAssetService
-from .cli_common import json_dump
+from .cli_common import json_dump, moment
 from .cli_maintenance import register as register_maintenance_commands
+from .cli_memory import register as register_memory_commands
 from .cli_senses import register as register_sense_commands
 from .cli_senses import senses_report
 from .cli_transactive import register as register_transactive_commands
 from .config import get_settings
 from .db import Database
 from .ingestion import IngestionService
-from .memory import MemoryService
 from .profiles import runtime_profile_report
 from .proofs import HashHopEvaluator, PRDProofSuite
 from .proofs.contradictions import CORPUS_NAME, build_contradiction_scenarios, write_corpus
@@ -33,7 +32,7 @@ from .proofs.table import render_table
 from .research_modules import ResearchModuleService
 from .retrieval import RetrievalService
 from .runtime import QwenRuntime
-from .schemas import MemoryOrigin, SearchFilters, TimePrecision, TrainingAdapterKind
+from .schemas import SearchFilters, TrainingAdapterKind
 from .training import TrainingService
 
 app = typer.Typer(no_args_is_help=True)
@@ -42,6 +41,7 @@ app = typer.Typer(no_args_is_help=True)
 register_transactive_commands(app, lambda: get_settings())
 register_sense_commands(app, lambda: get_settings())
 register_maintenance_commands(app, lambda: get_settings())
+register_memory_commands(app, lambda: get_settings())
 
 
 @app.command()
@@ -83,15 +83,6 @@ def ingest(path: Path, cartridge_name: str | None = None) -> None:
     typer.echo(result.model_dump_json(indent=2))
 
 
-def _moment(value: str, option: str) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError as error:
-        raise ValueError(f"{option} {value!r} is not an ISO timestamp: {error}") from error
-
-
 @app.command()
 def search(
     query: str,
@@ -114,68 +105,14 @@ def search(
             holder=holder or None,
             scenario=scenario or None,
             source_id=source_id or None,
-            since=_moment(since, "--since"),
-            until=_moment(until, "--until"),
+            since=moment(since, "--since"),
+            until=moment(until, "--until"),
             min_trust=None if min_trust < 0 else min_trust,
         ),
         cursor=cursor or None,
         image=Path(image) if image else None,
     )
     typer.echo(result.model_dump_json(indent=2))
-
-
-@app.command()
-def remember(
-    text: str,
-    holder: str = typer.Option("", "--holder", help="who owns this memory"),
-    origin: MemoryOrigin = MemoryOrigin.self_,
-    scenario: str = "",
-    event_time: str = typer.Option("", "--event-time", help="when it was true, ISO with offset"),
-    precision: TimePrecision = TimePrecision.unknown,
-    retention_until: str = typer.Option("", "--retention-until"),
-) -> None:
-    settings = get_settings()
-    atom = MemoryService(settings).remember(
-        text,
-        holder_id=holder or settings.default_holder,
-        origin=origin,
-        scenario=scenario,
-        event_time=_moment(event_time, "--event-time"),
-        event_time_precision=precision,
-        retention_until=_moment(retention_until, "--retention-until"),
-    )
-    typer.echo(atom.model_dump_json(indent=2))
-
-
-@app.command()
-def supersede(
-    atom_id: str,
-    text: str,
-    holder: str = typer.Option("", "--holder"),
-    scenario: str = "",
-    event_time: str = typer.Option("", "--event-time"),
-    precision: TimePrecision = TimePrecision.unknown,
-) -> None:
-    settings = get_settings()
-    atom = MemoryService(settings).supersede(
-        atom_id,
-        text=text,
-        holder_id=holder or settings.default_holder,
-        scenario=scenario,
-        event_time=_moment(event_time, "--event-time"),
-        event_time_precision=precision,
-    )
-    typer.echo(atom.model_dump_json(indent=2))
-
-
-@app.command()
-def forget(atom_id: str = "", source_id: str = "", reason: str = "") -> None:
-    report = MemoryService(get_settings()).forget(
-        atom_id=atom_id or None,
-        source_id=source_id or None,
-        reason=reason,
-    )
-    typer.echo(report.model_dump_json(indent=2))
 
 
 @app.command("list-cartridges")

@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from bench.leg_report import write_markdown
 from bench.metrics import aggregate, newest_gold_first, score_query
 from bench.query_set import load_queries, scale_probes, source_times
 from bench.report import git_commit
@@ -38,6 +39,9 @@ ENCODE_SAMPLE = 200
 
 # The page the product asks for by default; measure() checks it against Settings, so "as shipped" cannot rot into a hypothesis.
 SHIPPED_TOP_K = 24
+
+# The modality whose questions carry a question type; measured whole, because 15 probes of 150 cannot separate six categories.
+MEMORY_MODALITY = "conversation"
 
 # (label, atoms asked, dense leg, picture leg); the picture leg answers only on a thin page, which is the product's rule.
 CONFIGS: list[dict[str, Any]] = [
@@ -234,6 +238,10 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         raise SystemExit("the frozen suite carries no answerable query; nothing to score")
     print(f"{len(answerable)} answerable probes", flush=True)
     times = source_times()
+    memory = [query for query in load_queries() if query.modality == MEMORY_MODALITY and query.gold]
+    if not memory:
+        raise SystemExit(f"the frozen suite carries no answerable {MEMORY_MODALITY} query; the memory tables would be empty")
+    print(f"{len(memory)} answerable {MEMORY_MODALITY} queries, measured whole beside the probes", flush=True)
 
     vectors = _dense_vectors(home / "data" / "ely_eye.sqlite")
     if vectors == 0 and any(config["dense"] for config in CONFIGS):
@@ -280,6 +288,12 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         ]
         summary = aggregate(scores)
         timing = latency(timings)
+        memory_rankings, _, _ = rank_all(service, ids, memory, int(config["top_k"]))
+        memory_scores = [
+            score_query(query.query_id, ranking, set(query.gold), query.holder)
+            for query, ranking in zip(memory, memory_rankings, strict=True)
+        ]
+        memory_summary = aggregate(memory_scores)
         arms.append(
             {
                 "label": config["label"],
@@ -294,6 +308,14 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
                 "p95_seconds": timing["p95"],
                 "median_distinct_sources": statistics.median(distinct),
                 **_groups(answerable, scores, rankings, times),
+                "memory": {
+                    "queries": len(memory),
+                    "recall_at_10": memory_summary["recall_at_10"],
+                    "mrr": memory_summary["mrr"],
+                    "hit_at_10": memory_summary["hit_at_10"],
+                    "wilson_lower": memory_summary["hit_at_10_wilson_lower"],
+                    **_groups(memory, memory_scores, memory_rankings, times),
+                },
             }
         )
         print(
@@ -310,6 +332,8 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         "picture_index": picture,
         "encode_rate": rate,
         "probes": len(answerable),
+        "memory_queries": len(memory),
+        "memory_modality": MEMORY_MODALITY,
         "arms": arms,
         "machine": machine_facts(),
     }
@@ -320,144 +344,6 @@ def _source_ids(database: Any) -> dict[str, str]:
     from bench.systems import _corpus_ids
 
     return _corpus_ids(database)
-
-
-def write_markdown(report: dict[str, Any], path: Path) -> None:
-    machine = report["machine"]
-    header = [
-        "| leg configuration | atoms asked | recall@10 | MRR | hit@10 | 95% lower | p50 ms | p95 ms | distinct sources |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-    ]
-    rows = []
-    for arm in report["arms"]:
-        rows.append(
-            f"| {arm['label']} | {arm['top_k']} | {arm['recall_at_10']:.3f} | {arm['mrr']:.3f} | "
-            f"{arm['hit_at_10']:.3f} | {arm['wilson_lower']:.3f} | {arm['p50_seconds'] * 1000:.1f} | "
-            f"{arm['p95_seconds'] * 1000:.1f} | {arm['median_distinct_sources']} |"
-        )
-    modalities = sorted({modality for arm in report["arms"] for modality in arm["by_modality"]})
-    modality_rows = [
-        "| leg configuration | " + " | ".join(modalities) + " |",
-        "| --- |" + " --- |" * len(modalities),
-    ]
-    for arm in report["arms"]:
-        modality_rows.append(
-            f"| {arm['label']} | "
-            + " | ".join(f"{arm['by_modality'].get(modality, float('nan')):.3f}" for modality in modalities)
-            + " |"
-        )
-    counts = report["arms"][0]["modality_counts"]
-
-    def category_table(title: str, field: str, sizes_field: str) -> list[str]:
-        """A table over the question types the sets label; unlabelled sets stay out of it."""
-        names = sorted({name for arm in report["arms"] for name in arm[field] if name != "unlabelled"})
-        if not names:
-            return []
-        lines = [
-            f"## {title}",
-            "",
-            "| leg configuration | " + " | ".join(names) + " |",
-            "| --- |" + " --- |" * len(names),
-        ]
-        for arm in report["arms"]:
-            values, sizes = arm[field], arm[sizes_field]
-            cells = []
-            for name in names:
-                if name not in values:
-                    cells.append("—")
-                elif field == "by_category":
-                    cells.append(f"{values[name]:.3f}")
-                else:
-                    cells.append(f"{values[name]:.2f} ({sizes[name]})")
-            lines.append(f"| {arm['label']} | " + " | ".join(cells) + " |")
-        labelled = report["arms"][0][sizes_field]
-        lines += [
-            "",
-            "_Queries per type: "
-            + ", ".join(f"{name} {size}" for name, size in labelled.items() if name != "unlabelled")
-            + "._",
-        ]
-        return lines
-    path.write_text(
-        "\n".join(
-            [
-                "# LEGS: what each retrieval leg is worth",
-                "",
-                f"- commit: `{report['commit']}`, schema v{report['schema_version']}",
-                (
-                    f"- store: {report['store']} — a copy of {report['source_store']}, which carries "
-                    f"{report['dense_vectors']:,} dense vectors built by bench/dense_scale. The build "
-                    "sits outside the measured latency, and the frozen baseline itself holds no "
-                    "vectors, so a dense arm there would rank an empty index."
-                ),
-                f"- {report['probes']} answerable queries, each asked as the holder the frozen set assigns it",
-                *(
-                    []
-                    if report.get("picture_index") is None
-                    else [
-                        (
-                            f"- picture index: {report['picture_index']['atoms']:,} atoms at "
-                            f"{report['picture_index']['dim']} dimensions, "
-                            f"{report['picture_index']['bytes']:,} bytes, read from "
-                            f"{report['picture_index']['path']}"
-                        ),
-                        (
-                            f"- encoder speed: {report['encode_rate']['per_second']:.1f} pictures/s "
-                            f"measured on {report['encode_rate']['pictures']} pictures, so the "
-                            f"{report['picture_index']['atoms']:,} pictures in that index cost about "
-                            f"{report['picture_index']['atoms'] / report['encode_rate']['per_second'] / 60:.1f} "
-                            "minutes to encode"
-                        ),
-                    ]
-                ),
-                (
-                    f"- machine: {machine['system']} {machine['release']}, {machine['cpus']} cores, "
-                    f"{machine['threads_per_query']} threads per query, load {machine['load_average_1_5_15']}"
-                ),
-                "",
-                "Recall is scored on the first ten **sources** after atoms are collapsed to their source",
-                "by first hit, which is how every other arm in this repo is scored.",
-                "",
-                *header,
-                *rows,
-                "",
-                "## recall@10 by modality",
-                "",
-                *modality_rows,
-                "",
-                f"_Query counts per modality: {', '.join(f'{name} {count}' for name, count in counts.items())}._",
-                "",
-                *category_table("recall@10 by question type", "by_category", "category_counts"),
-                "",
-                *category_table(
-                    "the newest of the gold memories came back first",
-                    "newest_gold_first_by_category",
-                    "newest_gold_first_counts",
-                ),
-                "",
-                (
-                    "recall@10 counts any gold memory, so a knowledge-update question can score 1.000 "
-                    "while the ranking still leads with the value the speaker has since replaced. The "
-                    "table above asks the sharper question: when the answer lives in several dated "
-                    "memories, is the newest one the first one returned? Only questions with at least two "
-                    "dated gold memories and at least one returned are counted."
-                ),
-                "",
-                (
-                    "The picture leg is not a switch this harness flips per row: the product runs it only "
-                    "when the sparse page comes back thin, so these rows measure the product with the leg "
-                    "available, not a forced always-on fusion."
-                ),
-                "",
-                (
-                    "_Latency is wall time per search on the machine named above with the thread budget "
-                    "the benchmark pins; a run on a loaded machine is not comparable._"
-                ),
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
 
 
 def main() -> None:
