@@ -12,8 +12,9 @@ only as a parameter of register().
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 
+from .api_auth import read_as, resolve_caller
 from .config import Settings
 from .db import Database
 from .memory import MemoryService
@@ -21,28 +22,46 @@ from .schemas import ConflictRecord, EvidenceAtom
 
 
 def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
-    """Register the tier reads. The holder is named by the caller because the question is about
-    somebody's memory, not about the server's own identity."""
+    """Register the tier reads. A tier belongs to somebody, so the token decides whose it is: the
+    `holder` parameter narrows the question to a name, and naming a name the token cannot back is
+    refused rather than obeyed."""
 
     def service(settings: Settings) -> MemoryService:
         return MemoryService(settings, Database(settings))
 
     @app.get("/api/memory/working", response_model=list[EvidenceAtom])
     def working_set(
-        holder: str,
         session: str,
+        http: Request,
         settings: Annotated[Settings, Depends(settings_dep)],
+        holder: str | None = None,
     ) -> list[EvidenceAtom]:
         """What one session recorded, in the order it recorded it, with no search involved."""
+        who = read_as(resolve_caller(http, settings), holder)
+        if not who:
+            raise HTTPException(
+                status_code=422,
+                detail="a working set belongs to somebody; send that holder's token, or the operator token with a holder",
+            )
         try:
-            return service(settings).working_set(holder, session)
+            return service(settings).working_set(who, session)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/api/memory/conflicts", response_model=list[ConflictRecord])
     def conflicts(
+        http: Request,
         settings: Annotated[Settings, Depends(settings_dep)],
         holder: str | None = None,
     ) -> list[ConflictRecord]:
         """Every disagreement the store noticed and nobody has settled."""
-        return service(settings).conflicts(holder)
+        who = read_as(resolve_caller(http, settings), holder)
+        if who == "":
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "a disagreement belongs to somebody; send that holder's token, "
+                    "or the operator token with a holder"
+                ),
+            )
+        return service(settings).conflicts(who)

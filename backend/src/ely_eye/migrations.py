@@ -16,7 +16,7 @@ import sqlite3
 from .storage import token_equivalent, visual_token_equivalent
 from .text_index import index_text
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -96,6 +96,8 @@ _BASE_TABLES = """
             CHECK (kind IN ('person', 'agent', 'service')),
         knows_about_json TEXT NOT NULL DEFAULT '[]',
         contact_json TEXT NOT NULL DEFAULT '{}',
+        token_hash TEXT,
+        token_issued_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     );
@@ -290,6 +292,13 @@ def _recount_visual_tokens(connection: sqlite3.Connection) -> None:
     connection.executemany("UPDATE atoms SET token_equivalent = ? WHERE atom_id = ?", updates)
 
 
+_NEW_HOLDER_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("token_hash", "TEXT"),
+    ("token_issued_at", "TEXT"),
+)
+"""A holder proves its identity with a bearer token; only its hash is kept, so a copied database cannot replay it."""
+
+
 def apply(connection: sqlite3.Connection) -> None:
     """Bring the schema to SCHEMA_VERSION, in place, without losing rows."""
     version = int(connection.execute("PRAGMA user_version").fetchone()[0])
@@ -314,6 +323,11 @@ def apply(connection: sqlite3.Connection) -> None:
             for name, definition in columns:
                 if name not in existing:
                     connection.execute(f"ALTER TABLE atoms ADD COLUMN {name} {definition}")
+    if version < 11:
+        existing_holders = _column_names(connection, "holders")
+        for name, definition in _NEW_HOLDER_COLUMNS:
+            if name not in existing_holders:
+                connection.execute(f"ALTER TABLE holders ADD COLUMN {name} {definition}")
     if version < 10:
         # CREATE VIEW IF NOT EXISTS keeps the old body, and v10 changed which rows are current, so an upgraded store must be told to look again.
         connection.execute("DROP VIEW IF EXISTS v_atoms_current")

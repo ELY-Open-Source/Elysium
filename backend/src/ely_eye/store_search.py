@@ -46,10 +46,11 @@ def search_atoms(
     depends on string-built SQL, and the planner sees one shape. A memory with no event time
     cannot answer a time filter, so it drops out when one is asked for.
 
-    `as_holder` applies the sharing rule: a memory is readable by its owner, by anyone named
-    in its visible_to list, by everyone when it is public, and by anyone when nobody owns it.
-    A memory with no holder cannot be private to a holder that does not exist. Without an
-    asker the query runs over the whole library, which is what an operator debugging wants."""
+    `as_holder` applies the sharing rule in three states: a holder id sees its own memories, the
+    ones naming it in visible_to, the ones marked for everyone, and the ones nobody owns; the
+    empty string is a caller who is nobody, so only the last two; None runs over the whole
+    library, which is what an operator or a process that owns the store reads with. A memory with
+    no holder cannot be private to a holder that does not exist."""
     with database.connect() as connection:
         expression = fts_expression(rare_terms(connection, fts_terms(query)))
         rows = connection.execute(
@@ -77,13 +78,14 @@ def search_atoms(
                     WHERE ca.atom_id = f.atom_id
                       AND ca.cartridge_id IN (SELECT value FROM json_each(?))
               ))
-              AND (? IS NULL OR a.holder_id = ''
+              AND (? IS NULL
+                    OR a.holder_id = ''
                     OR json_extract(a.visibility_json, '$.scope') = 'everyone'
-                    OR a.holder_id = ?
-                    OR EXISTS (
-                          SELECT 1 FROM json_each(json_extract(a.visibility_json, '$.holders'))
-                          WHERE value = ?
-                    ))
+                    OR (? <> '' AND (a.holder_id = ?
+                          OR EXISTS (
+                                SELECT 1 FROM json_each(json_extract(a.visibility_json, '$.holders'))
+                                WHERE value = ?
+                          ))))
             ORDER BY score
             LIMIT ? OFFSET ?
             """,
@@ -105,6 +107,7 @@ def search_atoms(
                 min_trust,
                 None if cartridge_ids is None else to_json(cartridge_ids),
                 None if cartridge_ids is None else to_json(cartridge_ids),
+                as_holder,
                 as_holder,
                 as_holder,
                 as_holder,

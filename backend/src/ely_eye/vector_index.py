@@ -225,7 +225,9 @@ class VectorIndex:
         question with a full scan (77ms over 153,857 atoms) while the atoms table answers it
         through the atom_id index in 0.2ms, and a search cannot afford the scan. The scope is
         checked here rather than in the engine so the rule lives in one place; the engine's id
-        list is only a narrowing.
+        list is only a narrowing. Visibility is here too, and it reads the same three states the
+        words leg reads: a holder id, the empty string for a caller who is nobody (unowned rows
+        and rows marked for everyone, no more), and None for an operator reading the whole library.
         """
         rows = connection.execute(
             """
@@ -246,13 +248,14 @@ class VectorIndex:
                     WHERE ca.atom_id = atoms.atom_id
                       AND ca.cartridge_id IN (SELECT value FROM json_each(?))
               ))
-              AND (? IS NULL OR holder_id = ''
+              AND (? IS NULL
+                    OR holder_id = ''
                     OR json_extract(visibility_json, '$.scope') = 'everyone'
-                    OR holder_id = ?
-                    OR EXISTS (
-                          SELECT 1 FROM json_each(json_extract(visibility_json, '$.holders'))
-                          WHERE value = ?
-                    ))
+                    OR (? <> '' AND (holder_id = ?
+                          OR EXISTS (
+                                SELECT 1 FROM json_each(json_extract(visibility_json, '$.holders'))
+                                WHERE value = ?
+                          ))))
             """,
             (
                 to_json(atom_ids),
@@ -270,6 +273,7 @@ class VectorIndex:
                 until,
                 None if cartridge_ids is None else to_json(cartridge_ids),
                 None if cartridge_ids is None else to_json(cartridge_ids),
+                as_holder,
                 as_holder,
                 as_holder,
                 as_holder,

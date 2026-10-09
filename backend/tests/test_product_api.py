@@ -18,6 +18,8 @@ from ely_eye.storage import ObjectStore
 
 PNG = b"\x89PNG\r\n\x1a\n"
 BASE = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
+OPERATOR = "the-shelf-owner"
+AS_OWNER = {"Authorization": f"Bearer {OPERATOR}"}
 
 HTTP_SURFACE = {
     "/api/adapters",
@@ -32,11 +34,14 @@ HTTP_SURFACE = {
     "/api/cartridges/{cartridge_id}/refresh",
     "/api/cartridges/{cartridge_id}/switch",
     "/api/cartridges/{cartridge_id}/unmount",
+    "/api/card",
+    "/api/card/{holder_id}",
     "/api/chat",
     "/api/hashhop",
     "/api/holders",
     "/api/holders/{holder_id}",
     "/api/holders/{holder_id}/knows",
+    "/api/holders/{holder_id}/token",
     "/api/ingest/path",
     "/api/ingest/upload",
     "/api/memory",
@@ -57,7 +62,7 @@ HTTP_SURFACE = {
 
 @pytest.fixture
 def settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
-    resolved = Settings(home=tmp_path, default_holder="wife")
+    resolved = Settings(home=tmp_path, default_holder="wife", auth_token=OPERATOR)
     monkeypatch.setattr(api_module, "get_settings", lambda: resolved)
     Database(resolved).init()
     return resolved
@@ -106,14 +111,15 @@ def _seed(settings: Settings, pictures: int = 3) -> None:
 
 def test_the_store_pages_newest_first_and_says_how_much_is_left(client: TestClient, settings: Settings) -> None:
     _seed(settings)
-    first = client.get("/api/atoms", params={"limit": 2})
+    # A tokenless caller is nobody and would see none of these; this test reads the shelf as its owner.
+    first = client.get("/api/atoms", params={"limit": 2}, headers=AS_OWNER)
     assert first.status_code == 200
     page = first.json()
     assert page["total"] == 3
     assert [atom["atom_id"] for atom in page["atoms"]] == ["shot2:frame", "shot1:frame"]
     assert page["next_cursor"]
 
-    second = client.get("/api/atoms", params={"limit": 2, "cursor": page["next_cursor"]})
+    second = client.get("/api/atoms", params={"limit": 2, "cursor": page["next_cursor"]}, headers=AS_OWNER)
     rest = second.json()
     assert [atom["atom_id"] for atom in rest["atoms"]] == ["shot0:frame"]
     assert rest["next_cursor"] is None, "the last page must not promise another one"
@@ -125,11 +131,11 @@ def test_browse_narrows_by_modality_and_by_holder(client: TestClient, settings: 
         "the keys are on the shelf", holder_id="wife", origin=MemoryOrigin.self_
     )
 
-    images = client.get("/api/atoms", params={"modality": "image"}).json()
+    images = client.get("/api/atoms", params={"modality": "image"}, headers=AS_OWNER).json()
     assert images["total"] == 2
     assert {atom["modality"] for atom in images["atoms"]} == {"image"}
 
-    his = client.get("/api/atoms", params={"holder": "husband"}).json()
+    his = client.get("/api/atoms", params={"holder": "husband"}, headers=AS_OWNER).json()
     assert [atom["atom_id"] for atom in his["atoms"]] == ["shot1:frame"]
 
 
@@ -142,7 +148,7 @@ def test_an_unreadable_cursor_is_refused_with_400(client: TestClient, settings: 
 
 def test_a_picture_atom_serves_the_bytes_behind_it(client: TestClient, settings: Settings) -> None:
     _seed(settings, pictures=1)
-    response = client.get("/api/atoms/shot0:frame/image")
+    response = client.get("/api/atoms/shot0:frame/image", headers=AS_OWNER)
     assert response.status_code == 200
     assert response.content == PNG
     assert response.headers["content-type"] == "image/png"
@@ -152,15 +158,15 @@ def test_a_memory_with_no_picture_says_so(client: TestClient, settings: Settings
     atom = MemoryService(settings, Database(settings)).remember(
         "the keys are on the shelf", holder_id="wife", origin=MemoryOrigin.self_
     )
-    assert client.get(f"/api/atoms/{atom.atom_id}/image").status_code == 404
-    assert client.get("/api/atoms/nope:image").status_code == 404
+    assert client.get(f"/api/atoms/{atom.atom_id}/image", headers=AS_OWNER).status_code == 404
+    assert client.get("/api/atoms/nope:image", headers=AS_OWNER).status_code == 404
 
 
 def test_a_forgotten_picture_stops_being_served(client: TestClient, settings: Settings) -> None:
     _seed(settings, pictures=1)
     MemoryService(settings, Database(settings)).forget(atom_id="shot0:frame")
-    assert client.get("/api/atoms/shot0:frame/image").status_code == 404
-    assert client.get("/api/atoms").json()["total"] == 0
+    assert client.get("/api/atoms/shot0:frame/image", headers=AS_OWNER).status_code == 404
+    assert client.get("/api/atoms", headers=AS_OWNER).json()["total"] == 0
 
 
 def test_status_says_what_the_machine_can_see_and_what_it_cannot(client: TestClient, settings: Settings) -> None:

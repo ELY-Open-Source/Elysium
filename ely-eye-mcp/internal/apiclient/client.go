@@ -190,3 +190,27 @@ func (c *Client) Search(ctx context.Context, options SearchOptions) (*SearchResu
 	}
 	return &result, nil
 }
+
+// Card asks what the store can answer: the schema its answers come out under, which
+// senses its memory actually covers, and who is in the directory. It is served
+// without a token, so a caller can decide whether to send questions at all.
+func (c *Client) Card(ctx context.Context) (*domain.CapabilityCard, error) {
+	var card domain.CapabilityCard
+	if err := c.Get(ctx, "/api/card", &card); err != nil {
+		return nil, err
+	}
+	return &card, nil
+}
+
+// HolderCard asks the same question about one holder. The server derives it from the
+// memories that holder owns, so a card cannot promise a modality the store lacks.
+func (c *Client) HolderCard(ctx context.Context, holderID string) (*domain.HolderCard, error) {
+	if strings.TrimSpace(holderID) == "" {
+		return nil, errors.New("holder_id is required")
+	}
+	var card domain.HolderCard
+	if err := c.Get(ctx, "/api/card/"+url.PathEscape(holderID), &card); err != nil {
+		return nil, err
+	}
+	return &card, nil
+}

@@ -272,3 +272,33 @@ type ReferralAnswer struct {
 	Answer     string   `json:"answer,omitempty"`
 	Basis      []string `json:"basis"`
 }
+
+// HolderCard is what a stranger may learn about one holder: who they are, what they
+// claim to know, how much they hold and how fresh it is. No memory text is here.
+type HolderCard struct {
+	HolderID     string            `json:"holder_id"`
+	Name         string            `json:"name"`
+	Kind         string            `json:"kind"`
+	KnowsAbout   []string          `json:"knows_about"`
+	Contact      map[string]string `json:"contact"`
+	Memories     int               `json:"memories"`
+	Modalities   map[string]int    `json:"modalities"`
+	Scenarios    []string          `json:"scenarios"`
+	NewestMemory string            `json:"newest_memory,omitempty"`
+	Registered   bool              `json:"registered"`
+	TokenIssued  bool              `json:"token_issued"`
+}
+
+// CapabilityCard answers "can this store answer my kind of questions" before a
+// single question is sent: the schema the answers come out under, which senses the
+// memory actually covers, and who is in the directory.
+type CapabilityCard struct {
+	SchemaVersion int            `json:"schema_version"`
+	Atoms         int            `json:"atoms"`
+	Sources       int            `json:"sources"`
+	Modalities    map[string]int `json:"modalities"`
+	HasAudio      bool           `json:"has_audio"`
+	Holders       []HolderCard   `json:"holders"`
+	Mounts        MountState     `json:"mounts"`
+	GeneratedAt   string         `json:"generated_at"`
+}

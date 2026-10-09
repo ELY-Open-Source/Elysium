@@ -24,6 +24,8 @@ class Holder(BaseModel):
     kind: HolderKind = "person"
     knows_about: list[str] = Field(default_factory=list)
     contact: dict[str, str] = Field(default_factory=dict)
+    token_issued_at: datetime | None = None
+    """When a bearer token was last issued here. The hash itself stays out of the answer."""
     created_at: datetime
     updated_at: datetime
 
@@ -33,6 +35,18 @@ class Holder(BaseModel):
         if not value.strip():
             raise ValueError("holder_id cannot be blank; a directory entry has to name somebody")
         return value.strip()
+
+
+class IssuedToken(BaseModel):
+    """A holder's bearer token, shown once at the moment it is minted.
+
+    Only the hash is stored, so this answer is the only place the value will ever appear: a lost
+    token is replaced, not recovered.
+    """
+
+    holder_id: str
+    token: str
+    issued_at: datetime
 
 
 class HolderUpsertRequest(BaseModel):

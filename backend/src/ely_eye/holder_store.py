@@ -8,6 +8,8 @@ never a guess.
 
 from __future__ import annotations
 
+import hashlib
+import secrets
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
@@ -28,6 +30,9 @@ class WhoKnowsCount:
     matched: int
     top_score: float
     latest_time: str | None
+
+
+_TOKEN_BYTES = 32
 
 
 class HolderStore:
@@ -67,6 +72,63 @@ class HolderStore:
                 ),
             )
         return stored
+
+    def register_minimal(self, holder_id: str) -> None:
+        """Make a holder exist without overwriting what somebody already declared about them.
+
+        A memory nobody registered still needs a directory entry, or a referral to its holder has
+        no target to point at.
+        """
+        now = utc_now().isoformat()
+        with self.database.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO holders (holder_id, name, kind, knows_about_json, contact_json, created_at, updated_at)
+                VALUES (?, '', 'person', '[]', '{}', ?, ?)
+                ON CONFLICT(holder_id) DO NOTHING
+                """,
+                (holder_id, now, now),
+            )
+
+    def issue_token(self, holder_id: str) -> tuple[Holder, str]:
+        """Give a holder a fresh bearer token. The plain value is returned once; the row keeps its hash."""
+        self.register_minimal(holder_id)
+        token = secrets.token_urlsafe(_TOKEN_BYTES)
+        now = utc_now().isoformat()
+        with self.database.connect() as connection:
+            connection.execute(
+                "UPDATE holders SET token_hash = ?, token_issued_at = ?, updated_at = ? WHERE holder_id = ?",
+                (_token_hash(token), now, now, holder_id),
+            )
+        entry = self.get(holder_id)
+        if entry is None:
+            raise ValueError(f"holder {holder_id!r} vanished while its token was being issued")
+        return entry, token
+
+    def revoke_token(self, holder_id: str) -> Holder:
+        """Drop a holder's token: nobody can read as them until a new one is issued."""
+        now = utc_now().isoformat()
+        with self.database.connect() as connection:
+            changed = connection.execute(
+                "UPDATE holders SET token_hash = NULL, token_issued_at = NULL, updated_at = ? WHERE holder_id = ?",
+                (now, holder_id),
+            )
+        if changed.rowcount == 0:
+            raise ValueError(f"no holder {holder_id!r} is registered")
+        entry = self.get(holder_id)
+        if entry is None:
+            raise ValueError(f"holder {holder_id!r} vanished while its token was being revoked")
+        return entry
+
+    def verify_token(self, token: str) -> str | None:
+        """Which holder a bearer token speaks for, or None when it speaks for nobody."""
+        if not token:
+            return None
+        with self.database.connect() as connection:
+            row = connection.execute(
+                "SELECT holder_id FROM holders WHERE token_hash = ?", (_token_hash(token),)
+            ).fetchone()
+        return None if row is None else str(row["holder_id"])
 
     def get(self, holder_id: str) -> Holder | None:
         with self.database.connect() as connection:
@@ -145,6 +207,10 @@ class HolderStore:
         ]
 
 
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def _moment(value: str) -> datetime:
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
@@ -168,6 +234,7 @@ def _row_to_holder(row: sqlite3.Row) -> Holder:
         kind=_kind(str(row["kind"])),
         knows_about=from_json(row["knows_about_json"], []),
         contact=from_json(row["contact_json"], {}),
+        token_issued_at=None if row["token_issued_at"] is None else _moment(str(row["token_issued_at"])),
         created_at=_moment(str(row["created_at"])),
         updated_at=_moment(str(row["updated_at"])),
     )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ import ely_eye.cli as cli_module
 from ely_eye.cli import app
 from ely_eye.config import Settings
 from ely_eye.db import Database
+from ely_eye.holder_store import HolderStore
 from ely_eye.ingestion import IngestionService
 from ely_eye.memory import MemoryService
 from ely_eye.migrations import SCHEMA_VERSION
@@ -249,3 +251,45 @@ def test_the_cli_asks_and_reports_the_referral(tmp_path: Path, monkeypatch: pyte
     assert asked.exit_code == 0 and '"status": "referred"' in asked.stdout
     assert runner.invoke(app, ["holders"]).stdout.count("wife") >= 1
     assert runner.invoke(app, ["holder-set", "wife", "--contact", "not-a-pair"]).exit_code != 0
+
+
+def test_the_cli_mints_a_token_that_proves_who_is_asking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings(home=tmp_path / "home", default_holder="husband")
+    monkeypatch.setattr(cli_module, "get_settings", lambda: settings)
+    runner = CliRunner()
+    Store(settings).wife_remembers(HOME_KEYS)
+
+    issued = json.loads(runner.invoke(app, ["holder-issue", "wife"]).stdout)
+    assert issued["holder_id"] == "wife" and issued["token"] and issued["issued_at"]
+    assert HolderStore(Database(settings)).verify_token(issued["token"]) == "wife"
+    assert issued["token"] not in runner.invoke(app, ["card"]).stdout, "the card is public and the token is not"
+
+    revoked = json.loads(runner.invoke(app, ["holder-revoke", "wife"]).stdout)
+    assert revoked["holder_id"] == "wife" and revoked["token_issued_at"] is None
+    assert HolderStore(Database(settings)).verify_token(issued["token"]) is None
+
+
+def test_the_card_is_read_back_from_the_store_rather_than_written_by_hand(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = Settings(home=tmp_path / "home", default_holder="husband")
+    monkeypatch.setattr(cli_module, "get_settings", lambda: settings)
+    runner = CliRunner()
+    store = Store(settings)
+    store.wife_remembers(HOME_KEYS)
+    store.husband_remembers(WORK_KEYS)
+    store.register("neighbour", name="邻居", knows_about=["weather"])
+
+    answer = runner.invoke(app, ["card"])
+    assert answer.exit_code == 0, answer.stdout
+    card = json.loads(answer.stdout)
+    assert card["schema_version"] == SCHEMA_VERSION
+    assert card["atoms"] == 2 and card["sources"] == 2
+    assert card["modalities"] == {"text": 2} and card["has_audio"] is False
+    assert card["mounts"] == {"mounted": [], "scoped": False, "atoms_in_scope": 0}
+
+    named = {entry["holder_id"]: entry for entry in card["holders"]}
+    assert named["wife"]["memories"] == 1 and named["wife"]["scenarios"] == ["home"]
+    assert named["wife"]["newest_memory"], "a caller needs to know how stale the answer would be"
+    assert named["neighbour"]["memories"] == 0 and named["neighbour"]["knows_about"] == ["weather"]
+    assert HOME_KEYS not in answer.stdout, "the card says what a holder holds, never what they hold it to be"

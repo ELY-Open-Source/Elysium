@@ -8,9 +8,9 @@ only as a parameter of register().
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 
-from .api_auth import require_write
+from .api_auth import read_as, require_write, resolve_caller
 from .config import Settings
 from .db import Database
 from .holder_store import HolderStore
@@ -20,6 +20,7 @@ from .transactive_schemas import (
     AskRequest,
     Holder,
     HolderUpsertRequest,
+    IssuedToken,
     ReferralAnswer,
     WhoKnowsReport,
     WhoKnowsRequest,
@@ -27,7 +28,12 @@ from .transactive_schemas import (
 
 
 def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
-    """Register the transactive routes. The server owns the timestamps, the caller does not."""
+    """Register the transactive routes. The server owns the timestamps, the caller does not.
+
+    The directory routes answer "who knows this?" and carry counts, scores and contact details but
+    no memory text, so they stay readable without a token; `ask` reads the memories themselves, so
+    it runs through the eyes the token proves.
+    """
 
     app.state.write_settings = settings_dep
 
@@ -84,6 +90,34 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return entry
 
+    @app.post("/api/holders/{holder_id}/token", response_model=IssuedToken)
+    def issue_token(
+        holder_id: str,
+        settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
+    ) -> IssuedToken:
+        """Mint a bearer token for one holder. Only the operator token may do this, and the value is shown once."""
+        try:
+            entry, token = store(settings).issue_token(holder_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        issued_at = entry.token_issued_at
+        if issued_at is None:
+            raise HTTPException(status_code=500, detail=f"holder {holder_id!r} holds a token but no issue time")
+        return IssuedToken(holder_id=entry.holder_id, token=token, issued_at=issued_at)
+
+    @app.delete("/api/holders/{holder_id}/token", response_model=Holder)
+    def revoke_token(
+        holder_id: str,
+        settings: Annotated[Settings, Depends(settings_dep)],
+        _: Annotated[None, Depends(require_write)],
+    ) -> Holder:
+        """Drop a holder's token; the holder stays in the directory, only the proof of identity goes."""
+        try:
+            return store(settings).revoke_token(holder_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     @app.get("/api/holders/{holder_id}/knows", response_model=WhoKnowsReport)
     def holder_knows(
         holder_id: str,
@@ -111,12 +145,14 @@ def register(app: FastAPI, settings_dep: Callable[[], Settings]) -> None:
     @app.post("/api/ask", response_model=ReferralAnswer)
     def ask(
         request: AskRequest,
+        http: Request,
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> ReferralAnswer:
+        """Ask, and be referred. The memories read here belong to somebody, so the token decides whose."""
         try:
             return TransactiveService(settings).ask(
                 request.question,
-                as_holder=request.as_holder,
+                as_holder=read_as(resolve_caller(http, settings), request.as_holder),
                 max_hops=request.max_hops,
                 include_text=request.include_text,
             )

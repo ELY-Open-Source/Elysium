@@ -65,7 +65,7 @@ fi
 # /api/memory/working exists only on builds that carry the memory tiers, so a server left over from
 # an older tree answers 404 here. Checking the MCP reply instead would prove nothing — the Go layer
 # decodes into its own struct and re-emits a missing field as 0, so an old server still passes.
-status="$(curl -s -o /dev/null -w '%{http_code}' \
+status="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
   "http://127.0.0.1:${port}/api/memory/working?holder=fingerprint&session=probe")"
 if [ "$status" != "200" ]; then
   echo "FAIL: port ${port} answers /api/status but returns HTTP $status for /api/memory/working;"
@@ -178,7 +178,8 @@ send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 names = [item["name"] for item in call(2, "tools/list", {})["tools"]]
 for required in ("remember", "supersede_memory", "forget_memory", "mounted_cartridges",
                  "mount_cartridge", "switch_cartridge", "unmount_cartridge", "append_to_cartridge",
-                 "who_knows", "ask", "list_holders", "working_set", "memory_conflicts"):
+                 "who_knows", "ask", "list_holders", "working_set", "memory_conflicts",
+                 "ely_eye_card"):
     if required not in names:
         raise SystemExit(f"FAIL: {required} is not registered; tools are {names}")
 
@@ -315,5 +316,140 @@ if any(hit["atom"]["atom_id"] == older["atom_id"] for hit in settled):
 if not any(hit["atom"]["atom_id"] == newer["atom_id"] for hit in settled):
     raise SystemExit(f"FAIL: the newer side of the conflict went missing: {settled}")
 
-print("PASS: remember, supersede, search, forget, cartridge mounting, the transactive referral and the memory tiers work through MCP")
+# The card is derived, not declared: it says what this store can answer, and it is
+# safe to read before trusting the store because it carries no memory text.
+card = tool("ely_eye_card", {})["card"]
+if card["schema_version"] < 11 or card["has_audio"]:
+    raise SystemExit(f"FAIL: the capability card misreports the store: {card}")
+wife_card = next((item for item in card["holders"] if item["holder_id"] == "wife"), None)
+if not wife_card or wife_card["memories"] < 1 or "护照" not in wife_card["knows_about"]:
+    raise SystemExit(f"FAIL: the card does not say what the wife holds: {card['holders']}")
+if secret in json.dumps(card, ensure_ascii=False):
+    raise SystemExit(f"FAIL: the capability card carried private text: {card}")
+single = tool("ely_eye_card", {"holder_id": "wife"})["holder"]
+if single["memories"] != wife_card["memories"] or single["newest_memory"] != wife_card["newest_memory"]:
+    raise SystemExit(f"FAIL: the one-holder card disagrees with the store card: {single}")
+
+print("PASS: remember, supersede, search, forget, cartridge mounting, the transactive referral, the memory tiers and the capability card work through MCP")
+PY
+
+# The boundary, proved from the outside: a caller with no token is nobody, and a holder's
+# token reads her own memories and nobody else's. The MCP process is re-run without the
+# operator token so the Go path is measured against the same rule, not assumed.
+"$python_bin" - "$home/ely-eye-mcp" "$port" "$secret" "$ELY_EYE_AUTH_TOKEN" <<'PY'
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+binary, port, secret, operator = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+base = f"http://127.0.0.1:{port}"
+
+
+def request(path, body=None, token=None, method=None):
+    payload = None if body is None else json.dumps(body, ensure_ascii=False).encode()
+    req = urllib.request.Request(base + path, data=payload, method=method or ("POST" if body is not None else "GET"))
+    if payload is not None:
+        req.add_header("content-type", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as error:
+        raw = error.read().decode()
+        try:
+            return error.code, json.loads(raw)
+        except json.JSONDecodeError:
+            return error.code, {"detail": raw}
+
+
+def texts(query, token=None):
+    status, answer = request("/api/search", {"query": query, "top_k": 10}, token=token)
+    if status != 200:
+        raise SystemExit(f"FAIL: search returned HTTP {status}: {answer}")
+    return [hit["atom"]["text"] for hit in answer["hits"]]
+
+
+# Written by this machine's principal, so it is somebody else's memory to her.
+foreign = "the oven needs descaling"
+
+if secret in texts(secret):
+    raise SystemExit("FAIL: a caller with no token read a private memory")
+
+status, issued = request("/api/holders/wife/token", {}, token=operator, method="POST")
+token = issued.get("token") if status == 200 else None
+if not token:
+    raise SystemExit(f"FAIL: the operator could not mint the wife's token: HTTP {status} {issued}")
+if secret not in texts(secret, token=token):
+    raise SystemExit("FAIL: the wife's own token cannot find her memory")
+if foreign not in texts(foreign, token=operator):
+    raise SystemExit("FAIL: the operator token cannot read the memory its own principal wrote")
+if foreign in texts(foreign, token=token):
+    raise SystemExit("FAIL: the wife's token reads somebody else's memory")
+
+status, answer = request("/api/search", {"query": "护照", "filters": {"as_holder": "local"}}, token=token)
+if status != 403:
+    raise SystemExit(f"FAIL: the wife naming another holder returned HTTP {status}, want 403: {answer}")
+if "local" not in json.dumps(answer, ensure_ascii=False):
+    raise SystemExit(f"FAIL: the refusal does not name the holder she reached for: {answer}")
+
+status, card = request("/api/card")
+if status != 200 or card["schema_version"] < 11:
+    raise SystemExit(f"FAIL: the capability card needs a token or misreports the store: HTTP {status} {card}")
+if secret in json.dumps(card, ensure_ascii=False):
+    raise SystemExit("FAIL: the capability card carried private text")
+
+env = {key: value for key, value in os.environ.items() if key != "ELY_EYE_AUTH_TOKEN"}
+proc = subprocess.Popen([binary, "server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL, text=True, env=env)
+
+
+def send(message):
+    proc.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
+    proc.stdin.flush()
+
+
+def call(id_, method, params):
+    send({"jsonrpc": "2.0", "id": id_, "method": method, "params": params})
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            raise SystemExit(f"FAIL: the tokenless MCP server closed the pipe at request {id_}")
+        answer = json.loads(line)
+        if answer.get("id") == id_:
+            if "error" in answer:
+                raise SystemExit(f"FAIL: {method} returned {answer['error']}")
+            return answer["result"]
+
+
+def tool(name, arguments):
+    result = call(3, "tools/call", {"name": name, "arguments": arguments})
+    if result.get("isError"):
+        raise SystemExit(f"FAIL: {name} returned an error: {result['content']}")
+    return result["structuredContent"]
+
+
+call(1, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
+                       "clientInfo": {"name": "ely-eye-stranger", "version": "0"}})
+send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+stranger_card = tool("ely_eye_card", {})["card"]
+if stranger_card["schema_version"] != card["schema_version"]:
+    raise SystemExit(f"FAIL: the tokenless card reports a different schema: {stranger_card}")
+stranger_hits = tool("search_atoms", {"query": secret})["hits"]
+if any(hit["atom"]["text"] == secret for hit in stranger_hits):
+    raise SystemExit(f"FAIL: a tokenless MCP client read a private memory: {stranger_hits}")
+directory = tool("who_knows", {"query": "护照"})["report"]
+if directory["status"] != "found" or not directory["hits"]:
+    raise SystemExit(f"FAIL: a tokenless client cannot use the directory: {directory}")
+if directory["hits"][0]["holder_id"] != "wife":
+    raise SystemExit(f"FAIL: the directory stopped naming the wife: {directory['hits'][0]}")
+proc.stdin.close()
+proc.wait(timeout=10)
+
+print("PASS: a caller with no token sees only public memory, a holder's token sees her own, "
+      "naming somebody else is refused, and the capability card answers without a token")
 PY

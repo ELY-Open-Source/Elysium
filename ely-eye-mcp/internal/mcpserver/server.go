@@ -33,13 +33,14 @@ func Run(ctx context.Context, cfg config.Config, version string) error {
 		Title:   "Ely-Eye Context Cartridge MCP",
 		Version: version,
 	}, &mcp.ServerOptions{
-		Instructions: "Use Ely-Eye tools to retrieve local cartridge context, evidence atoms, proof suites, and compiled evidence packs. Read tools mirror local Ely-Eye state without writing. remember, supersede_memory and forget_memory mutate memory through the Ely-Eye API, which must be running (`ely-eye serve`); the server, not the caller, decides who owns a memory. mount_cartridge and switch_cartridge decide what a search may see: mount a cartridge to ask only that cartridge, and unmount everything to ask the whole library. working_set reloads what one session already recorded, in order, without searching; memory_conflicts reports what the store has not reconciled, and settling one is the operator's act, not a tool's.",
+		Instructions: "Use Ely-Eye tools to retrieve local cartridge context, evidence atoms, proof suites, and compiled evidence packs. Read tools mirror local Ely-Eye state without writing. remember, supersede_memory and forget_memory mutate memory through the Ely-Eye API, which must be running (`ely-eye serve`); the server, not the caller, decides who owns a memory. mount_cartridge and switch_cartridge decide what a search may see: mount a cartridge to ask only that cartridge, and unmount everything to ask the whole library. working_set reloads what one session already recorded, in order, without searching; memory_conflicts reports what the store has not reconciled, and settling one is the operator's act, not a tool's. ely_eye_card says what the store can answer before anything is sent: schema version, which senses its memory covers, and who holds what. A read with no ELY_EYE_AUTH_TOKEN sees only memories nobody owns and memories marked for everyone, so a private answer needs the token.",
 	})
 	server.registerTools(mcpServer)
 	server.registerWriteTools(mcpServer)
 	server.registerDirectoryTools(mcpServer)
 	server.registerMountTools(mcpServer)
 	server.registerTierTools(mcpServer)
+	server.registerCardTools(mcpServer)
 	server.registerResources(mcpServer)
 	if err := mcpServer.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		if errors.Is(err, io.EOF) || strings.HasSuffix(err.Error(), "EOF") {

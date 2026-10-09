@@ -8,7 +8,14 @@ from .cache_fabric import SEMANTIC_LAYER, CacheFabric
 from .config import Settings, get_settings
 from .db import Database
 from .retrieval import RetrievalService
-from .schemas import CompiledContext, ContextPlan, Modality, RetrievalHit, RuntimeProfile
+from .schemas import (
+    CompiledContext,
+    ContextPlan,
+    Modality,
+    RetrievalHit,
+    RuntimeProfile,
+    SearchFilters,
+)
 
 PROFILE_TOKEN_BUDGETS = {
     RuntimeProfile.live_demo: 128_000,
@@ -25,8 +32,18 @@ class ContextCompiler:
         self.retrieval = RetrievalService(self.settings, self.db)
         self.cache = CacheFabric(self.settings, self.db)
 
-    def compile(self, question: str, profile: RuntimeProfile) -> CompiledContext:
-        cache_key = self.cache.semantic_key(question, profile.value, self.db.revision())
+    def compile(self, question: str, profile: RuntimeProfile, as_holder: str | None = None) -> CompiledContext:
+        """Build the context one question gets, seen through one holder's eyes.
+
+        `as_holder` is passed to retrieval and folded into the cache key: a context compiled for
+        a holder carries that holder's own memories, and serving it to somebody else would leak.
+        """
+        cache_key = self.cache.semantic_key(
+            question,
+            profile.value,
+            self.db.revision(),
+            "the whole library" if as_holder is None else f"as holder {as_holder!r}",
+        )
         cached = self.cache.read_semantic_cache(cache_key)
         if cached is not None:
             compiled = CompiledContext.model_validate(cached)
@@ -40,7 +57,9 @@ class ContextCompiler:
         else:
             self.cache.record_miss(SEMANTIC_LAYER, cache_key)
         plan = self.plan(question, profile)
-        hits = self.retrieval.search(plan.retrieval_query, plan.evidence_budget_atoms).hits
+        hits = self.retrieval.search(
+            plan.retrieval_query, plan.evidence_budget_atoms, filters=SearchFilters(as_holder=as_holder)
+        ).hits
         citable, held = self._split_citable(hits)
         packed_text, token_total = self._pack_hits(citable, plan.token_budget, plan.retrieval_query)
         trace_id = hashlib.sha256(f"{cache_key}:{token_total}".encode()).hexdigest()[:16]

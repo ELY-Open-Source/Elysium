@@ -17,6 +17,7 @@ from . import lifecycle_store, trust
 from .cache_fabric import CacheFabric
 from .config import Settings, get_settings
 from .db import Database
+from .holder_store import HolderStore
 from .schemas import (
     ArchiveReport,
     ConflictRecord,
@@ -75,7 +76,8 @@ class MemoryService:
         """Store one statement as a memory owned by a holder.
 
         Repeating the same sentence as the same holder updates the memory instead of
-        duplicating it; two holders holding the same sentence keep two memories.
+        duplicating it; two holders holding the same sentence keep two memories. A holder nobody
+        registered is added to the directory here, so a referral to it has something to point at.
         """
         statement = text.strip()
         if not statement:
@@ -89,6 +91,7 @@ class MemoryService:
             )
 
         moment = utc_now()
+        HolderStore(self.db).register_minimal(holder_id)
         digest = hashlib.sha256(f"{holder_id}\n{statement}".encode()).hexdigest()
         source_id = f"mem-{digest[:16]}"
         self.db.upsert_sources(

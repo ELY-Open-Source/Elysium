@@ -51,7 +51,8 @@ class Store:
         return self.cartridges.materialize(name, atoms, sources).cartridge_id
 
     def texts(self, query: str = "钥匙", **filters: Any) -> list[str]:
-        result = self.search.search(query, filters=SearchFilters(**filters) if filters else None)
+        eyes: dict[str, Any] = {"as_holder": "wife", **filters}
+        result = self.search.search(query, filters=SearchFilters(**eyes))
         return [hit.atom.text for hit in result.hits]
 
 

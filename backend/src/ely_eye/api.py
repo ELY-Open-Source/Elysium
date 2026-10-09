@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +13,8 @@ from pydantic import BaseModel
 
 from . import __version__
 from .adapters import plan as adapter_plan
-from .api_auth import require_write
+from .api_auth import read_as, require_write, resolve_caller
+from .api_card import register as register_card_routes
 from .api_cartridges import register as register_cartridge_routes
 from .api_holders import register as register_holder_routes
 from .api_memory import register as register_memory_routes
@@ -43,6 +44,7 @@ from .schemas import (
     PathIngestRequest,
     RememberRequest,
     RuntimeProfile,
+    SearchFilters,
     SearchRequest,
     SearchResult,
     SupersedeRequest,
@@ -166,12 +168,15 @@ def create_app() -> FastAPI:
     @app.post("/api/chat", response_model=AnswerResponse)
     def chat(
         request: ChatRequest,
+        http: Request,
         settings: Annotated[Settings, Depends(settings_dep)],
         _: Annotated[None, Depends(require_write)],
     ) -> AnswerResponse:
         db = Database(settings)
         compiler = ContextCompiler(settings, db)
-        context = compiler.compile(request.question, request.profile)
+        context = compiler.compile(
+            request.question, request.profile, as_holder=read_as(resolve_caller(http, settings), None)
+        )
         if not context.hits:
             raise HTTPException(status_code=404, detail="No evidence atoms are available for this question.")
         runtime = QwenRuntime(settings)
@@ -192,12 +197,24 @@ def create_app() -> FastAPI:
         )
 
     @app.post("/api/search", response_model=SearchResult)
-    def search(request: SearchRequest, settings: Annotated[Settings, Depends(settings_dep)]) -> SearchResult:
+    def search(
+        request: SearchRequest,
+        http: Request,
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> SearchResult:
+        """Search through the eyes the token proves. A body that names another holder is refused, not obeyed."""
         try:
+            caller = resolve_caller(http, settings)
+            eyes = read_as(caller, request.filters.as_holder if request.filters else None)
+            filters = request.filters
+            if filters is not None:
+                filters = filters.model_copy(update={"as_holder": eyes})
+            elif eyes is not None:
+                filters = SearchFilters(as_holder=eyes)
             return RetrievalService(settings).search(
                 request.query,
                 request.top_k,
-                filters=request.filters,
+                filters=filters,
                 cursor=request.cursor,
                 image=request.image,
             )
@@ -207,13 +224,15 @@ def create_app() -> FastAPI:
     @app.post("/api/memory", response_model=EvidenceAtom)
     def remember(
         request: RememberRequest,
+        http: Request,
         settings: Annotated[Settings, Depends(settings_dep)],
         _: Annotated[None, Depends(require_write)],
     ) -> EvidenceAtom:
+        """The token decides who owns the memory; the body cannot say so. The operator token writes as the default holder."""
         try:
             return MemoryService(settings).remember(
                 request.text,
-                holder_id=settings.default_holder,
+                holder_id=resolve_caller(http, settings).holder_id or settings.default_holder,
                 origin=MemoryOrigin.self_,
                 scenario=request.scenario,
                 event_time=request.event_time,
@@ -229,6 +248,7 @@ def create_app() -> FastAPI:
     @app.post("/api/memory/supersede", response_model=EvidenceAtom)
     def supersede(
         request: SupersedeRequest,
+        http: Request,
         settings: Annotated[Settings, Depends(settings_dep)],
         _: Annotated[None, Depends(require_write)],
     ) -> EvidenceAtom:
@@ -236,7 +256,7 @@ def create_app() -> FastAPI:
             return MemoryService(settings).supersede(
                 request.atom_id,
                 text=request.text,
-                holder_id=settings.default_holder,
+                holder_id=resolve_caller(http, settings).holder_id or settings.default_holder,
                 scenario=request.scenario,
                 event_time=request.event_time,
                 event_time_precision=request.event_time_precision,
@@ -263,6 +283,7 @@ def create_app() -> FastAPI:
     register_cartridge_routes(app, settings_dep)
     register_holder_routes(app, settings_dep)
     register_memory_routes(app, settings_dep)
+    register_card_routes(app, settings_dep)
 
     @app.get("/api/adapters", response_model=list[AdapterStatus])
     def adapters(settings: Annotated[Settings, Depends(settings_dep)]) -> list[AdapterStatus]:
@@ -270,6 +291,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/atoms", response_model=AtomPage)
     def atoms(
+        http: Request,
         settings: Annotated[Settings, Depends(settings_dep)],
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         cursor: str | None = None,
@@ -277,6 +299,7 @@ def create_app() -> FastAPI:
         source_id: str | None = None,
         holder: str | None = None,
     ) -> AtomPage:
+        """`holder` picks whose shelf to look at; the token decides what is on it."""
         try:
             return browse(
                 settings,
@@ -285,13 +308,16 @@ def create_app() -> FastAPI:
                 modality=modality,
                 source_id=source_id,
                 holder=holder,
+                as_holder=read_as(resolve_caller(http, settings), None),
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/atoms/{atom_id}/image")
-    def atom_image(atom_id: str, settings: Annotated[Settings, Depends(settings_dep)]) -> FileResponse:
-        found = picture(settings, atom_id)
+    def atom_image(
+        atom_id: str, http: Request, settings: Annotated[Settings, Depends(settings_dep)]
+    ) -> FileResponse:
+        found = picture(settings, atom_id, as_holder=read_as(resolve_caller(http, settings), None))
         if found is None:
             raise HTTPException(status_code=404, detail=f"{atom_id} has no picture to show")
         return FileResponse(found.path, media_type=found.mime)

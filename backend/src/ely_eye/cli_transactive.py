@@ -10,12 +10,13 @@ from collections.abc import Callable
 
 import typer
 
+from .card import build_card
 from .config import Settings
 from .db import Database
 from .holder_store import HolderStore
 from .schemas import utc_now
 from .transactive import TransactiveService
-from .transactive_schemas import Holder, HolderKind
+from .transactive_schemas import Holder, HolderKind, IssuedToken
 
 
 def register(app: typer.Typer, settings: Callable[[], Settings]) -> None:
@@ -61,6 +62,25 @@ def register(app: typer.Typer, settings: Callable[[], Settings]) -> None:
         """Delete a holder. Refuses while that holder still owns memories."""
         store().delete(holder_id)
         typer.echo(f'{{"deleted": "{holder_id}"}}')
+
+    @app.command("holder-issue")
+    def holder_issue(holder_id: str) -> None:
+        """Mint a bearer token for one holder. The value appears once: only its hash is stored."""
+        entry, token = store().issue_token(holder_id)
+        if entry.token_issued_at is None:
+            raise ValueError(f"holder {holder_id!r} holds a token but no issue time")
+        issued = IssuedToken(holder_id=entry.holder_id, token=token, issued_at=entry.token_issued_at)
+        typer.echo(issued.model_dump_json(indent=2))
+
+    @app.command("holder-revoke")
+    def holder_revoke(holder_id: str) -> None:
+        """Drop a holder's token. The entry stays; nobody can read as them until a new one is issued."""
+        typer.echo(store().revoke_token(holder_id).model_dump_json(indent=2))
+
+    @app.command()
+    def card() -> None:
+        """What this store can answer, read back from what it holds: holders, senses, schema, mounts."""
+        typer.echo(build_card(settings()).model_dump_json(indent=2))
 
     @app.command("who-knows")
     def who_knows(query: str, as_holder: str = "", limit: int = 8) -> None:

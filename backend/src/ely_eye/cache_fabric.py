@@ -17,9 +17,9 @@ class CacheFabric:
         self.settings = settings or get_settings()
         self.db = database or Database(self.settings)
 
-    def semantic_key(self, question: str, profile: str, store_revision: int) -> str:
-        """A compiled context is only true for the corpus it was compiled from, so the corpus is part of its name."""
-        return hashlib.sha256(f"compiler-v2\n{profile}\n{store_revision}\n{question}".encode()).hexdigest()
+    def semantic_key(self, question: str, profile: str, store_revision: int, holder: str = "") -> str:
+        """A compiled context is only true for the corpus it was compiled from and the eyes that were allowed to see it, so both belong in its name."""
+        return hashlib.sha256(f"compiler-v2\n{profile}\n{store_revision}\n{holder}\n{question}".encode()).hexdigest()
 
     def record_hit(self, layer: str, cache_key: str, bytes_estimate: int = 0, metadata: dict[str, Any] | None = None) -> None:
         self.db.log_cache_event(layer, cache_key, "hit", bytes_estimate, metadata)
