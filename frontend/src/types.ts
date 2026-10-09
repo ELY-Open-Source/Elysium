@@ -309,6 +309,7 @@ export interface ForgetReport {
   atoms_deleted: number;
   edges_deleted: number;
   cache_entries_cleared: number;
+  semantic_cache_cleared: number;
   vectors_dropped: number;
   visual_index_dropped: boolean;
   affected_cartridges: Array<Record<string, unknown>>;

@@ -18,6 +18,7 @@ from ely_eye.schemas import MemoryOrigin
 from ely_eye.store_search import search_atoms
 from ely_eye.text_index import (
     RAREST_KEEP,
+    fts_all_expression,
     fts_expression,
     fts_query,
     fts_terms,
@@ -177,6 +178,29 @@ def test_a_query_of_one_word_is_never_filtered() -> None:
     connection = _library(_shelf("pdf"))
 
     assert rare_terms(connection, ["the"]) == ["the"], "dropping the only word would leave nothing to match"
+
+
+def test_a_word_the_library_lacks_leaves_nothing_behind() -> None:
+    """A question is a read: a stranger's vocabulary must not grow the store one row per novel word."""
+    connection = _library(_shelf("pdf"))
+
+    rare_terms(connection, fts_terms("quixotic pdf"))
+
+    cached = connection.execute("SELECT term FROM term_df").fetchall()
+    assert [row[0] for row in cached] == [fts_expression(["pdf"])], (
+        "only a word the library actually holds is worth remembering"
+    )
+
+
+def test_an_all_expression_demands_every_word_it_is_given() -> None:
+    connection = _library(["the archive thermostat holds eighteen degrees", "the archive is closed"])
+
+    hits = connection.execute(
+        "SELECT atom_id FROM atom_fts WHERE atom_fts MATCH ?",
+        (fts_all_expression(["archive", "thermostat"]),),
+    ).fetchall()
+
+    assert [row[0] for row in hits] == ["a0"], "one shared word must not match a whole sentence"
 
 
 def test_an_empty_library_keeps_every_term() -> None:

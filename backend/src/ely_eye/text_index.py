@@ -54,9 +54,23 @@ def fts_expression(terms: list[str]) -> str:
     """
     if not terms:
         raise ValueError("fts_expression needs at least one term")
-    if len(terms) == 1:
-        return _cjk_phrase(terms[0]) if _is_cjk(terms[0]) else f"{_quote(terms[0])}*"
-    return " OR ".join(_cjk_phrase(term) if _is_cjk(term) else f"{_quote(term)}*" for term in terms)
+    return " OR ".join(_term_phrase(term) for term in terms)
+
+
+def fts_all_expression(terms: list[str]) -> str:
+    """Build the MATCH expression that demands every term.
+
+    A question ORs because it is longer than the sentence that answers it. Corroboration ANDs: a
+    second source either carries the claim's own words or it does not, and an OR would let one
+    shared word vouch for a whole sentence.
+    """
+    if not terms:
+        raise ValueError("fts_all_expression needs at least one term")
+    return " AND ".join(_term_phrase(term) for term in terms)
+
+
+def _term_phrase(term: str) -> str:
+    return _cjk_phrase(term) if _is_cjk(term) else f"{_quote(term)}*"
 
 
 def fts_query(query: str) -> str:
@@ -115,7 +129,9 @@ def _term_matches(connection: sqlite3.Connection, expression: str, cap: int) -> 
             (expression, cap),
         ).fetchone()[0]
     )
-    connection.execute("INSERT OR REPLACE INTO term_df(term, documents) VALUES (?, ?)", (expression, matches))
+    if matches:
+        # A word the corpus has never used is not remembered: a stranger's vocabulary would grow the store one row per novel question.
+        connection.execute("INSERT OR REPLACE INTO term_df(term, documents) VALUES (?, ?)", (expression, matches))
     return matches
 
 

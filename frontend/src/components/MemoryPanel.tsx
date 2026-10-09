@@ -103,6 +103,7 @@ export function MemoryPanel({ onChanged }: { onChanged: () => void }) {
       setNotice(
         `forgotten: ${report.atoms_deleted} atom${report.atoms_deleted === 1 ? '' : 's'}, ` +
           `${report.edges_deleted} links, ${report.cache_entries_cleared} cache entries` +
+          (report.semantic_cache_cleared ? `, ${report.semantic_cache_cleared} compiled contexts dropped` : '') +
           (report.vectors_dropped ? `, ${report.vectors_dropped} dense vectors dropped` : '') +
           (report.visual_index_dropped ? ', picture index dropped' : ''),
       );
