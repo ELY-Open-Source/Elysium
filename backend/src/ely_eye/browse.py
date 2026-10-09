@@ -11,7 +11,7 @@ from .retrieval import decode_cursor, encode_cursor
 from .schemas import AtomPage, Modality
 from .storage import ObjectStore
 
-# The visibility rule is spelled out in four literal statements — two here, one in store_search, one in vector_index — because the SQL gate rejects a concatenated statement and a view cannot take a parameter; backend/tests/test_visibility_rule.py fails if the copies disagree.
+# The visibility rule is spelled out in five literal statements — three here, one in store_search, one in vector_index — because the SQL gate rejects a concatenated statement and a view cannot take a parameter; backend/tests/test_visibility_rule.py fails if the copies disagree.
 
 
 @dataclass(frozen=True)
