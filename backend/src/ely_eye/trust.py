@@ -45,6 +45,11 @@ CORROBORATION_TERMS = 3
 CORROBORATION_LIMIT = 3
 # A claim written in both scripts is corroborated in both: the CJK positions plus its most distinctive Latin word.
 LATIN_WITH_CJK = 1
+# A function word cannot be one of the places a witness has to match. The list is fixed and knows nothing
+# about the corpus, so it cannot decide belief by size the way a rare-term cutoff did.
+STOPWORDS: frozenset[str] = frozenset(
+    ["a", "an", "the", "and", "or", "but", "if", "then", "than", "of", "to", "in", "on", "for", "with", "without", "within", "at", "by", "from", "into", "over", "under", "above", "as", "that", "this", "these", "those", "it", "its", "he", "she", "they", "them", "we", "you", "i", "not", "no", "yes", "very", "just", "also", "too", "am", "is", "are", "was", "were", "be", "been", "being", "do", "does", "did", "have", "has", "had", "having", "will", "would", "shall", "should", "can", "could", "may", "might", "must", "there", "here", "where", "when", "who", "whom", "whose", "which", "what", "how", "why"]
+)
 
 
 def _fold(text: str) -> str:
@@ -80,12 +85,13 @@ def corroborating_atom_ids(
     that the claim was seen twice, not proof that it is true. A closed or quarantined atom cannot
     corroborate, so a superseded fact stops propping up whatever cited it.
 
-    The words demanded are the claim's own spine, with the instruction phrases stripped out. Neither
-    the attack's own words nor the size of the library decides whether a second source is believed:
+    The words demanded are the claim's own spine, with the instruction phrases and function words
+    stripped out. Neither the attack's own words nor the size of the library decides whether a second
+    source is believed:
     an earlier rule that dropped words common to the corpus left a two-atom library unable to
-    corroborate anything, and 40 unrelated memories able to. A claim with fewer usable words than the
-    rule demands is never corroborated, so a two-word rumour stays uncited — failing closed was
-    chosen over trusting a sentence too short to compare.
+    corroborate anything, and 40 unrelated memories able to. A claim too short to compare in its own
+    script is never corroborated, and a word borrowed from the other script cannot rescue it — failing
+    closed was chosen over trusting a sentence too short to compare.
     """
     terms = claim_terms(atom.text)
     if len(terms) < CORROBORATION_TERMS:
@@ -127,9 +133,15 @@ def claim_terms(text: str) -> list[str]:
     longest Latin word, because sorting the two channels together by length let one planted English
     word drop the Chinese assertion out of the comparison.
 
+    Each script is measured on its own terms. A claim with fewer than three usable pairs is not made
+    comparable by a borrowed Latin word, and a demanded word is only counted if it carries content —
+    "恒温器 the" repeated verbatim, or "Pineapple answer the", is too short to corroborate anything.
+
     What that does not buy: the middle position of a long claim can land on filler, so a witness that
     keeps the three positions and changes a date or a number elsewhere is still read as agreement, and
-    a witness that contains a demanded pair inside a longer word (很好 inside 很好笑) counts too.
+    a witness that contains a demanded pair inside a longer word (很好 inside 很好笑) counts too. A mixed
+    claim also demands its longest Latin word, so a witness that translates that word instead of
+    keeping it is read as disagreement.
     """
     try:
         terms = fts_terms(text)
@@ -141,11 +153,15 @@ def claim_terms(text: str) -> list[str]:
     for term in terms:
         if is_cjk(term):
             pairs.extend(pair for pair in cjk_pairs(term) if pair not in blocked)
-        elif term not in blocked:
+        elif term not in blocked and term not in STOPWORDS:
             words.append(term)
-    spread = _spread(list(dict.fromkeys(pairs)))
+    unique = list(dict.fromkeys(pairs))
     longest = sorted(dict.fromkeys(words), key=lambda word: -len(word))
-    return spread + longest[:LATIN_WITH_CJK if spread else CORROBORATION_TERMS]
+    if unique:
+        if len(unique) < CORROBORATION_TERMS:
+            return []
+        return _spread(unique) + longest[:LATIN_WITH_CJK]
+    return longest[:CORROBORATION_TERMS] if len(longest) >= CORROBORATION_TERMS else []
 
 
 def _signal_words(text: str) -> set[str]:
