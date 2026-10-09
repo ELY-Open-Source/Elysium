@@ -1,0 +1,98 @@
+# Agent notes for this repository
+
+Read `CHECKLIST.md` for the ordered work list and `Gaps.md` for the audit the
+work started from. Measured results live in `bench/reports/`. If a sentence in
+this repository states a capability, there must be a command that demonstrates
+it — otherwise the sentence belongs in the "not measured" section.
+
+## Verify before you claim
+
+Run the gates, and compare against the recorded baseline rather than "it built":
+
+```bash
+pytest -q                                       # both launch styles must work
+ruff check backend/src/ely_eye backend/tests bench
+.venv/bin/python -m bench.filesize_check         # fails on any tracked file > 500 lines
+.venv/bin/python -m bench.audit --product        # the harness must not justify the product
+.venv/bin/python -m mypy backend/src/ely_eye backend/tests   # cold cache; baseline is 24 errors in 9 files
+./node_modules/.bin/pyright <the files you touched>          # must be 0 errors on touched files
+cd ely-eye-mcp && go build ./... && go vet ./... && go test ./... && gofmt -l .
+cd frontend && npm run build && npx eslint src --max-warnings 0
+bash scripts/mcp_write_smoke.sh                  # two processes, one store
+```
+
+mypy carries a pre-existing error baseline. A change is clean when the count and
+the file set match the recorded baseline; measure the baseline in a worktree of
+the commit you branched from, do not assume it.
+
+## Rules this repo enforces
+
+- One writer per fact. Memory writes go through `MemoryService`; the Go MCP
+  server forwards over HTTP instead of touching SQLite, so the rules cannot
+  drift into two dialects.
+- Fail fast and name the thing. `nothing to forget: no atom or source was given`,
+  `database schema is version 99, this build understands 11`. A silent default
+  that hides a caller's mistake is a defect, not a convenience.
+- A file over 500 lines gets split before it gets commented.
+- No dead code, no `v1`/`v2`/`v3` shadows of a thing that no longer exists.
+- A `#` comment is one line. A docstring is a contract and may be longer.
+- Absence is a state. `v_atoms_current` hides a closed, lapsed, or not-yet-valid
+  memory; it does not delete it, and `atom_count()` still counts it.
+
+## Measurement rules
+
+- A number that moves with machine load is quoted as a range across runs, or it
+  points at the report that holds it. Never quote a single load-dependent value
+  as if it were stable.
+- A report's commit stamp must name the commit that carries the harness that
+  produced it. That is why a harness change and its report land as two commits: a
+  report cannot stamp its own commit.
+- Every recall number sits next to its chance floor and, where one exists, an
+  external counterpart. `bench/reports/BASELINE_EXTERNAL.md` is the counterpart;
+  the chance row is printed in the same table.
+- One sample is not a benchmark. `next(iter(stream))` with `streaming=True` was
+  how the old proof suite "scored" MMMU-Pro and OCRBench.
+- A probe sample drawn by file order can silently drop a whole modality.
+  `bench/query_set.py:scale_probes` is modality-stratified for that reason, and a
+  test pins that every modality appears.
+- A harness works on a copy of the frozen store (`bench/scratch.py:copy_store`).
+  Never migrate `bench/runs/baseline/data/ely_eye.sqlite` in place.
+- When two correct engines disagree, suspect the metric before the engine:
+  byte-identical atoms produce tied scores, so id-level recall can read 0.83 for
+  no real reason. `bench/reports/QUANT.md` scores a hit as "any returned atom
+  whose true cosine is at least the K-th best".
+
+## Environment traps already paid for
+
+- pi-lens runs pyright with **0 config files**, so its `Import could not be
+  resolved` findings for `pydantic`, `fastapi`, `torch`, `sqlite_vec` are an
+  environment artifact. `./node_modules/.bin/pyright` reads `pyrightconfig.json`
+  and is the one that counts.
+- pi-lens auto-runs a `ruff format`-style formatter on files you touch. This
+  repository is not ruff-format clean and its gate is `ruff check`, so revert
+  that drift (`git checkout --`) before committing.
+- Run `ruff check --fix` on explicit paths, never on the package: it will
+  reformat a dozen unrelated files and you will commit them by accident.
+- `bench/tests` import `bench.*`; the root `pyproject.toml` supplies
+  `pythonpath = ["."]`, which is why bare `pytest` works.
+- `import fitz` prints a deprecation warning to **stdout**, which corrupts every
+  CLI JSON answer. Import it as `import pymupdf as fitz`.
+- SQLite statements must be literals at the call site: the repo's semgrep rule
+  rejects `connection.execute(variable, …)` even when the variable is a module
+  constant. Where a rule must be copied, a test compares the copies
+  (`backend/tests/test_visibility_rule.py`).
+
+## Review protocol
+
+Every task lands through an independent reviewer running in a `herdr` pane
+against the commit, not against a description of it. Findings are numbered
+`D1…Dn`; fix the mechanism, not the wording, and re-measure. A checklist item is
+not `[x]` before the reviewer returns PASS. Read the reviewer's verdict from its
+session JSONL (the last assistant text block), not from a pane scroll-back that
+may show an older round.
+
+## Cross-language contract
+
+`backend/src/ely_eye/schemas.py` is the source of truth. `ely-eye-mcp/internal/domain/types.go`
+and `frontend/src/types.ts` mirror it; when a field changes there, it changes in
+all three, and the smoke script is what proves the Go path agrees.

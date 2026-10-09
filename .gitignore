@@ -22,7 +22,6 @@ unsloth_compiled_cache/
 *.sqlite-wal
 *.sqlite-shm
 PRD.md
-AGENTS.md
 CLAUDE.md
 designreference.html
 # Local landing site — deployed to Cloudflare, not part of this repo

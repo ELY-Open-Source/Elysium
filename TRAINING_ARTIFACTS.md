@@ -1,5 +1,21 @@
 # Ely-Eye Training Artifacts
 
+## What this file is, and what it is not
+
+It is a record of what was produced on **2026-05-28** on the Windows + RTX 4090
+machine that trained the adapters, from a `PRD.md` that no longer exists in this
+repository. The adapters themselves, the cartridge, and every `.ely_eye/` path
+listed below are runtime state and are **not tracked by git**, so a clone of this
+repository cannot reproduce them.
+
+What is **measured in this repository today** lives in `bench/reports/` and is
+reproducible with the commands in `README.md`. Nothing in this file belongs to
+that set. Scores that were never run against ground truth have been deleted
+rather than kept with a hedge; where a number is kept, the sentence next to it
+says what the number actually measures.
+
+## Artifacts
+
 Generated on 2026-05-28 from the local `PRD.md`, ingested Evidence Atom
 `PRD_0b88b12114634a56:text`, visual Evidence Atom
 `ely_eye_dashboard_0180927ffdd3f8b0:image`, local UI proof images, and Qwen
@@ -68,6 +84,11 @@ Runtime generation proof:
 transformers generated 218 tokens with hme_core_lora citation accuracy 1.00
 ```
 
+"Citation accuracy 1.00" there means every atom id the answer cited existed in
+the context that was handed to the model. It is not entailment: the check cannot
+tell a correct citation from a citation of the wrong passage, and the question
+used by that check contained its own answer.
+
 100M memory capsule proof:
 
 ```text
@@ -75,6 +96,13 @@ transformers generated 218 tokens with hme_core_lora citation accuracy 1.00
 .ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/memory_capsule_index.json
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/memory_capsule.json
 The Context Cartridge materialized a 100,000,000 token-equivalent memory capsule with 4,096 committed segments and a verified segment Merkle root.
+
+The 100M is a property of a capsule the check generated for itself, not 100
+million tokens of ingested content: the segments were synthesized, and the check
+verified that the capsule hashed to its own recorded digest. What the store
+actually holds today is measured in `bench/reports/DENSE.md` (165,973 atoms,
+153,857 vectors), and `Gaps.md` appendix B prices one million tokens of live KV
+cache at 148.9 GB in fp16.
 ```
 
 Model-solved HashHop proofs:
@@ -87,7 +115,12 @@ Model-solved HashHop proofs:
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/4f24efd13342694c/model_visual_hashhop.json
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/a3f49402ef2710a3/model_visual_hashhop.json
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/0bd17526ab51392b/model_visual_hashhop.json
-Qwen/Qwen3.5-9B with HME-Core-LoRA solved a 1.01M token-equivalent 2-hop text HashHop and 6 Visual HashHop arenas at 262K token-equivalent. The Visual HashHop gate passed 7/7 model-solved proofs, with 262K 1-hop=1.00 and 2-hop=1.00.
+Qwen/Qwen3.5-9B with HME-Core-LoRA solved a 1.01M token-equivalent 2-hop text HashHop and 6 Visual HashHop arenas at 262K token-equivalent.
+
+The check that produced this collected proofs until its pass-rate target was
+reached, so the file records that the model could solve these arenas, not a
+measured solve rate. The retry loop was removed in the audit pass; a re-run now
+reports the rate it got.
 ```
 
 Benchmark source and sample proof:
@@ -96,7 +129,14 @@ Benchmark source and sample proof:
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_sources.json
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_samples.json
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_predictions.json
-MMMU-Pro, OCRBench, MMLongBench-Doc, VideoMME, LongVideoBench, RULER, and LongBench v2 loaded official streaming samples or official public metadata samples with sample hashes and source dataset SHA values. LongVideoBench uses `longvideobench/LongVideoBench-Meta` validation metadata with canonical `longvideobench/LongVideoBench` registry tracking. MMMU-Pro and OCRBench generated local Qwen/Qwen3.5-9B + HME-Core-LoRA predictions from official image samples, with local sample scores MMMU-Pro=1.00 and OCRBench=1.00.
+MMMU-Pro, OCRBench, MMLongBench-Doc, VideoMME, LongVideoBench, RULER, and LongBench v2 loaded official streaming samples or official public metadata samples with sample hashes and source dataset SHA values. LongVideoBench uses `longvideobench/LongVideoBench-Meta` validation metadata with canonical `longvideobench/LongVideoBench` registry tracking.
+
+No benchmark score is quoted here. The prediction step read **one** sample per
+benchmark (`next(iter(stream))` with `streaming=True`), so MMMU-Pro and OCRBench
+produced a single local prediction each; a score computed from one sample is not
+a benchmark result and the two `=1.00` lines that used to sit in this file have
+been deleted. `bench/reports/` is where this repository
+reports measured numbers, on corpora with hundreds of queries.
 ```
 
 Repository input proof:
@@ -104,6 +144,10 @@ Repository input proof:
 ```text
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/repository_input.json
 The repository input proof indexed 94 files, 49 code files, 11,977 call graph edges, and 26 local git commits for PRD 10.1 code repository coverage.
+
+That is a snapshot of the repository as it stood on 2026-05-28; the repository is
+larger now, and the check passed on any git history, which is why it is not
+treated as evidence of anything today.
 ```
 
 Runtime profile readiness:
@@ -111,6 +155,11 @@ Runtime profile readiness:
 ```text
 .ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/runtime_profiles.json
 SGLang 0.5.12.post1, vLLM 0.21.0, KTransformers 0.6.2.post4, WSL RTX 4090 GPU visibility, launcher module probes, and winget llama-server help output are verified.
+
+Verified inside WSL on that machine, against the fixed distro name the launcher
+used at the time. The launch profiles now read `ELY_EYE_WSL_DISTRO`, every
+`.ps1` has a `.sh` twin for Linux and macOS, and CI runs the suite on Linux — so
+this line is a record of one machine, not a portability claim.
 ```
 
 Checks:
@@ -123,7 +172,7 @@ Cartridge Physical Assets passed
 100M Memory Capsule      passed
 Context Cartridge Replay  passed
 Visual HashHop            passed  # 7/7 model-solved proofs
-Standard Benchmark Registry passed  # MMMU-Pro=1.00, OCRBench=1.00 local samples
+Standard Benchmark Registry passed  # one local sample per benchmark
 Repository Input Coverage passed  # 94 files + 11977 call graph edges + local git history
 Runtime Profile Delivery  passed
 Research Module Delivery  passed  # executable module gates, evidence graph edge, probability sum
@@ -131,6 +180,13 @@ Learned Memory Recall     passed
 Memory DNA                passed
 Cache Trace               passed
 ```
+
+These are the rows that suite wrote on 2026-05-28, not a current verdict. `Gaps.md`
+appendix A judges each of the fifteen checks individually, and several of them
+were self-referential — the replay check compiled the same question twice against
+the live store, the recall check only proved an adapter file loads, the cache check
+passed if any layer had any entry. The suite was rewritten afterwards so a check
+that cannot run says what it could not run instead of passing.
 
 Cartridge physical assets:
 
@@ -142,3 +198,10 @@ Cartridge physical assets:
 .ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/ttt_vl_adapter.safetensors
 .ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/visual_mtp_head.safetensors
 ```
+
+A cartridge written today is not this list. `cartridge.py` now writes
+`manifest.json`, `atoms.parquet`, `sources.json`, `sparse_index.bm25.zst` and
+`temporal_graph.sqlite`, and a cartridge is a scope you mount rather than only a
+bundle you export. The files above are what that 2026-05-28 export contained;
+`kv_snapshots.kivi` and `ttt_vl_adapter.safetensors` were placeholders for a
+runtime layout that was never wired to a loader.

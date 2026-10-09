@@ -112,3 +112,8 @@ def test_the_cli_answers_in_json_a_machine_can_read(tmp_path: Path, monkeypatch:
 
     empty = json.loads(runner.invoke(app, ["search", "钥匙", "--scenario", "travel"]).stdout)
     assert empty["status"] == "no_match"
+
+    stranger = json.loads(runner.invoke(app, ["search", "钥匙", "--as-holder", "stranger"]).stdout)
+    assert stranger["status"] == "no_match", "--as-holder must show what a stranger would see"
+    owner = json.loads(runner.invoke(app, ["search", "钥匙", "--as-holder", "wife"]).stdout)
+    assert [hit["atom"]["text"] for hit in owner["hits"]] == [KEYS]

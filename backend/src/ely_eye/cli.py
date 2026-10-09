@@ -88,6 +88,7 @@ def search(
     query: str,
     top_k: int = typer.Option(0, "--top-k", help="hits to return; 0 uses the configured default"),
     holder: str = typer.Option("", "--holder", help="only this holder's memories may answer"),
+    as_holder: str = typer.Option("", "--as-holder", help="see the store through this holder's eyes, the way their agent would"),
     scenario: str = typer.Option("", "--scenario"),
     source_id: str = typer.Option("", "--source-id"),
     since: str = typer.Option("", "--since", help="event time at or after, ISO with offset"),
@@ -103,6 +104,7 @@ def search(
         top_k or None,
         filters=SearchFilters(
             holder=holder or None,
+            as_holder=as_holder or None,
             scenario=scenario or None,
             source_id=source_id or None,
             since=moment(since, "--since"),
