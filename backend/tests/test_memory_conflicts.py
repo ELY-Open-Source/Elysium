@@ -318,3 +318,16 @@ def test_an_identifier_with_no_reading_after_it_reads_as_a_quantity(tmp_path) ->
         "3 and 4 are compared as one quantity that moved, so this pair is recorded and the holder "
         "settles it — the boundary the rule does not cross, and the price of not hiding a disagreement"
     )
+
+
+def test_a_second_number_in_one_memory_hides_the_update(tmp_path) -> None:
+    service, database = _lane(tmp_path, ["温度 22 度", "温度 24 度 湿度 40"])
+
+    assert service.conflicts("wife") == [], (
+        "whether a bare number renames its subject depends on that memory's own sentence, so 「温度」 "
+        "and 「温度24」 never compare — the temperature moved and the store did not notice"
+    )
+    assert sorted(_search(tmp_path, database, "温度")) == ["温度 22 度", "温度 24 度 湿度 40"], (
+        "the fail-closed side of the boundary: nothing is suppressed, the reader sees both readings "
+        "and decides for themselves"
+    )

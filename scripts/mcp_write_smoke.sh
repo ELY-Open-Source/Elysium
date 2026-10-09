@@ -61,6 +61,18 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
+# Fingerprint the answering build where the fields actually come from: the Python answer itself.
+# /api/memory/working exists only on builds that carry the memory tiers, so a server left over from
+# an older tree answers 404 here. Checking the MCP reply instead would prove nothing — the Go layer
+# decodes into its own struct and re-emits a missing field as 0, so an old server still passes.
+status="$(curl -s -o /dev/null -w '%{http_code}' \
+  "http://127.0.0.1:${port}/api/memory/working?holder=fingerprint&session=probe")"
+if [ "$status" != "200" ]; then
+  echo "FAIL: port ${port} answers /api/status but returns HTTP $status for /api/memory/working;"
+  echo "      the server on it predates the memory tiers — stop it and re-run"
+  exit 1
+fi
+
 # The gate, proved before anything else: a query needs nothing, a write needs the token.
 status="$(curl -s -o "$home/refused.json" -w '%{http_code}' -X POST "http://127.0.0.1:${port}/api/memory" \
   -H 'content-type: application/json' -d '{"text":"a write with no token"}')"
@@ -174,8 +186,8 @@ statement = "keys are in the hall drawer"
 remembered = tool("remember", {"text": statement, "scenario": "home"})["atom"]
 if "recall_count" not in remembered:
     raise SystemExit(
-        "FAIL: the API answered with no recall_count; a server left over from before the memory tiers "
-        "took the port after our guard passed — stop it and re-run"
+        "FAIL: the MCP reply carries no recall_count; the Go binary is not built from this tree — "
+        "the server's own build is proved above, this proves the other half of the path"
     )
 if not remembered["holder_id"]:
     raise SystemExit(f"FAIL: the server stamped no holder: {remembered}")
