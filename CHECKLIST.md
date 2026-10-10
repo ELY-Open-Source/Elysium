@@ -468,6 +468,12 @@
 
 ## 终验
 
+- [ ] **p2-6** 视觉与音频腿（验收线的缺口全在这里；目标清单里挂在 `final-accept` 下，不另开任务）
+  - 为什么要有这一条：验收线 `recall@10 ≥ 0.90`（m00217 定的）现在 0.863，而缺口不是均匀的。按全库可答题数加权（code 1237/2928=0.4225、pdf 766=0.2616、ui_screenshot 320=0.1093、image 240=0.0820、video 215=0.0734、conversation 150=0.0512）用当前每模态实测重算：0.945×0.4225 + 0.885×0.2616 + 0.818×0.1093 + 0.720×0.0820 + 0.493×0.0734 + 0.965×0.0512 = **0.865**，距 0.90 差 **0.035**。
+  - 谁能补上这 0.035：ui_screenshot 0.818→0.95 只值 +0.0144，video 0.493→0.75（即音频就抬 +0.256）值 +0.0189，image 0.720→0.85 值 +0.0107——**三条加起来 +0.044 才过线，任何单条都不够**；code/pdf/conversation 已经没多少可抬。所以这不是“再调一下排序”能解决的，是图片与视频的内容表示问题。
+  - [ ] p2-6.1 音频进视频：`bench/video_audio_check` 在 129 个视频上重录一遍（同库副本、同题、同 words-only 路径，只差音频），报告 `bench/reports/VIDEO_AUDIO.md`。验收 = 两行对照 + 当时的机器负载 + 音频 atom 数；跑前已量到 before 行复现 LEGS.md 的 shipped 0.863（同一产品路径的交叉校验）。
+  - [ ] p2-6.2 给截图一个局部的图片腿：整屏的 CLIP 向量不含「搜索图标」这种局部信息（VISUAL.md 实测 picture 腿把 ui_screenshot 从 0.583 拉到 0.528，因为它把整屏编成一个向量）。试法：一张屏切成重叠小块，**每块一个 atom**（`layout` 带 bbox，source 不变所以 source 级 recall 可比），CLIP 只编块。验收 = `bench/visual_recall.py` 加一臂，与现有 arms 并排（image n=240、ui_screenshot n=320）；不涨就删掉该臂并把“不涨”写进 VISUAL.md，不留在默认路径里。
+  - [ ] p2-6.3 若仍不达 0.90：把「不达」与原因写进 README/Gaps（已有的 VLM 区域描述、widget tree 两条外部能力，本轮按 m00217 未下 8B VLM），不用改验收线口径硬凑。
 - [ ] **final-accept** Gaps.md §6「钥匙测试」7 条场景逐条跑通
   - 命令：`bash scripts/key_test.sh`（自建临时 home、假模型快照、起 API、Go MCP 走 stdio、CLI 挂卡带；一张表，任何 FAIL 退出码非 0）。实测：**6 PASS + 1 NOT MEASURED**，exit 0。
   - 1 随手记 PASS：`POST /api/memory` 一次往返 → `POST /api/search` 答出来，holder=wife origin=self scenario=home event_time=2026-09-30 citable=True。
