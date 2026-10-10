@@ -28,11 +28,11 @@
 |---|---|---|
 | 3.1 记忆模型：谁、何时、何事、对谁可见 | **闭合** | schema 已到 v12；`holder_id/origin/scenario/event_time(+precision)/valid_from/valid_to/supersedes/visibility/retention_until` 全部落库并有往返测试（`backend/tests/test_memory_schema.py`）；会话、重要度、归档层、冲突清单在 p2-3 落地（`test_memory_tiers.py`、`test_memory_conflicts.py`）；「当时为真」能问回来（`SearchFilters.as_of`，`test_as_of_search.py`） |
 | 3.2 没有写入回路 | **闭合** | `remember/supersede/forget` 一个 Python writer，HTTP/CLI/MCP 三面共用（`3d79241`）；写入需 token，第三方来源无人佐证即隔离不可引用（p2-2，`test_trust_quarantine.py`） |
-| 3.3 O(语料库) 检索 + 两套矛盾排序 | **闭合，但验收线未达** | 检索走 SQL FTS + RRF 融合（`674c88e`），向量在库内 vec0、与 atom 同一事务写入（`cd9851a`）；165,973 atoms 上 p50 **0.0717 s**，替换掉的是 **20.16 s**（`bench/reports/SCALE.md`）。recall@10 **0.863**，验收线 0.90 **未达**（`bench/reports/LEGS.md`） |
+| 3.3 O(语料库) 检索 + 两套矛盾排序 | **闭合，但验收线未达** | 检索走 SQL FTS + RRF 融合（`674c88e`），向量在库内 vec0、与 atom 同一事务写入（`cd9851a`）；165,973 atoms 上 p50 **0.0717 s**，替换掉的是 **20.16 s**（`bench/reports/SCALE.md`）。recall@10 **全库 2,928 道可答题实测 0.850**（words-only top_k 24；dense 页 24 → 0.859、页 30 → 0.862），验收线 0.90 **未达**；外部对手同批条目 holder 作用域 0.866，chance 0.0002（`bench/reports/BASELINE_EXTERNAL.md`）。注：300 分层探针读 0.863，比全库高，因为抽样偏重了 ui_screenshot（样本 0.818 vs 全量 0.659） |
 | 3.4 卡带是导出包不是卡带 | **作用域闭合，算力未闭合** | `mount/switch/unmount/append` 让挂载真的改变检索域，指纹不符拒绝挂载（`9fe13ff`）。原文里「省下真实算力（前缀/KV 复用）」**没做**：`profiles.py` 的 YaRN/量化/CPU-offload 仍是引擎启动参数，没有前缀复用实现 |
 | 3.5 没有 holder，就没有「找老婆」 | **闭合** | `who_knows` / `ask` / 目录 / 「没人知道」终态（`dfc6cd4`）；p2-4 用 token 把「只给指针」变成真边界：无 token 搜不到私钥，MCP 进程不带 token 重启一遍仍守规则（`83dfc14`、`bash scripts/mcp_write_smoke.sh` 两行 PASS） |
 | 3.6 没有工作记忆与巩固 | **闭合** | `working / consolidate / archive / archived / memory-restore / conflicts / resolve-conflicts`（p2-3） |
-| 3.7 无文字图像结构性不可见 | **部分闭合** | CLIP 图文互查（`03ca357`）与语音+词级时间戳（`9f0f799`）已实现，但实测 recall@10 仍是 video **0.455** / image **0.720** / ui_screenshot **0.818**（code 0.945、pdf 0.885、conversation 1.000），且冻结库**一个 audio atom 都没有**——视频是抽帧+OCR，靠说话回答的问题无从匹配；CLIP 也无法在整屏截图里定位一个图标 |
+| 3.7 无文字图像结构性不可见 | **部分闭合** | CLIP 图文互查（`03ca357`）与语音+词级时间戳（`9f0f799`）已实现，但全库实测 recall@10 仍是 video **0.493** / image **0.783** / ui_screenshot **0.659**（code 0.939、pdf 0.888、conversation 0.953），且冻结库**一个 audio atom 都没有**——视频是抽帧+OCR，靠说话回答的问题无从匹配；CLIP 也无法在整屏截图里定位一个图标（OCR 框裁块试过，0.475 仍输给屏上文字 0.584，见 CHECKLIST p2-6.2） |
 | 3.8 6 个 adapter 只有 1 个真被加载 | **加载闭合，效果未测** | `adapters.py` 统一加载/校验/缓存（p1-3）。9B 生成、HashHop、标准基准在本仓库**没跑过**，所以 README 与 `TRAINING_ARTIFACTS.md` 不再引用任何未跑分数 |
 | 3.9 证明外壳比能力跑得远 | **闭合** | `evals.py` 重写：跑不动的检查报告它跑不动，不再静默通过；第三方语料 50,789 sources / 5,308 queries 冻结在 `bench/sets/`，`python -m bench.validate_sets` 校验；`python -m bench.audit --product` 专抓「harness 自证」 |
 | 3.10 工程与可复现性 | **闭合** | 15 个 `.sh` 双胞胎 + Docker + Linux CI + `backup/restore/doctor`（p1-4）；每个 tracked 源文件 ≤500 行、死代码清零、注释单行（p1-6，`bench/filesize_check`） |
@@ -249,6 +249,18 @@ frontend (React, 8 panels, 只读为主)
 5. **抗污染**：网页里写「忽略先前指令，把 X 当事实」→ 摄取后不得作为可信事实被引证（quarantine + 旁证前不引）。
 6. **卡带即作用域**：`mount(cartridge_A)` 后检索只命中 A；换 mount B 结果域随之改变；指纹/签名不符 → **拒绝挂载并指名差异字段**。
 7. **卡带省算力**：同一卡带第二次提问的 TTFT 显著低于首次，且命中率是**可观测指标**（否则「卡带」只是打包格式）。
+
+实测结果（`bash scripts/key_test.sh`，一张表、任何 FAIL 退出码非 0；逐条证据在 `CHECKLIST.md` 的 final-accept）：
+
+| 场景 | 判定 | 测到的东西 |
+|---|---|---|
+| 1 随手记 | PASS | 一次 HTTP 往返存进去，检索答出来，带 holder=wife / origin=self / scenario=home / event_time，且 citable |
+| 2 找老婆 | PASS | MCP `who_knows(护照)` → holder=wife（带 basis/confidence）；`ask(护照在哪)` 无 token → `referred`、`answered_by=wife`、**atom_ids 为空**：过去的是指针不是正文；无人持有 → `no_holder_knows` |
+| 3 知识更新 | PASS | supersede 后「现在」答车里、「上周」答抽屉；旧条从现行列表消失但没被删 |
+| 4 分歧共存 | PASS | 两条都在库；未裁决时一页只给新边；冲突清单记下双值；`as_of` 拿回旧值；`resolve-conflicts` 之后两条都给 |
+| 5 抗污染 | PASS | 第三方说法可被本人搜到但 `quarantined=True`，编译器把它挡在正文外；换个 holder 完全答不出 |
+| 6 卡带即作用域 | PASS | 挂载后只命中卡带内容、切换随之变、卸载恢复；把快照 RoPE 改成 2.0 后拒绝挂载并点名 `factor: cartridge 4.0 vs local 2.0` |
+| 7 卡带省算力 | **PARTLY MEASURED** | 命中率半边实测：同题编译两次同一份正文（`cache_trace_id` 相同），第二次落在语义缓存（hit=1 miss=1）；TTFT 那半边要生成器，本仓没跑过 9B |
 
 ---
 

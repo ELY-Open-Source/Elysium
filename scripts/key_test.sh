@@ -214,12 +214,25 @@ if "恒温器调到 24 度" not in page:
 older_then = texts(search("恒温器", as_holder="wife", as_of=(NOW - datetime.timedelta(hours=36)).isoformat())["hits"])
 if "恒温器放在书房，设定 22 度" not in older_then:
     raise SystemExit(f"FAIL: the older reading is unreachable for the time it was true: {older_then}")
+# Settling is the holder's call: until it happens retrieval shows the newer side, and once it happens both sides answer.
+from ely_eye.config import Settings
+from ely_eye.db import Database
+from ely_eye.memory import MemoryService
+
+keeper = MemoryService(Settings(), Database(Settings()))
+settled = keeper.resolve_conflicts([item["conflict_id"] for item in conflicts])
+if settled != len(conflicts):
+    raise SystemExit(f"FAIL: settling reported {settled}, expected {len(conflicts)}")
+both = texts(search("恒温器", as_holder="wife")["hits"])
+if not {warm["text"], hot["text"]} <= set(both):
+    raise SystemExit(f"FAIL: settling did not hand both readings back to the reader: {both}")
 record(
     4,
     "PASS",
     f"two dated memories that disagree: both stay in the store (each fetched back from the store), one page shows the newer "
     "reading instead of merging them into one vague sentence, GET /api/memory/conflicts?holder=wife records the "
-    f"disagreement with both values ({len(conflicts)} open), and asking as_of 36h ago returns the 22 度 reading",
+    f"disagreement with both values ({len(conflicts)} open), asking as_of 36h ago returns the 22 度 reading, and "
+    f"after resolve-conflicts settles that {settled} disagreement one page shows both ({len(both)} hits)",
 )
 
 # 5. 抗污染: a third-party sentence cannot make itself a trusted fact.
@@ -370,8 +383,48 @@ write_snapshot 4.0
 printf '6\tPASS\tely-eye ingest --cartridge-name 甲/乙 + finalize-cartridge + switch: mounted 甲 → 月岩灰=%s 花岗岩=%s; switch 乙 → 月岩灰=%s 花岗岩=%s; unmount → 月岩灰=%s; rewriting the model snapshot to rope factor 2.0 makes `mount 甲` refuse: %s\n' \
   "$a_only" "$b_hidden" "$a_gone" "$b_found" "$whole_a" "$moved" >> "$results"
 
-# 7. 卡带省算力: the claim is a time-to-first-token saving, which needs the generator.
-printf '7\tNOT MEASURED\tno command measures it here: the saving is time-to-first-token and cache-hit rate on a real generation, and this repo has never run the 9B generator (no model snapshot in the tree). The observable half — a compile that writes a cache trace — has no route either: there is no /api/compile or /api/cache endpoint, and /api/chat returns 503 without a runtime. What exists today is the scope (ely-eye mount/switch/unmount/append) and the launch flags in profiles.py that would deliver it\n' >> "$results"
+# 7. 卡带省算力: the cache-hit half is measurable here, the time-to-first-token half is not.
+cache_stats="$(
+  "$python_bin" - "车库的漆是什么颜色" <<'PY'
+import json
+import sys
+from ely_eye.compiler import ContextCompiler
+from ely_eye.config import get_settings
+from ely_eye.db import Database
+from ely_eye.schemas import RuntimeProfile
+
+database = Database(get_settings())
+compiler = ContextCompiler(get_settings(), database)
+question = sys.argv[1]
+first = compiler.compile(question, RuntimeProfile.live_demo)
+second = compiler.compile(question, RuntimeProfile.live_demo)
+with database.connect() as connection:
+    rows = connection.execute(
+        "SELECT event, count(*) AS n FROM cache_events WHERE layer = 'semantic' GROUP BY event"
+    ).fetchall()
+counts = {row["event"]: int(row["n"]) for row in rows}
+print(
+    json.dumps(
+        {
+            "same_pack": first.cache_trace_id == second.cache_trace_id,
+            "atoms": len(first.hits),
+            "hit": counts.get("hit", 0),
+            "miss": counts.get("miss", 0),
+        }
+    )
+)
+PY
+)"
+cache_same="$(printf '%s' "$cache_stats" | "$python_bin" -c 'import json,sys;print(json.load(sys.stdin)["same_pack"])')"
+cache_atoms="$(printf '%s' "$cache_stats" | "$python_bin" -c 'import json,sys;print(json.load(sys.stdin)["atoms"])')"
+cache_hit="$(printf '%s' "$cache_stats" | "$python_bin" -c 'import json,sys;print(json.load(sys.stdin)["hit"])')"
+cache_miss="$(printf '%s' "$cache_stats" | "$python_bin" -c 'import json,sys;print(json.load(sys.stdin)["miss"])')"
+if [ "$cache_same" != "True" ] || [ "$cache_atoms" -lt 1 ] || [ "$cache_hit" -lt 1 ]; then
+  echo "FAIL: the second compile did not land on the semantic cache: $cache_stats"
+  exit 1
+fi
+printf '7\tPARTLY MEASURED\tthe observable half is measured: compiling the same question twice hands back the same pack (cache_trace_id equal=%s over %s atoms) and the second compile is served from the semantic cache (cache_events layer=semantic: hit=%s miss=%s). The claimed saving is time-to-first-token on a real generation, and this repo has never run the 9B generator (no model snapshot in the tree) and /api/chat returns 503 without a runtime, so that half stays unmeasured. What exists today is the scope (ely-eye mount/switch/unmount/append) and the launch flags in profiles.py that would deliver it\\n' \
+  "$cache_same" "$cache_atoms" "$cache_hit" "$cache_miss" >> "$results"
 
 echo
 echo "钥匙测试 — the seven scenarios from Gaps.md §6, run against one live store"
@@ -386,5 +439,5 @@ if grep -qP '^\d+\tFAIL' "$results"; then
   echo "RESULT: at least one scenario failed"
   exit 1
 fi
-fail_count="$(grep -cP '^\d+\tNOT MEASURED' "$results" || true)"
-echo "RESULT: $fail_count scenario(s) could not be measured here; the rest passed"
+fail_count="$(grep -cP '^\d+\t(NOT MEASURED|PARTLY MEASURED)' "$results" || true)"
+echo "RESULT: $fail_count scenario(s) could not be fully measured here; the rest passed"
