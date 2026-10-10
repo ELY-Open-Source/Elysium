@@ -2,11 +2,14 @@
 
 The product fuses three legs with reciprocal rank fusion: a sparse page, a dense vector leg, and a
 picture leg that only speaks up when the words come back thin. Each one costs latency and a model
-snapshot, and the suite is the only honest referee. This harness turns each leg on and off over the
-same probes and prints recall, first-hit quality, latency, and per-modality recall in one table, so
-a default like `dense_embeddings_enabled=False` is a measurement rather than a preference.
+snapshot, and the suite is the only honest referee. This harness turns each leg on and off over
+**every answerable query in the suite** and prints recall, first-hit quality, latency, and
+per-modality recall in one table, so a default like `dense_embeddings_enabled=False` is a
+measurement rather than a preference. Recall is scored whole because a 300-query sample reads a
+modality a few points off; latency is timed on a stratified sample because that is what a sample
+is for.
 
-Run: python -m bench.leg_check [--probes 300]
+Run: python -m bench.leg_check [--probes 300]   # --probes sizes the timing sample only
 Writes: bench/reports/LEGS.md, bench/reports/leg_check.json
 """
 
@@ -39,9 +42,6 @@ ENCODE_SAMPLE = 200
 
 # The page the product asks for by default; measure() checks it against Settings, so "as shipped" cannot rot into a hypothesis.
 SHIPPED_TOP_K = 24
-
-# The modality whose questions carry a question type; measured whole, because 15 probes of 150 cannot separate six categories.
-MEMORY_MODALITY = "conversation"
 
 # (label, atoms asked, dense leg, picture leg); the picture leg answers only on a thin page, which is the product's rule.
 CONFIGS: list[dict[str, Any]] = [
@@ -232,16 +232,18 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
             f"SHIPPED_TOP_K={SHIPPED_TOP_K}; update the rows before trusting the 'as shipped' label"
         )
 
-    chosen = scale_probes(load_queries(), probes)
-    answerable = [query for query in chosen if query.gold]
+    every = load_queries()
+    answerable = [query for query in every if query.gold]
     if not answerable:
         raise SystemExit("the frozen suite carries no answerable query; nothing to score")
-    print(f"{len(answerable)} answerable probes", flush=True)
+    timed = {query.query_id for query in scale_probes(every, probes) if query.gold}
+    if not timed:
+        raise SystemExit(
+            f"--probes {probes} picked no query to time: the sample strides the suite by modality, "
+            "so a small count can skip one and the latency row would be a single modality"
+        )
+    print(f"{len(answerable)} answerable queries scored, {len(timed)} of them timed", flush=True)
     times = source_times()
-    memory = [query for query in load_queries() if query.modality == MEMORY_MODALITY and query.gold]
-    if not memory:
-        raise SystemExit(f"the frozen suite carries no answerable {MEMORY_MODALITY} query; the memory tables would be empty")
-    print(f"{len(memory)} answerable {MEMORY_MODALITY} queries, measured whole beside the probes", flush=True)
 
     vectors = _dense_vectors(home / "data" / "ely_eye.sqlite")
     source_schema = _schema(home)
@@ -287,13 +289,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
             for query, ranking in zip(answerable, rankings, strict=True)
         ]
         summary = aggregate(scores)
-        timing = latency(timings)
-        memory_rankings, _, _ = rank_all(service, ids, memory, int(config["top_k"]))
-        memory_scores = [
-            score_query(query.query_id, ranking, set(query.gold), query.holder)
-            for query, ranking in zip(memory, memory_rankings, strict=True)
-        ]
-        memory_summary = aggregate(memory_scores)
+        timing = latency([t for query, t in zip(answerable, timings, strict=True) if query.query_id in timed])
         arms.append(
             {
                 "label": config["label"],
@@ -308,14 +304,6 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
                 "p95_seconds": timing["p95"],
                 "median_distinct_sources": statistics.median(distinct),
                 **_groups(answerable, scores, rankings, times),
-                "memory": {
-                    "queries": len(memory),
-                    "recall_at_10": memory_summary["recall_at_10"],
-                    "mrr": memory_summary["mrr"],
-                    "hit_at_10": memory_summary["hit_at_10"],
-                    "wilson_lower": memory_summary["hit_at_10_wilson_lower"],
-                    **_groups(memory, memory_scores, memory_rankings, times),
-                },
             }
         )
         print(
@@ -333,9 +321,8 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         "dense_vectors": vectors,
         "picture_index": picture,
         "encode_rate": rate,
-        "probes": len(answerable),
-        "memory_queries": len(memory),
-        "memory_modality": MEMORY_MODALITY,
+        "queries": len(answerable),
+        "timed_queries": len(timed),
         "arms": arms,
         "machine": machine_facts(),
     }

@@ -33,18 +33,10 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "by_modality": {"code": 0.953, "pdf": 0.849},
         "modality_counts": {"code": 128, "pdf": 86},
         "newest_gold_first": 0.44,
-        "memory": {
-            "queries": 150,
-            "recall_at_10": 0.965,
-            "mrr": 0.875,
-            "hit_at_10": 0.98,
-            "wilson_lower": 0.921,
-            "by_category": {"knowledge-update": 1.0, "temporal-reasoning": 0.947},
-            "category_counts": {"knowledge-update": 25, "temporal-reasoning": 25},
-            "newest_gold_first": 0.4,
-            "newest_gold_first_by_category": {"knowledge-update": 0.4, "temporal-reasoning": 0.526},
-            "newest_gold_first_counts": {"knowledge-update": 19, "temporal-reasoning": 21},
-        },
+        "by_category": {"knowledge-update": 1.0, "temporal-reasoning": 0.947},
+        "category_counts": {"knowledge-update": 25, "temporal-reasoning": 25},
+        "newest_gold_first_by_category": {"knowledge-update": 0.4, "temporal-reasoning": 0.526},
+        "newest_gold_first_counts": {"knowledge-update": 19, "temporal-reasoning": 21},
     }
     report: dict[str, Any] = {
         "commit": "abcdef123456",
@@ -55,9 +47,8 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "dense_vectors": 153857,
         "picture_index": {"path": "bench/runs/leg_check_index", "atoms": 53668, "dim": 512, "bytes": 109912192},
         "encode_rate": {"pictures": 200, "seconds": 10.0, "per_second": 20.0},
-        "probes": 300,
-        "memory_queries": 150,
-        "memory_modality": "conversation",
+        "queries": 2928,
+        "timed_queries": 300,
         "arms": [arm],
         "machine": {
             "system": "Linux",
@@ -83,8 +74,8 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "knowledge-update" in text and "1.000" in text and "0.40 (19)" in text
     ), "the two question types the contract names need their own recall and their own n"
     assert (
-        "every answerable conversation query (150) measured whole" in text
-    ), "a 15-probe sample cannot separate six question types, and the report must say which set the table used"
+        "2,928 answerable queries scored whole" in text and "stratified sample of 300" in text
+    ), "recall is scored over the whole suite and only latency is sampled, and the report must say so"
     assert "| 0.44 |" in text, "the probe table needs its own newest-first column"
     assert (
         "arrives at v7 and the product migrates it when it opens, so every arm ran on v8" in text

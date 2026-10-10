@@ -32,9 +32,9 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         )
     counts = report["arms"][0]["modality_counts"]
 
-    def memory_table(title: str, field: str, sizes_field: str) -> list[str]:
-        """A table over the question types the memory set labels; unlabelled sets stay out of it."""
-        rows = [arm["memory"] for arm in report["arms"]]
+    def category_table(title: str, field: str, sizes_field: str) -> list[str]:
+        """A table over the question types the set records; unlabelled sets stay out of it."""
+        rows = report["arms"]
         names = sorted({name for row in rows for name in row[field] if name != "unlabelled"})
         if not names:
             return []
@@ -79,11 +79,12 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                     "sits outside the measured latency, and the frozen baseline itself holds no "
                     "vectors, so a dense arm there would rank an empty index."
                 ),
-                f"- {report['probes']} answerable queries, each asked as the holder the frozen set assigns it",
                 (
-                    f"- memory subset: every answerable {report['memory_modality']} query "
-                    f"({report['memory_queries']}) measured whole, because a 15-probe sample cannot "
-                    "separate six question types; the two tables further down use that subset, not the sample"
+                    f"- {report['queries']:,} answerable queries scored whole, each asked as the "
+                    f"holder the frozen set assigns it; latency is timed on a stratified sample of "
+                    f"{report['timed_queries']}, because a sample sized for timing is not sized for a "
+                    "modality's recall — the 300-probe sample this harness used before read the "
+                    "screenshot modality 0.818 where all 320 of its answerable queries read 0.659"
                 ),
                 *(
                     []
@@ -121,9 +122,9 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                 "",
                 f"_Query counts per modality: {', '.join(f'{name} {count}' for name, count in counts.items())}._",
                 "",
-                *memory_table("recall@10 by question type, every memory query measured", "by_category", "category_counts"),
+                *category_table("recall@10 by question type", "by_category", "category_counts"),
                 "",
-                *memory_table(
+                *category_table(
                     "the newest of the gold memories came back first",
                     "newest_gold_first_by_category",
                     "newest_gold_first_counts",
