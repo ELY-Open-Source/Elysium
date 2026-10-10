@@ -244,6 +244,22 @@ def test_a_superseded_memory_keeps_its_vector_but_leaves_the_current_answer_alon
     assert list(then) == [old.atom_id], "asked before the retirement, the old memory is still findable"
 
 
+def test_a_closed_memory_owes_the_index_a_vector_even_though_it_answers_nothing_now(
+    tmp_path: Path, fake_embeddings: Callable[[], Any]
+) -> None:
+    """`sync` walks the atoms table, not the current view, or an as-of question would find nothing."""
+    settings, database = _settings(tmp_path), Database(_settings(tmp_path))
+    index = _index(settings, database, fake_embeddings)
+    memory = _memory(settings, database, index)
+    old = memory.remember(KEYS, holder_id="wife", origin=MemoryOrigin.self_)
+    memory.supersede(old.atom_id, text=PASSPORT, holder_id="wife")
+    index.drop_atoms([old.atom_id])
+
+    assert index.stats()["pending"] == 1, "the closed memory answers nothing now, but the index still owes it a vector"
+    assert index.sync()["encoded"] == 1, "sync re-encodes the closed memory rather than skipping it"
+    assert index.stats()["vectors"] == 2
+
+
 def test_a_store_that_never_built_its_index_says_so_instead_of_stalling_a_search(
     tmp_path: Path, fake_embeddings: Callable[[], Any]
 ) -> None:

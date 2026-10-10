@@ -104,7 +104,9 @@ class RetrievalService:
 
         Every filter is applied inside the engine, in the same statement as the nearest-neighbour
         walk, so a scoped search cannot return a memory the caller was never allowed to see. The
-        index catches up inside `search`, so nothing here has to rebuild it first.
+        writer indexes a memory in the call that saves it, so a search never waits for a rebuild;
+        a store upgraded from an older schema is the exception, and `ely-eye doctor` names it until
+        `ely-eye build-dense-index` runs.
         """
         query_vector = self.embeddings.embed_query(query)
         return self.vectors.search(

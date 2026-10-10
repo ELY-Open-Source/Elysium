@@ -272,10 +272,17 @@ def write_markdown(report: dict[str, Any], destination: Path) -> None:
 
 
 def _tracked(path: Path) -> bool:
-    """Only committed evidence is frozen; a harness's own untracked output is fair game."""
+    """Only committed evidence is frozen; a harness's own untracked output is fair game.
+
+    The question goes to the repository that owns the path, so a reviewer working in a worktree
+    cannot point at another checkout's committed report and be told it is untracked.
+    """
+    owner = path.resolve().parent
     return (
         subprocess.run(
-            ["git", "ls-files", "--error-unmatch", str(path)], capture_output=True, check=False
+            ["git", "-C", str(owner), "ls-files", "--error-unmatch", path.resolve().name],
+            capture_output=True,
+            check=False,
         ).returncode
         == 0
     )
@@ -283,9 +290,7 @@ def _tracked(path: Path) -> bool:
 
 def refuse_frozen_overwrite(destination: Path) -> None:
     """A reviewer running this in a worktree of its own must not overwrite the committed evidence."""
-    if destination.exists() and destination.resolve().parent == PAYLOAD.resolve().parent and _tracked(
-        destination
-    ):
+    if destination.exists() and _tracked(destination):
         raise SystemExit(
             f"{destination} is a frozen report; point --report and --payload somewhere else, or "
             "delete the frozen copy on purpose rather than under a harness"

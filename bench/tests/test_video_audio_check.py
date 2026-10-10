@@ -11,8 +11,7 @@ from bench import video_audio_check
 def test_a_frozen_report_is_not_overwritten_by_a_harness(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A reviewer runs harnesses in a worktree of its own; the committed evidence stays put."""
-    monkeypatch.setattr(video_audio_check, "PAYLOAD", tmp_path / "video_audio.json")
+    """A reviewer runs harnesses in a worktree of its own; the committed evidence stays put, in any directory."""
     monkeypatch.setattr(video_audio_check, "_tracked", lambda path: True)
     frozen = tmp_path / "VIDEO_AUDIO.md"
     frozen.write_text("committed evidence", encoding="utf-8")
@@ -21,14 +20,14 @@ def test_a_frozen_report_is_not_overwritten_by_a_harness(
     elsewhere = tmp_path / "scratch" / "VIDEO_AUDIO.md"
     elsewhere.parent.mkdir()
     elsewhere.write_text("scratch", encoding="utf-8")
-    video_audio_check.refuse_frozen_overwrite(elsewhere)
+    with pytest.raises(SystemExit, match="is a frozen report"):
+        video_audio_check.refuse_frozen_overwrite(elsewhere)
 
 
 def test_a_harness_may_write_its_own_untracked_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The default destination is the reports directory; refusing it would stop the shipped run."""
-    monkeypatch.setattr(video_audio_check, "PAYLOAD", tmp_path / "video_audio.json")
     monkeypatch.setattr(video_audio_check, "_tracked", lambda path: False)
     fresh = tmp_path / "VIDEO_AUDIO.md"
     fresh.write_text("not yet evidence", encoding="utf-8")
@@ -38,8 +37,7 @@ def test_a_harness_may_write_its_own_untracked_output(
 def test_an_absolute_path_to_the_frozen_directory_is_refused_too(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The guard compares where the file really lands, not how the path was spelled."""
-    monkeypatch.setattr(video_audio_check, "PAYLOAD", tmp_path / "video_audio.json")
+    """The guard asks about the file, not the spelling of its path."""
     monkeypatch.setattr(video_audio_check, "_tracked", lambda path: True)
     frozen = tmp_path / "VIDEO_AUDIO.md"
     frozen.write_text("committed evidence", encoding="utf-8")
@@ -47,11 +45,21 @@ def test_an_absolute_path_to_the_frozen_directory_is_refused_too(
         video_audio_check.refuse_frozen_overwrite(Path(frozen.resolve()))
 
 
+def test_a_committed_report_is_frozen_without_any_stub(tmp_path: Path) -> None:
+    """A stubbed `_tracked` proves the branch works, not that the guard does: this test uses the real git index."""
+    committed = Path("bench/reports/LEGS.md")
+    assert committed.exists(), "the acceptance needs a tracked report to refuse"
+    with pytest.raises(SystemExit, match="is a frozen report"):
+        video_audio_check.refuse_frozen_overwrite(committed)
+    elsewhere = tmp_path / "LEGS.md"
+    elsewhere.write_text("mine", encoding="utf-8")
+    video_audio_check.refuse_frozen_overwrite(elsewhere)
+
+
 def test_the_probe_arm_switches_off_rather_than_ranking_nothing() -> None:
     """--probes 0 means "skip that arm"; a small count with the smoke knob means "you measured nothing"."""
     assert video_audio_check.probe_sample(0, 0) == []
-    # The shipped sample keeps every modality; the smoke knob narrows it to video, where a
-    # small count can miss the modality entirely (the reviewer's --limit 1 --probes 1 crash).
+    # The shipped sample keeps every modality; the smoke knob narrows it to video, where a small count can miss one entirely.
     assert any(query.modality == video_audio_check.VIDEO_MODALITY for query in video_audio_check.probe_sample(300, 0))
     for probes in (1, 5):
         with pytest.raises(SystemExit, match=f"--probes {probes} picked no answerable video query"):

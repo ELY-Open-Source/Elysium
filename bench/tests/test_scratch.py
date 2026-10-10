@@ -29,3 +29,18 @@ def test_one_run_may_copy_more_than_once(tmp_path: Path) -> None:
     scratch.claim(tmp_path)
     scratch.claim(tmp_path)
     assert (tmp_path / scratch.HELD).read_text(encoding="utf-8") == str(os.getpid())
+
+
+def test_copy_store_claims_the_copy_it_makes(tmp_path: Path) -> None:
+    """The claim lives inside `copy_store`, so a harness cannot step on a live run by forgetting to call `claim`."""
+    if not Path("/proc/1").exists():
+        pytest.skip("liveness is read from /proc")
+    source = tmp_path / "source"
+    (source / "data").mkdir(parents=True)
+    (source / "data" / "ely_eye.sqlite").write_text("store", encoding="utf-8")
+    busy = tmp_path / "scratch"
+    busy.mkdir()
+    (busy / scratch.HELD).write_text("1", encoding="utf-8")
+    with pytest.raises(SystemExit, match="is held by pid 1"):
+        scratch.copy_store(source, busy)
+    assert not (busy / "data").exists(), "the refusal must come before a byte is copied"

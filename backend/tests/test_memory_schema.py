@@ -311,3 +311,34 @@ def test_a_ninth_version_database_gains_the_tiers_in_place(tmp_path: Path) -> No
     assert hidden == 0, (
         "the old view body survived the upgrade, so an archived memory would still answer"
     )
+
+
+def test_an_eleventh_version_database_learns_that_a_future_retirement_is_still_current(tmp_path: Path) -> None:
+    """v11's view hid a memory whose retirement is scheduled for next year; the upgrade must rewrite the body."""
+    clock = datetime.now(UTC)
+    database = _database(tmp_path)
+    _seed_source(database)
+    database.upsert_atoms([_atom("key", ingested_at=clock, valid_from=clock, valid_to=clock + timedelta(days=365))])
+    with database.connect() as connection:
+        # The body v11 shipped, written out here so the upgrade is judged against the thing it replaced.
+        connection.executescript(
+            """
+            DROP VIEW IF EXISTS v_atoms_current;
+            CREATE VIEW v_atoms_current AS
+              SELECT * FROM atoms
+              WHERE valid_to IS NULL
+                AND (valid_from IS NULL OR valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00','now'))
+                AND (retention_until IS NULL OR retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00','now'));
+            PRAGMA user_version = 11;
+            """
+        )
+        hidden = connection.execute("SELECT count(*) FROM v_atoms_current").fetchone()[0]
+    assert hidden == 0, "the fixture must really look like a v11 store before it is upgraded"
+
+    upgraded = _database(tmp_path)
+    with upgraded.connect() as connection:
+        assert int(connection.execute("PRAGMA user_version").fetchone()[0]) == SCHEMA_VERSION
+        visible = [str(row[0]) for row in connection.execute("SELECT atom_id FROM v_atoms_current")]
+    assert visible == ["key"], (
+        "the old view body survived, so a memory retiring next year would answer nothing today"
+    )
