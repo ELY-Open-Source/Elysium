@@ -11,8 +11,9 @@ from bench import video_audio_check
 def test_a_frozen_report_is_not_overwritten_by_a_harness(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A reviewer runs harnesses in a worktree of its own; the committed reports stay put."""
+    """A reviewer runs harnesses in a worktree of its own; the committed evidence stays put."""
     monkeypatch.setattr(video_audio_check, "PAYLOAD", tmp_path / "video_audio.json")
+    monkeypatch.setattr(video_audio_check, "_tracked", lambda path: True)
     frozen = tmp_path / "VIDEO_AUDIO.md"
     frozen.write_text("committed evidence", encoding="utf-8")
     with pytest.raises(SystemExit, match="is a frozen report"):
@@ -21,6 +22,47 @@ def test_a_frozen_report_is_not_overwritten_by_a_harness(
     elsewhere.parent.mkdir()
     elsewhere.write_text("scratch", encoding="utf-8")
     video_audio_check.refuse_frozen_overwrite(elsewhere)
+
+
+def test_a_harness_may_write_its_own_untracked_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The default destination is the reports directory; refusing it would stop the shipped run."""
+    monkeypatch.setattr(video_audio_check, "PAYLOAD", tmp_path / "video_audio.json")
+    monkeypatch.setattr(video_audio_check, "_tracked", lambda path: False)
+    fresh = tmp_path / "VIDEO_AUDIO.md"
+    fresh.write_text("not yet evidence", encoding="utf-8")
+    video_audio_check.refuse_frozen_overwrite(fresh)
+
+
+def test_an_absolute_path_to_the_frozen_directory_is_refused_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The guard compares where the file really lands, not how the path was spelled."""
+    monkeypatch.setattr(video_audio_check, "PAYLOAD", tmp_path / "video_audio.json")
+    monkeypatch.setattr(video_audio_check, "_tracked", lambda path: True)
+    frozen = tmp_path / "VIDEO_AUDIO.md"
+    frozen.write_text("committed evidence", encoding="utf-8")
+    with pytest.raises(SystemExit, match="is a frozen report"):
+        video_audio_check.refuse_frozen_overwrite(Path(frozen.resolve()))
+
+
+def test_the_probe_arm_switches_off_rather_than_ranking_nothing() -> None:
+    """--probes 0 means "skip that arm"; a small count with the smoke knob means "you measured nothing"."""
+    assert video_audio_check.probe_sample(0, 0) == []
+    # The shipped sample keeps every modality; the smoke knob narrows it to video, where a
+    # small count can miss the modality entirely (the reviewer's --limit 1 --probes 1 crash).
+    assert any(query.modality == video_audio_check.VIDEO_MODALITY for query in video_audio_check.probe_sample(300, 0))
+    for probes in (1, 5):
+        with pytest.raises(SystemExit, match=f"--probes {probes} picked no answerable video query"):
+            video_audio_check.probe_sample(probes, probes)
+
+
+def test_an_empty_video_arm_is_a_lie_not_a_zero() -> None:
+    """The video arm is the point of the harness; a row of zeros there must stop the run."""
+    with pytest.raises(SystemExit, match="nothing to rank"):
+        video_audio_check._required(None, "every video question")
+    assert video_audio_check._score_of(None) == "skipped"
 
 
 def test_a_missing_speech_snapshot_says_so_before_ranking(tmp_path: Path) -> None:

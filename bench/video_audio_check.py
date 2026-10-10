@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -75,12 +76,14 @@ def speech_facts(store: Path) -> dict[str, Any]:
     return {"atoms": int(atoms), "characters": int(characters)}
 
 
-def rank_arm(home: Path, probes: list[Any], top_k: int) -> dict[str, Any]:
-    """Rank the probes through the shipped words-only path and score them."""
+def rank_arm(home: Path, probes: list[Any], top_k: int) -> dict[str, Any] | None:
+    """Rank the probes through the shipped words-only path and score them; None skips the arm."""
     from ely_eye.config import Settings
     from ely_eye.db import Database
     from ely_eye.retrieval import RetrievalService
 
+    if not probes:
+        return None
     settings = Settings(
         home=home,
         dense_embeddings_enabled=False,
@@ -140,15 +143,33 @@ def add_speech(home: Path, files: list[Path], asr: Path, limit: int) -> dict[str
     return {"files": batches, "seconds": time.perf_counter() - began}
 
 
+def probe_sample(probes: int, limit: int) -> list[Any]:
+    """The standard stratified sample, asked about video only when the smoke knob is on.
+
+    A small `--probes` is not "measure a little": the sample strides the whole suite, so a
+    count under a few dozen can miss this modality entirely and the arm would rank nothing.
+    """
+    if probes <= 0:
+        return []
+    picked = [query for query in scale_probes(load_queries(), probes) if query.gold]
+    if limit:
+        picked = [query for query in picked if query.modality == VIDEO_MODALITY][:limit]
+    if not picked:
+        raise SystemExit(
+            f"--probes {probes} picked no answerable video query: the sample strides the whole "
+            "suite, so a small count can skip this modality and the arm would rank nothing. "
+            "Pass --probes 0 to skip the probe arm, or the shipped 300 to keep every modality."
+        )
+    return picked
+
+
 def measure(home: Path, scratch: Path, videos: Path, asr: Path, probes: int, limit: int) -> dict[str, Any]:
     """Score the video questions and the standard probe sample before and after the speech pass."""
     if not (home / "data" / "ely_eye.sqlite").exists():
         raise SystemExit(f"{home}: no store to copy; run `python -m bench.dense_scale` first")
     files = guard_videos(videos, home)
     whole = video_queries() if not limit else video_queries()[:limit]
-    sample = [query for query in scale_probes(load_queries(), probes) if query.gold]
-    if limit:
-        sample = [query for query in sample if query.modality == VIDEO_MODALITY][:limit]
+    sample = probe_sample(probes, limit)
     print(f"{len(whole)} answerable video queries, {len(sample)} stratified probes, {len(files)} files", flush=True)
 
     copy_home, copied = copy_store(home, scratch)
@@ -156,11 +177,11 @@ def measure(home: Path, scratch: Path, videos: Path, asr: Path, probes: int, lim
     before_speech = speech_facts(copy_home)
     if before_speech["atoms"]:
         print(f"note: the copy already carries {before_speech['atoms']} speech atoms", flush=True)
-    before_video = rank_arm(copy_home, whole, SHIPPED_TOP_K)
+    before_video = _required(rank_arm(copy_home, whole, SHIPPED_TOP_K), "every video question")
     before_sample = rank_arm(copy_home, sample, SHIPPED_TOP_K)
     print(
         f"  before: video recall@10 {before_video['recall_at_10']:.3f}, "
-        f"probes {before_sample['recall_at_10']:.3f}",
+        f"probes {_score_of(before_sample)}",
         flush=True,
     )
 
@@ -171,11 +192,11 @@ def measure(home: Path, scratch: Path, videos: Path, asr: Path, probes: int, lim
             f"re-ingesting {len(files)} files added no speech atoms; the snapshot at {asr} is "
             "available but produced nothing, so the after row would be a measurement of nothing"
         )
-    after_video = rank_arm(copy_home, whole, SHIPPED_TOP_K)
+    after_video = _required(rank_arm(copy_home, whole, SHIPPED_TOP_K), "every video question")
     after_sample = rank_arm(copy_home, sample, SHIPPED_TOP_K)
     print(
         f"  after:  video recall@10 {after_video['recall_at_10']:.3f}, "
-        f"probes {after_sample['recall_at_10']:.3f}, speech atoms {after_speech['atoms']}",
+        f"probes {_score_of(after_sample)}, speech atoms {after_speech['atoms']}",
         flush=True,
     )
     return {
@@ -191,6 +212,18 @@ def measure(home: Path, scratch: Path, videos: Path, asr: Path, probes: int, lim
         "before": {"video": before_video, "probes": before_sample},
         "after": {"video": after_video, "probes": after_sample},
     }
+
+
+def _required(row: dict[str, Any] | None, label: str) -> dict[str, Any]:
+    """The video arm is never empty; a row of zeros there would be a silent lie."""
+    if row is None:
+        raise SystemExit(f"{label}: nothing to rank, so this run would print a row of zeros")
+    return row
+
+
+def _score_of(row: dict[str, Any] | None) -> str:
+    """One number for the progress line, or the reason there is none."""
+    return "skipped" if row is None else f"{row['recall_at_10']:.3f}"
 
 
 def write_markdown(report: dict[str, Any], destination: Path) -> None:
@@ -217,15 +250,19 @@ def write_markdown(report: dict[str, Any], destination: Path) -> None:
     for stage in ("before", "after"):
         for arm, label in (("video", "every video question"), ("probes", "the stratified probe sample")):
             row = report[stage][arm]
+            if row is None:
+                lines.append(f"| {label} ({stage}) | 0 | skipped (--probes 0) | — | — | — | — |")
+                continue
             lines.append(
                 f"| {label} ({stage}) | {row['queries']} | {row['recall_at_10']:.3f} | {row['mrr']:.3f} | "
                 f"{row['hit_at_10']:.3f} | {row['wilson_lower']:.3f} | {row['p50_seconds']:.3f} |"
             )
     gained = report["after"]["video"]["recall_at_10"] - report["before"]["video"]["recall_at_10"]
-    overall = report["after"]["probes"]["recall_at_10"] - report["before"]["probes"]["recall_at_10"]
+    probe_row = report["after"]["probes"]
+    overall = "not measured (--probes 0)" if probe_row is None else f"{probe_row['recall_at_10'] - report['before']['probes']['recall_at_10']:+.3f}"
     lines += [
         "",
-        f"Speech moved video recall@10 by {gained:+.3f} and the whole probe sample by {overall:+.3f}.",
+        f"Speech moved video recall@10 by {gained:+.3f} and the whole probe sample by {overall}.",
         "",
         "Latency is read from the same pass and moves with machine load; the recall columns do not.",
         "",
@@ -234,9 +271,21 @@ def write_markdown(report: dict[str, Any], destination: Path) -> None:
     destination.write_text("\n".join(lines), encoding="utf-8")
 
 
+def _tracked(path: Path) -> bool:
+    """Only committed evidence is frozen; a harness's own untracked output is fair game."""
+    return (
+        subprocess.run(
+            ["git", "ls-files", "--error-unmatch", str(path)], capture_output=True, check=False
+        ).returncode
+        == 0
+    )
+
+
 def refuse_frozen_overwrite(destination: Path) -> None:
     """A reviewer running this in a worktree of its own must not overwrite the committed evidence."""
-    if destination.parent == PAYLOAD.parent and destination.exists():
+    if destination.exists() and destination.resolve().parent == PAYLOAD.resolve().parent and _tracked(
+        destination
+    ):
         raise SystemExit(
             f"{destination} is a frozen report; point --report and --payload somewhere else, or "
             "delete the frozen copy on purpose rather than under a harness"
