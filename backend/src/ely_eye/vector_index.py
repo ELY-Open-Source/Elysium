@@ -4,7 +4,8 @@ The first version kept the vectors in `cache/dense_index.npy` plus a JSON list o
 That pair had no owner: nothing noticed when an atom was added, changed or forgotten, so a
 search answered from a snapshot of the past and `forget` had to delete the whole file. Here the
 vectors sit in the same SQLite file as the atoms, in a `vec0` table the `sqlite-vec` extension
-answers, and the only rule the index has is "one row per current atom, re-encode what changed".
+answers, and the only rule the index has is "one row per atom that still exists and has words,
+re-encode what changed".
 """
 
 from __future__ import annotations
@@ -58,7 +59,7 @@ def load_extension(connection: sqlite3.Connection) -> None:
 
 
 class VectorIndex:
-    """One float32 vector per current atom: the writer keeps it, the reader asks it questions."""
+    """One float32 vector per memory that has words: the writer keeps it, the reader asks it questions."""
 
     def __init__(
         self,
@@ -121,7 +122,9 @@ class VectorIndex:
         """Bring the index in step with memories as they are written.
 
         Nothing on the search path rebuilds, so this is the half that keeps "written now,
-        findable now" true; a memory that has closed or been forgotten loses its vector here too.
+        findable now" true. A forgotten memory loses its vector here; a memory that has merely
+        closed keeps one, because a question about the past still has to reach it — the currency
+        rule in `_allowed` decides who may see it, not the presence of a vector.
         """
         wanted = [atom_id for atom_id in atom_ids if atom_id]
         if not wanted or not self.settings.dense_embeddings_enabled:
@@ -382,12 +385,16 @@ class VectorIndex:
         return removed
 
     def _current(self, connection: sqlite3.Connection, atom_ids: list[str]) -> list[tuple[str, Any]]:
-        """The written memories that still deserve a vector: open, and with words."""
+        """The written memories that still deserve a vector: ones whose row exists, with words.
+
+        Currency is not asked here on purpose. A superseded memory keeps its vector so `as_of`
+        can answer from it; the search path is where the window gets applied.
+        """
         from .row_codec import row_to_atom
 
         rows = connection.execute(
             """
-            SELECT * FROM v_atoms_current
+            SELECT * FROM atoms
             WHERE atom_id IN (SELECT value FROM json_each(?)) AND text IS NOT NULL AND text != ''
             """,
             (to_json(atom_ids),),
@@ -425,7 +432,7 @@ class VectorIndex:
             )
 
     def _stale(self, connection: sqlite3.Connection) -> list[tuple[str, Any]]:
-        """Current memories the index does not hold, or holds from an older version of the memory.
+        """Memories the index does not hold, or holds from an older version of the memory.
 
         A memory with no words is the visual index's job, so it never reaches this table. The
         stored stamps are copied into a temp table first: a vec0 table has no index on atom_id,
@@ -441,7 +448,7 @@ class VectorIndex:
         )
         rows = connection.execute(
             """
-            SELECT a.* FROM v_atoms_current AS a
+            SELECT a.* FROM atoms AS a
             LEFT JOIN dense_seen AS d ON d.atom_id = a.atom_id
             WHERE a.text IS NOT NULL AND a.text != ''
               AND (d.atom_id IS NULL OR d.stamp IS NULL OR d.stamp != atom_stamp(a.ingested_at, a.text))
@@ -457,14 +464,14 @@ def atom_stamp(ingested_at: str, text: str | None) -> str:
 
 
 def expected_vectors(database: Database) -> int:
-    """Memories this index is meant to hold: the open ones that have words."""
+    """Memories this index is meant to hold: the ones whose row exists and has words."""
     with database.connect() as connection:
         return _expected(connection)
 
 
 def _expected(connection: sqlite3.Connection) -> int:
     row = connection.execute(
-        "SELECT count(*) AS n FROM v_atoms_current WHERE text IS NOT NULL AND text != ''"
+        "SELECT count(*) AS n FROM atoms WHERE text IS NOT NULL AND text != ''"
     ).fetchone()
     return int(row["n"])
 

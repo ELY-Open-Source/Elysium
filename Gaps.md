@@ -22,11 +22,11 @@
 
 ## 0.5 现在的状态（2026-10-09 复核，逐项跑过）
 
-上面那三句结论在审查当天成立。经过 `CHECKLIST.md` 上的 b→P0→P1→P2 之后，**12 项差距里 10 项已闭合、2 项部分闭合**；未闭合的两项卡在同一个地方：视觉与音频腿的能力，不是架构。
+上面那三句结论在审查当天成立。经过 `CHECKLIST.md` 上的 b→P0→P1→P2 之后，**12 项差距里 8 项闭合、3 项闭合但带保留、1 项部分闭合**；带保留的是 3.3（检索快但 recall@10 0.863 未达 0.90 验收线）、3.4（挂载作用域做了，省算力没做）、3.8（adapter 真加载了，效果没测）；部分闭合的是 3.7。三处缺口卡在同一个地方：视觉与音频腿的能力，不是架构。
 
 | 差距 | 状态 | 证据（跑过的命令 / 报告） |
 |---|---|---|
-| 3.1 记忆模型：谁、何时、何事、对谁可见 | **闭合** | schema 已到 v11；`holder_id/origin/scenario/event_time(+precision)/valid_from/valid_to/supersedes/visibility/retention_until` 全部落库并有往返测试（`backend/tests/test_memory_schema.py`）；会话、重要度、归档层、冲突清单在 p2-3 落地（`test_memory_tiers.py`、`test_memory_conflicts.py`） |
+| 3.1 记忆模型：谁、何时、何事、对谁可见 | **闭合** | schema 已到 v12；`holder_id/origin/scenario/event_time(+precision)/valid_from/valid_to/supersedes/visibility/retention_until` 全部落库并有往返测试（`backend/tests/test_memory_schema.py`）；会话、重要度、归档层、冲突清单在 p2-3 落地（`test_memory_tiers.py`、`test_memory_conflicts.py`）；「当时为真」能问回来（`SearchFilters.as_of`，`test_as_of_search.py`） |
 | 3.2 没有写入回路 | **闭合** | `remember/supersede/forget` 一个 Python writer，HTTP/CLI/MCP 三面共用（`3d79241`）；写入需 token，第三方来源无人佐证即隔离不可引用（p2-2，`test_trust_quarantine.py`） |
 | 3.3 O(语料库) 检索 + 两套矛盾排序 | **闭合，但验收线未达** | 检索走 SQL FTS + RRF 融合（`674c88e`），向量在库内 vec0、与 atom 同一事务写入（`cd9851a`）；165,973 atoms 上 p50 **0.0717 s**，替换掉的是 **20.16 s**（`bench/reports/SCALE.md`）。recall@10 **0.863**，验收线 0.90 **未达**（`bench/reports/LEGS.md`） |
 | 3.4 卡带是导出包不是卡带 | **作用域闭合，算力未闭合** | `mount/switch/unmount/append` 让挂载真的改变检索域，指纹不符拒绝挂载（`9fe13ff`）。原文里「省下真实算力（前缀/KV 复用）」**没做**：`profiles.py` 的 YaRN/量化/CPU-offload 仍是引擎启动参数，没有前缀复用实现 |

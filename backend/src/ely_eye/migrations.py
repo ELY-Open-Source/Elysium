@@ -16,7 +16,7 @@ import sqlite3
 from .storage import token_equivalent, visual_token_equivalent
 from .text_index import index_text
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -188,7 +188,7 @@ tokenize = 'unicode61'
 VIEWS = """
     CREATE VIEW IF NOT EXISTS v_atoms_current AS
     SELECT * FROM atoms
-    WHERE valid_to IS NULL
+    WHERE (valid_to IS NULL OR valid_to > strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
       AND archived_at IS NULL
       AND (valid_from IS NULL OR valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
       AND (retention_until IS NULL OR retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'));
@@ -328,8 +328,8 @@ def apply(connection: sqlite3.Connection) -> None:
         for name, definition in _NEW_HOLDER_COLUMNS:
             if name not in existing_holders:
                 connection.execute(f"ALTER TABLE holders ADD COLUMN {name} {definition}")
-    if version < 10:
-        # CREATE VIEW IF NOT EXISTS keeps the old body, and v10 changed which rows are current, so an upgraded store must be told to look again.
+    if version < 12:
+        # CREATE VIEW IF NOT EXISTS keeps the old body, and v10 and v12 each changed which rows are current, so an upgraded store must be told to look again.
         connection.execute("DROP VIEW IF EXISTS v_atoms_current")
 
     connection.executescript(VIEWS)

@@ -68,7 +68,8 @@ def search_atoms(
             WHERE atom_fts MATCH ?
               AND (
                     (? IS NULL
-                        AND a.valid_to IS NULL
+                        AND (a.valid_to IS NULL
+                             OR a.valid_to > strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
                         AND a.archived_at IS NULL
                         AND (a.valid_from IS NULL
                              OR a.valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))

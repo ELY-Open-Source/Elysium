@@ -225,17 +225,23 @@ def test_the_index_survives_a_reopen(tmp_path: Path, fake_embeddings: Callable[[
     assert reopened.search(reopened.embeddings.embed_query(KEYS), 10)
 
 
-def test_superseding_moves_the_vector_rather_than_keeping_two(tmp_path: Path, fake_embeddings: Callable[[], Any]) -> None:
+def test_a_superseded_memory_keeps_its_vector_but_leaves_the_current_answer_alone(
+    tmp_path: Path, fake_embeddings: Callable[[], Any]
+) -> None:
     settings, database = _settings(tmp_path), Database(_settings(tmp_path))
     index = _index(settings, database, fake_embeddings)
     memory = _memory(settings, database, index)
     old = memory.remember(KEYS, holder_id="wife", origin=MemoryOrigin.self_)
 
-    memory.supersede(old.atom_id, text=PASSPORT, holder_id="wife")
+    replacement = memory.supersede(old.atom_id, text=PASSPORT, holder_id="wife")
 
     facts = index.stats()
-    assert facts["vectors"] == 1, "the closed memory lost its vector and the replacement took its place"
+    assert facts["vectors"] == 2, "a closed memory keeps its vector, or a question about the past cannot reach it"
     assert facts["pending"] == 0
+    current = index.search(index.embeddings.embed_query(KEYS), 10, as_holder="wife")
+    assert list(current) == [replacement.atom_id], "asked now, only the replacement answers"
+    then = index.search(index.embeddings.embed_query(KEYS), 10, as_holder="wife", as_of=old.ingested_at.isoformat())
+    assert list(then) == [old.atom_id], "asked before the retirement, the old memory is still findable"
 
 
 def test_a_store_that_never_built_its_index_says_so_instead_of_stalling_a_search(
