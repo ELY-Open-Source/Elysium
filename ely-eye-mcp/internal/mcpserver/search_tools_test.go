@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
 )
 
 func searchTestServer(t *testing.T, recorded *map[string]any) *httptest.Server {

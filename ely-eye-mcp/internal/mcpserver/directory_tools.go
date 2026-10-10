@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

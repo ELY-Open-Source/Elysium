@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
 	_ "modernc.org/sqlite"
 )
 

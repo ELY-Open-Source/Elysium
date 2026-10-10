@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
 )
 
 // askingServer records the path and query string of every request so a test can

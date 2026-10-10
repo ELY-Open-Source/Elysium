@@ -1,4 +1,4 @@
-module github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp
+module git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp
 
 go 1.25.0
 

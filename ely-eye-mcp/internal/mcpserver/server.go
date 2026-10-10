@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/store"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/store"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

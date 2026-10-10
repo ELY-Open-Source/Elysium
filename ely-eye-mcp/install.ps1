@@ -55,7 +55,7 @@ function Get-Platform {
 function Resolve-Version {
   if ($Version) { return $Version }
   try {
-    $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases" -Headers @{ "User-Agent" = "ely-eye-mcp-installer" }
+    $releases = Invoke-RestMethod -Uri "https://git.zacharyzhang.com/api/v1/repos/$Repo/releases" -Headers @{ "User-Agent" = "ely-eye-mcp-installer" }
   }
   catch { return "" }
   $match = $releases | Where-Object { $_.tag_name -like "mcp-*" } | Select-Object -First 1
@@ -79,8 +79,8 @@ function Build-FromSource {
 function Download-Binary([string]$Tag) {
   $platform = Get-Platform
   $asset = "ely-eye-mcp_$platform.zip"
-  $url = "https://github.com/$Repo/releases/download/$Tag/$asset"
-  $sumsUrl = "https://github.com/$Repo/releases/download/$Tag/ely-eye-mcp_SHA256SUMS.txt"
+  $url = "https://git.zacharyzhang.com/$Repo/releases/download/$Tag/$asset"
+  $sumsUrl = "https://git.zacharyzhang.com/$Repo/releases/download/$Tag/ely-eye-mcp_SHA256SUMS.txt"
   $tmp = Join-Path ([IO.Path]::GetTempPath()) ("ely-eye-mcp-" + [Guid]::NewGuid().ToString("N"))
   New-Item -ItemType Directory -Force -Path $tmp | Out-Null
   try {

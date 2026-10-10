@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
 )
 
 const manifestBody = `{"cartridge_id":"home_1","name":"home","created_at":"2026-05-01T12:00:00Z",` +

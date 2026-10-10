@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
 )
 
 const storeCardBody = `{"schema_version":11,"atoms":3,"sources":3,"modalities":{"text":2,"image":1},

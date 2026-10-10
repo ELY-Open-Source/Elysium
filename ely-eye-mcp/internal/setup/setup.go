@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
 )
 
 type Options struct {

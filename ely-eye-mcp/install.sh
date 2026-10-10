@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Ely-Eye MCP installer for Linux and macOS.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ZacharyZhang-NY/ely-eye/main/ely-eye-mcp/install.sh | bash
+#   curl -fsSL https://git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/raw/branch/main/ely-eye-mcp/install.sh | bash
 #
 # By default it downloads a prebuilt, checksum-verified binary for this platform
 # and needs no toolchain. Run with --method source from a repository checkout to
@@ -79,7 +79,7 @@ sha256() {
 resolve_version() {
   if [[ -n "$VERSION" ]]; then echo "$VERSION"; return 0; fi
   local body
-  body="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" 2>/dev/null)" || return 0
+  body="$(curl -fsSL "https://git.zacharyzhang.com/api/v1/repos/${REPO}/releases" 2>/dev/null)" || return 0
   printf '%s\n' "$body" \
     | grep -oE '"tag_name": *"mcp-[^"]*"' \
     | head -n 1 \
@@ -97,8 +97,8 @@ download_binary() {
   local tag="$1" platform asset url sums tmp
   platform="$(detect_platform)"
   asset="ely-eye-mcp_${platform}.tar.gz"
-  url="https://github.com/${REPO}/releases/download/${tag}/${asset}"
-  sums="https://github.com/${REPO}/releases/download/${tag}/ely-eye-mcp_SHA256SUMS.txt"
+  url="https://git.zacharyzhang.com/${REPO}/releases/download/${tag}/${asset}"
+  sums="https://git.zacharyzhang.com/${REPO}/releases/download/${tag}/ely-eye-mcp_SHA256SUMS.txt"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
   echo "Downloading $asset from release $tag."

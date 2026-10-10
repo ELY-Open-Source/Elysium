@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/domain"
 )
 
 func (s *Store) FetchAtom(ctx context.Context, atomID string) (domain.Atom, error) {

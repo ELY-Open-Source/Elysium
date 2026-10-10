@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/apiclient"
 )
 
 func directoryServer(t *testing.T, body string, seen *[]string) *httptest.Server {

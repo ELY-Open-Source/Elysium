@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/cli"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/cli"
 )
 
 func main() {

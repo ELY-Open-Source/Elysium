@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/mcpserver"
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/setup"
-	"github.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/store"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/config"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/mcpserver"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/setup"
+	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/ely-eye-mcp/internal/store"
 )
 
 // version is stamped at release build time via -ldflags -X. The default is the
