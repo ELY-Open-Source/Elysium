@@ -8,13 +8,19 @@ await mkdir(outputDir, { recursive: true });
 
 const apiBase = process.env.ELYSIUM_API ?? 'http://127.0.0.1:8765';
 const uiUrl = process.env.ELYSIUM_UI_URL ?? 'http://127.0.0.1:5173/';
+// Writes need the operator token since the server checks one; without it every seed is refused.
+const token = process.env.ELYSIUM_AUTH_TOKEN;
+if (!token) {
+  throw new Error('ELYSIUM_AUTH_TOKEN is not set: the server refuses every write without one, so nothing could be seeded');
+}
+const authorization = { Authorization: `Bearer ${token}` };
 // Mirrors PAGE_SIZE in frontend/src/components/MemoryPanel.tsx; the pager is only provable against a known page size.
 const PAGE_SIZE = 12;
 
 async function api(route, body) {
   const response = await fetch(`${apiBase}${route}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authorization },
     body: JSON.stringify(body ?? {}),
   });
   const payload = await response.json().catch(() => ({}));
@@ -25,7 +31,7 @@ async function api(route, body) {
 }
 
 async function apiGet(route) {
-  const response = await fetch(`${apiBase}${route}`);
+  const response = await fetch(`${apiBase}${route}`, { headers: authorization });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(`${route} was rejected: ${JSON.stringify(payload)}`);
@@ -61,6 +67,8 @@ const pictureModality = await seed();
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+// The console keeps the token in localStorage under elysium_token (frontend/src/api.ts), never in the bundle.
+await page.addInitScript((value) => window.localStorage.setItem('elysium_token', value), token);
 const consoleErrors = [];
 const failedRequests = [];
 page.on('pageerror', (error) => consoleErrors.push(`uncaught: ${error.message}`));

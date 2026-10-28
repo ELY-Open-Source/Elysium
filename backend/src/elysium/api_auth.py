@@ -94,7 +94,9 @@ def require_write(request: Request) -> None:
 
     settings: Settings = request.app.state.write_settings()
     origin = request.headers.get("origin")
-    if origin is not None and origin not in settings.allowed_origins:
+    # The console this server serves from ELYSIUM_UI_DIR is its own origin; a forged request comes from someone else's.
+    own = f"{request.url.scheme}://{request.url.netloc}"
+    if origin is not None and origin not in settings.allowed_origins and origin != own:
         raise HTTPException(
             status_code=403,
             detail=f"origin {origin} may not write; allowed origins: {', '.join(settings.allowed_origins)}",

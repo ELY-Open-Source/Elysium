@@ -35,6 +35,7 @@ fi
 
 export ELYSIUM_HOME="$home"
 export ELYSIUM_DEFAULT_HOLDER=wife
+export ELYSIUM_AUTH_TOKEN="ui-smoke-operator"
 export ELYSIUM_UI_DIR="$repo/frontend/dist"
 
 "$server_bin" serve --host 127.0.0.1 --port "$port" >"$home/serve.log" 2>&1 &

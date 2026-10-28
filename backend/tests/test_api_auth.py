@@ -76,6 +76,17 @@ def test_an_allowed_origin_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert answer.status_code == 200
 
 
+def test_the_console_this_server_serves_writes_from_its_own_origin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ELYSIUM_UI_DIR serves the console from the API's own address, which no allowlist names."""
+    client = _client(tmp_path, monkeypatch, auth_token=TOKEN)
+    own = {"Authorization": f"Bearer {TOKEN}", "Origin": str(client.base_url)}
+    assert client.post("/api/memory", json={"text": KEYS}, headers=own).status_code == 200
+    without_token = client.post("/api/memory", json={"text": KEYS}, headers={"Origin": str(client.base_url)})
+    assert without_token.status_code == 401, "its own origin waives the origin check, never the token"
+
+
 def test_the_cartridge_routes_need_the_token_too(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = _client(tmp_path, monkeypatch, auth_token=TOKEN)
     assert client.post("/api/cartridges/anything/mount").status_code == 401
