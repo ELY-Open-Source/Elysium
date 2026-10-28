@@ -1,5 +1,5 @@
 {
-  "name": "ely-eye-tools",
+  "name": "elysium-tools",
   "private": true,
   "description": "Dev-only type and lint gates for the Python and TypeScript surfaces.",
   "devDependencies": {

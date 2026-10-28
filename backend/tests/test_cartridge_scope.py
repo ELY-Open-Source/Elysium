@@ -13,17 +13,17 @@ import pytest
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
-import ely_eye.api as api_module
-import ely_eye.cli as cli_module
-from ely_eye import cartridge_store
-from ely_eye.cartridge import CartridgeService
-from ely_eye.cli import app
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.memory import MemoryService
-from ely_eye.migrations import SCHEMA_VERSION
-from ely_eye.retrieval import RetrievalService
-from ely_eye.schemas import MemoryOrigin, SearchFilters
+import elysium.api as api_module
+import elysium.cli as cli_module
+from elysium import cartridge_store
+from elysium.cartridge import CartridgeService
+from elysium.cli import app
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.memory import MemoryService
+from elysium.migrations import SCHEMA_VERSION
+from elysium.retrieval import RetrievalService
+from elysium.schemas import MemoryOrigin, SearchFilters
 
 HOME_KEYS = "我们的钥匙放在玄关抽屉里"
 WORK_KEYS = "备用钥匙在办公室第二个抽屉里"

@@ -1,14 +1,14 @@
 services:
-  ely-eye:
+  elysium:
     build: .
     ports:
       - "8765:8765"
     volumes:
-      - ./.ely_eye:/data/ely-eye
+      - ./.elysium:/data/elysium
     environment:
-      ELY_EYE_HOME: /data/ely-eye
-      ELY_EYE_RUNTIME_BACKEND: sglang
-      ELY_EYE_SGLANG_BASE_URL: http://host.docker.internal:8000/v1
+      ELYSIUM_HOME: /data/elysium
+      ELYSIUM_RUNTIME_BACKEND: sglang
+      ELYSIUM_SGLANG_BASE_URL: http://host.docker.internal:8000/v1
     deploy:
       resources:
         reservations:

@@ -1,4 +1,4 @@
-# Gaps.md — ely-eye 现状与目标之间的差距
+# Gaps.md — Elysium（往世乐土，原名 Ely-Eye）现状与目标之间的差距
 
 > 审查方式：全仓库通读（86 文件 / 17,146 行）+ 14 个并行审计 lane（6 个代码审计 + 8 个外部调研），
 > 每条结论都带 `file:line` 或一手来源。审查日期对应 HEAD `4cd29f9`。
@@ -8,7 +8,7 @@
 
 ## 0. 结论先行
 
-**现在的 ely-eye 是一个「带证明外壳的语料库检索器」，还不是一个「记忆系统」，更不是「转忆（transactive memory）系统」。**
+**现在的 elysium 是一个「带证明外壳的语料库检索器」，还不是一个「记忆系统」，更不是「转忆（transactive memory）系统」。**
 
 三句话概括：
 
@@ -76,7 +76,7 @@ frontend (React, 8 panels, 只读为主)
 
 真实存在的能力：本地单文件 SQLite + FTS5、PDF 页/区块 atom、视频抽帧 + RapidOCR、git 仓库结构 atom、LoRA 训练与产物哈希、只读 MCP server、跨平台 Go 发布工程。
 
-**仓库里没有任何测试文件**（Python 与 Go 都是 0），唯一 CI 是 Go 的 tag 触发交叉编译。`.ely_eye/` 运行时状态未提交，`PRD.md`（所有训练与证明的语料来源）被 `.gitignore` 排除 —— 也就是说**外人 clone 之后无法复现任何一条宣称**，`docker build` 甚至直接失败（`Dockerfile:16 COPY README.md PRD.md ./`）。
+**仓库里没有任何测试文件**（Python 与 Go 都是 0），唯一 CI 是 Go 的 tag 触发交叉编译。`.elysium/` 运行时状态未提交，`PRD.md`（所有训练与证明的语料来源）被 `.gitignore` 排除 —— 也就是说**外人 clone 之后无法复现任何一条宣称**，`docker build` 甚至直接失败（`Dockerfile:16 COPY README.md PRD.md ./`）。
 
 ---
 
@@ -142,9 +142,9 @@ frontend (React, 8 panels, 只读为主)
 - **没有 origin 类型**：`trust.model` 是一个连续值而不是来源类型 → 模型自己生成的内容被重新摄取后，与「我亲眼看到的」无法区分（认知科学里的 source-monitoring error；训练侧对应 model collapse）。
 - **没有转述回路的防环设计**：需要 visited-set + 深度上限 + 终态 `NO_HOLDER_KNOWS`，否则 A 问 B、B 问 A。
 - **没有 ACL / 可见性 / 冲突记录**：两个 holder 说法不一致时，今天会被检索分数**静默平均**掉，而不是把分歧呈现出来。
-- **污染已被量化**：Sleeper Memory Poisoning（arXiv 2605.15338）写入成功率 99.8%/95%，成功检索里 60–89% 被攻击者左右动作；InjecMEM（arXiv 2608.23471）同类。ely-eye 目前**摄取即信任**，无 quarantine。
+- **污染已被量化**：Sleeper Memory Poisoning（arXiv 2605.15338）写入成功率 99.8%/95%，成功检索里 60–89% 被攻击者左右动作；InjecMEM（arXiv 2608.23471）同类。elysium 目前**摄取即信任**，无 quarantine。
 - **隐私/删除**：GDPR Art.5/16/17/25 与 CJEU C-136/21 意味着「删除」必须是**级联**：atom + 派生 atom + 卡带 + 向量 + 元记忆 + 缓存。今天连软删除都没有。
-- **反向能力卡缺失**：别人要能把问题路由**到** ely-eye，需要一张 capability/authority card；现在没有对外声明「我知道什么」。
+- **反向能力卡缺失**：别人要能把问题路由**到** elysium，需要一张 capability/authority card；现在没有对外声明「我知道什么」。
 
 ### 3.6 短期/长期分层：没有工作记忆，也没有巩固 — **P0/P1**
 
@@ -181,7 +181,7 @@ frontend (React, 8 panels, 只读为主)
 
 ### 3.10 工程与可复现性 — **P1**
 
-- **0 个测试文件**（Python + Go），9,637 行后端无测试；唯一 CI 是 Go 交叉编译。`scripts/verify.ps1` = `compileall` + `ely-eye status`（atom_count=0 也退出 0）+ `npm build`。
+- **0 个测试文件**（Python + Go），9,637 行后端无测试；唯一 CI 是 Go 交叉编译。`scripts/verify.ps1` = `compileall` + `elysium status`（atom_count=0 也退出 0）+ `npm build`。
 - **`PRD.md` 被 gitignore**（`.gitignore:23/24`）但 `Dockerfile:16` 要 COPY 它 → 任何人的 `docker build` 都失败；同时它是全部训练数据的来源 → 宣称不可复现。
 - **硬件写死**：`evals.py:1672,1683,1780-1784` 断言 `"RTX 4090" in device_name` → 在 4080/5090/A6000 上证明直接失效（而 README 说目标是 4080 级 16GB）；`:1793-1798` 要求 unsloth/triton/xformers 版本串，而 unsloth 从未被 import。
 - **平台锁死**：`profiles.py` 一路 shell 到 `wsl.exe -d Ubuntu`（发行版名写死），16 个脚本里 15 个是 `.ps1`；`_runtime_profile_check` 因此只在 Windows+WSL+CUDA 下可能通过。
@@ -355,18 +355,18 @@ FTS5：改 external-content 表 + CJK 分词 + 标识符切分（去掉 `db.py:1
 
 ```
 MCP（写必须经 Python 单写者；Go 保持 mode=ro + query_only）
-  ely_eye_remember / ely_eye_forget / ely_eye_supersede
-  ely_eye_search        （与后端同一排序；filters: since/until/source/scenario/holder/modality/trust/limit/cursor）
-  ely_eye_who_knows     （返回排序后的持有者 + basis + confidence；终态 NO_HOLDER_KNOWS）
-  ely_eye_mount / ely_eye_unmount
+  elysium_remember / elysium_forget / elysium_supersede
+  elysium_search        （与后端同一排序；filters: since/until/source/scenario/holder/modality/trust/limit/cursor）
+  elysium_who_knows     （返回排序后的持有者 + basis + confidence；终态 NO_HOLDER_KNOWS）
+  elysium_mount / elysium_unmount
   全部加 readOnlyHint/destructiveHint/idempotentHint + outputSchema
 HTTP
   POST /api/search   POST /api/memory   POST /api/memory/{id}/forget   POST /api/memory/{id}/supersede
   GET  /api/holders  GET /api/holders/{id}/knows   POST /api/cartridges/{id}/mount
   /api/session/*     token 鉴权 + Origin 校验（默认 localhost）
 CLI
-  ely-eye search "q" --since --until --source --scenario --holder --modality --limit --cursor
-  ely-eye remember|forget|supersede|mount|who-knows|backup|restore|doctor
+  elysium search "q" --since --until --source --scenario --holder --modality --limit --cursor
+  elysium remember|forget|supersede|mount|who-knows|backup|restore|doctor
 前端
   补 search-without-answer、记忆浏览/编辑/遗忘、溯源下钻（time/source_id/trust/relations 已在响应里，types.ts 别丢）、
   图像渲染（App.tsx 目前无 <img>）、per-leg 分数可视化（把 45% 空权重暴露出来）

@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-import ely_eye.api as api_module
-from ely_eye.config import Settings
+import elysium.api as api_module
+from elysium.config import Settings
 
 KEYS = "我们的钥匙放在玄关抽屉里"
 TOKEN = "a-token-worth-having"
@@ -31,7 +31,7 @@ def test_a_write_against_a_server_with_no_token_is_refused_and_says_why(
 ) -> None:
     response = _client(tmp_path, monkeypatch).post("/api/memory", json={"text": KEYS})
     assert response.status_code == 403
-    assert "ELY_EYE_AUTH_TOKEN" in response.json()["detail"], "the refusal must name the fix"
+    assert "ELYSIUM_AUTH_TOKEN" in response.json()["detail"], "the refusal must name the fix"
 
 
 def test_a_write_with_the_wrong_token_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

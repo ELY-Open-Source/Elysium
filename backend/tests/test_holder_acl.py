@@ -9,13 +9,13 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-import ely_eye.api as api_module
-from ely_eye.compiler import ContextCompiler
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.holder_store import HolderStore
-from ely_eye.memory import MemoryService
-from ely_eye.schemas import (
+import elysium.api as api_module
+from elysium.compiler import ContextCompiler
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.holder_store import HolderStore
+from elysium.memory import MemoryService
+from elysium.schemas import (
     EvidenceAtom,
     MemoryOrigin,
     Modality,
@@ -24,7 +24,7 @@ from ely_eye.schemas import (
     TrustScores,
     Visibility,
 )
-from ely_eye.storage import ObjectStore
+from elysium.storage import ObjectStore
 
 OPERATOR = "the-operator-token"
 AS_OPERATOR = {"Authorization": f"Bearer {OPERATOR}"}

@@ -42,7 +42,7 @@ def test_the_report_prints_every_arm_with_its_numbers(tmp_path: Path) -> None:
         "commit": "abcdef123456",
         "schema_version": 8,
         "source_schema_version": 7,
-        "store": "bench/runs/leg_check/data/ely_eye.sqlite",
+        "store": "bench/runs/leg_check/data/elysium.sqlite",
         "source_store": "bench/runs/dense_scale",
         "dense_vectors": 153857,
         "picture_index": {"path": "bench/runs/leg_check_index", "atoms": 53668, "dim": 512, "bytes": 109912192},

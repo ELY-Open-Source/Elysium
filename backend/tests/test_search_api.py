@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import ely_eye.api as api_module
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.memory import MemoryService
-from ely_eye.schemas import MemoryOrigin
+import elysium.api as api_module
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.memory import MemoryService
+from elysium.schemas import MemoryOrigin
 
 KEYS = "我们的钥匙放在玄关抽屉里"
 PASSPORT = "护照在书房第二个抽屉里"
@@ -98,8 +98,8 @@ def test_the_cli_answers_in_json_a_machine_can_read(tmp_path: Path, monkeypatch:
 
     from typer.testing import CliRunner
 
-    import ely_eye.cli as cli_module
-    from ely_eye.cli import app
+    import elysium.cli as cli_module
+    from elysium.cli import app
 
     settings = Settings(home=tmp_path, default_holder="wife")
     monkeypatch.setattr(cli_module, "get_settings", lambda: settings)

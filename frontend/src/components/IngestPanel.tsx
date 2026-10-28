@@ -8,7 +8,7 @@ import { Panel } from './ui';
 
 export function IngestPanel({ onChanged }: { onChanged: () => void }) {
   const [path, setPath] = useState('');
-  const [cartridgeName, setCartridgeName] = useState('ely-eye-cartridge');
+  const [cartridgeName, setCartridgeName] = useState('elysium-cartridge');
   const [files, setFiles] = useState<File[]>([]);
   const [lastIngest, setLastIngest] = useState<IngestResponse | null>(null);
   const [busy, setBusy] = useState<string | null>(null);

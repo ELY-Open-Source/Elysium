@@ -10,11 +10,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.memory import MemoryService
-from ely_eye.retrieval import RetrievalService
-from ely_eye.schemas import MemoryOrigin, SearchFilters
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.memory import MemoryService
+from elysium.retrieval import RetrievalService
+from elysium.schemas import MemoryOrigin, SearchFilters
 
 NOW = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
 SESSION = "cooking-2026-10"
@@ -191,7 +191,7 @@ def test_an_archived_memory_stops_answering_without_leaving_the_store(tmp_path) 
 def test_importance_is_a_stated_value_and_not_a_free_number(tmp_path) -> None:
     from pydantic import ValidationError
 
-    from ely_eye.schemas import EvidenceAtom, Modality, TrustScores
+    from elysium.schemas import EvidenceAtom, Modality, TrustScores
 
     with pytest.raises(ValidationError, match="less than or equal to 1"):
         EvidenceAtom(

@@ -25,7 +25,7 @@ from bench.scratch import copy_store
 from bench.systems import DENSE_MODEL, MODELS, machine_facts
 
 if TYPE_CHECKING:
-    from ely_eye.db import Database
+    from elysium.db import Database
 
 DEFAULT_HOME = Path("bench/runs/baseline")
 DEFAULT_SCRATCH = Path("bench/runs/dense_scale")
@@ -102,10 +102,10 @@ def agreement(ids: list[str], matrix: np.ndarray, probes: Sequence[tuple[np.ndar
 
 
 def measure(home: Path, scratch: Path, probes: int, model_dir: Path) -> dict[str, Any]:
-    from ely_eye.config import Settings
-    from ely_eye.db import Database
-    from ely_eye.embeddings import EmbeddingService
-    from ely_eye.vector_index import VectorIndex, expected_vectors
+    from elysium.config import Settings
+    from elysium.db import Database
+    from elysium.embeddings import EmbeddingService
+    from elysium.vector_index import VectorIndex, expected_vectors
 
     copy_home, copy_seconds = copy_store(home, scratch)
     settings = Settings(
@@ -234,7 +234,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
                     f"- writing one memory into a full index: p50 {write['p50'] * 1000:.0f}ms · "
                     f"p95 {write['p95'] * 1000:.0f}ms over {write['queries']} writes"
                 ),
-                f"- the repair scan (`ely-eye build-dense-index`) over a full index: {report['repair_seconds']:.1f}s, and it is not on the search path",
+                f"- the repair scan (`elysium build-dense-index`) over a full index: {report['repair_seconds']:.1f}s, and it is not on the search path",
                 (
                     f"- search p50 {timing['p50'] * 1000:.1f}ms · p95 {timing['p95'] * 1000:.1f}ms · "
                     f"max {timing['max'] * 1000:.1f}ms over {timing['queries']} queries"

@@ -26,7 +26,7 @@ from bench.ingest_baseline import source_map
 from bench.scratch import copy_store
 
 if TYPE_CHECKING:
-    from ely_eye.db import Database
+    from elysium.db import Database
 from bench.sets_common import ROOT
 
 RUNS = ROOT / "runs" / "baseline"
@@ -466,10 +466,10 @@ def live_product_rankings(
     `scratch` copies the store before opening it. The product path migrates whatever it opens, and
     the baseline store is cited evidence, so a benchmark that measures the product must not edit it.
     """
-    from ely_eye.config import Settings
-    from ely_eye.db import Database
-    from ely_eye.retrieval import RetrievalService
-    from ely_eye.schemas import SearchFilters
+    from elysium.config import Settings
+    from elysium.db import Database
+    from elysium.retrieval import RetrievalService
+    from elysium.schemas import SearchFilters
 
     if as_holders is not None and len(as_holders) != len(queries):
         raise SystemExit(f"{len(as_holders)} holders for {len(queries)} queries")

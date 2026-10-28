@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.ingestion import IngestionService
-from ely_eye.retrieval import RetrievalService
-from ely_eye.schemas import SearchFilters
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.ingestion import IngestionService
+from elysium.retrieval import RetrievalService
+from elysium.schemas import SearchFilters
 
 
 def _service(tmp_path: Path) -> tuple[IngestionService, Settings]:

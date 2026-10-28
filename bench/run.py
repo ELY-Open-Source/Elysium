@@ -268,13 +268,13 @@ def main() -> int:
             picked = [query for query in queries if query.modality == modality][: args.limit]
             capped.extend(picked)
         queries = capped
-    atoms = load_atoms(DB_HOME / "data" / "ely_eye.sqlite")
+    atoms = load_atoms(DB_HOME / "data" / "elysium.sqlite")
     holders = holder_index(modalities)
     corpus_sources = len({atom.source_id for atom in atoms})
     print(f"{len(queries)} queries, {len(atoms)} atoms, {corpus_sources} sources", flush=True)
 
     report: dict[str, Any] = {
-        "meta": meta(corpus_sources, queries, args.limit, store=DB_HOME / "data" / "ely_eye.sqlite"),
+        "meta": meta(corpus_sources, queries, args.limit, store=DB_HOME / "data" / "elysium.sqlite"),
         "chance": chance_row(queries, corpus_sources),
     }
     # One pass over the queries: each signal is computed once, every arm derives from it, and each query is checkpointed so a kill costs one query.

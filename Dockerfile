@@ -10,10 +10,10 @@ RUN npm run build
 FROM nvidia/cuda:13.3.0-runtime-ubuntu24.04
 
 ENV PYTHONUNBUFFERED=1 \
-    ELY_EYE_HOME=/data/ely-eye \
-    ELY_EYE_RUNTIME_BACKEND=sglang \
-    ELY_EYE_SGLANG_BASE_URL=http://127.0.0.1:8000/v1 \
-    ELY_EYE_UI_DIR=/srv/ely-eye/ui
+    ELYSIUM_HOME=/data/elysium \
+    ELYSIUM_RUNTIME_BACKEND=sglang \
+    ELYSIUM_SGLANG_BASE_URL=http://127.0.0.1:8000/v1 \
+    ELYSIUM_UI_DIR=/srv/elysium/ui
 
 WORKDIR /app
 
@@ -24,11 +24,11 @@ RUN apt-get update \
 COPY backend ./backend
 COPY README.md ./
 
-RUN python3.12 -m venv /opt/ely-eye \
-    && /opt/ely-eye/bin/pip install --upgrade pip setuptools wheel \
-    && /opt/ely-eye/bin/pip install ./backend
+RUN python3.12 -m venv /opt/elysium \
+    && /opt/elysium/bin/pip install --upgrade pip setuptools wheel \
+    && /opt/elysium/bin/pip install ./backend
 
-COPY --from=ui /ui/dist /srv/ely-eye/ui
+COPY --from=ui /ui/dist /srv/elysium/ui
 
 EXPOSE 8765
-CMD ["/opt/ely-eye/bin/ely-eye", "serve", "--host", "0.0.0.0", "--port", "8765"]
+CMD ["/opt/elysium/bin/elysium", "serve", "--host", "0.0.0.0", "--port", "8765"]

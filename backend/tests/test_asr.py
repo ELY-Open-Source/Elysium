@@ -9,8 +9,8 @@ from typing import Any, cast
 import numpy as np
 import pytest
 
-from ely_eye import ingestion_media as media_module
-from ely_eye.asr import (
+from elysium import ingestion_media as media_module
+from elysium.asr import (
     DEFERRED,
     SAMPLE_RATE,
     SpeechSegment,
@@ -19,12 +19,12 @@ from ely_eye.asr import (
     audio_duration,
     decode_audio,
 )
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.ingestion import IngestionService, UnsupportedFile
-from ely_eye.ingestion_common import FileTooLarge
-from ely_eye.ocr import OcrResult
-from ely_eye.schemas import Modality
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.ingestion import IngestionService, UnsupportedFile
+from elysium.ingestion_common import FileTooLarge
+from elysium.ocr import OcrResult
+from elysium.schemas import Modality
 
 WORDS = (
     SpokenWord(word="钥匙", start=0.58, end=0.9, confidence=0.91),
@@ -207,7 +207,7 @@ def test_a_walk_records_what_it_refused_to_read(tmp_path: Path) -> None:
 def test_the_transcriber_names_the_snapshot_it_wants(tmp_path: Path) -> None:
     without = SpeechTranscriber(_settings(tmp_path))
     assert not without.available()
-    with pytest.raises(SystemExit, match="ELY_EYE_ASR_MODEL_DIR"):
+    with pytest.raises(SystemExit, match="ELYSIUM_ASR_MODEL_DIR"):
         without.transcribe(_audio(tmp_path))
 
     empty = tmp_path / "snapshot"

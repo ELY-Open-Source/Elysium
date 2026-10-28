@@ -25,22 +25,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.ocr import read_text_from_image
-from ely_eye.retrieval import RetrievalService
-from ely_eye.schemas import (
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.ocr import read_text_from_image
+from elysium.retrieval import RetrievalService
+from elysium.schemas import (
     EvidenceAtom,
     Modality,
     SourceRecord,
     TrustScores,
 )
-from ely_eye.storage import (
+from elysium.storage import (
     ObjectStore,
     token_equivalent,
     visual_token_equivalent,
 )
-from ely_eye.visual_index import VisualIndex
+from elysium.visual_index import VisualIndex
 
 from bench.metrics import aggregate, chance_recall_at_k, score_query
 from bench.systems import machine_facts

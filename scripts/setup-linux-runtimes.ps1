@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 Set-Location (Split-Path -Parent $PSScriptRoot)
-$distro = if ($env:ELY_EYE_WSL_DISTRO) { $env:ELY_EYE_WSL_DISTRO } else { "Ubuntu" }
+$distro = if ($env:ELYSIUM_WSL_DISTRO) { $env:ELYSIUM_WSL_DISTRO } else { "Ubuntu" }
 
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
   throw "WSL is required for SGLang, vLLM, and KTransformers runtime profiles."
@@ -21,4 +21,4 @@ if (-not (Get-Command llama-server -ErrorAction SilentlyContinue)) {
   winget install --id ggml.llamacpp -e --accept-package-agreements --accept-source-agreements
 }
 
-.\.venv\Scripts\ely-eye.exe runtime-profiles
+.\.venv\Scripts\elysium.exe runtime-profiles

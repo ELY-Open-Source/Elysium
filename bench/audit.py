@@ -30,7 +30,7 @@ CORPUS_MANIFEST = ROOT / "corpus" / "manifest.jsonl"
 SCORE_WORDS = ("pass_rate", "pass_target", "accuracy", "recall", "hit_rate", "score", "target")
 RETRY_MARKERS = ("best_of", "bestof", "reroll", "re_roll", "until_pass", "retry_until")
 # The scorer must stay a pure function of (query, ranked ids, gold ids), or the thing being graded starts grading itself.
-SCORER_FORBIDDEN = ("ely_eye", "transformers", "sentence_transformers", "torch", "bench.systems", "bench.counterpart")
+SCORER_FORBIDDEN = ("elysium", "transformers", "sentence_transformers", "torch", "bench.systems", "bench.counterpart")
 FROZEN_REPORTS = ("baseline.json", "baseline_external.json")
 
 
@@ -233,7 +233,7 @@ def self_test(manifest: dict[str, Any]) -> int:
 
 def product_sources(root: Path) -> list[Path]:
     """The product's proof suite, wherever it lives now: it moved out of one evals.py into a package."""
-    package = root / "backend" / "src" / "ely_eye" / "proofs"
+    package = root / "backend" / "src" / "elysium" / "proofs"
     if not package.is_dir():
         raise SystemExit(f"{package}: --product asked for the proof suite but it is not there")
     sources = sorted(package.glob("*.py"))

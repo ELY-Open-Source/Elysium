@@ -1,6 +1,6 @@
-# Ely-Eye
+# Elysium · 往世乐土
 
-Ely-Eye is a local memory store for AI. Every memory it keeps carries who it
+Elysium (Chinese name 往世乐土) is a local memory store for AI. Every memory it keeps carries who it
 belongs to, where it came from, when it was true, in what situation, and who may
 read it. Retrieval answers as the person asking, so a store shared by several
 people and several agents does not blend them into one voice. A Context
@@ -50,15 +50,15 @@ python -m bench.dense_scale                        # the vector leg at corpus si
 The generator side is written and runnable but has not been run in this
 repository's reports, so no score from it is quoted anywhere in this README:
 
-- generation with Qwen3.5-9B and the trained LoRA adapters — `ely-eye runtime-generation-proof`
-- Visual HashHop multi-hop visual addressing — `ely-eye hashhop --kind visual`
-- the Visual Contradiction Lens — `ely-eye visual-contradiction-proof`
-- standard benchmarks (MMMU-Pro, OCRBench, and the rest) — `ely-eye run-benchmark`
-- the fifteen-check proof suite as a whole — `ely-eye proof-suite`
+- generation with Qwen3.5-9B and the trained LoRA adapters — `elysium runtime-generation-proof`
+- Visual HashHop multi-hop visual addressing — `elysium hashhop --kind visual`
+- the Visual Contradiction Lens — `elysium visual-contradiction-proof`
+- standard benchmarks (MMMU-Pro, OCRBench, and the rest) — `elysium run-benchmark`
+- the fifteen-check proof suite as a whole — `elysium proof-suite`
 
 Each needs a CUDA machine and a model download. They are marked DEFERRED in
 `CHECKLIST.md`, and a run that has not happened is not allowed to look like a
-result: `ely-eye proof-suite` writes what it observed, and the checks that
+result: `elysium proof-suite` writes what it observed, and the checks that
 depend on a model report what they could not do rather than passing quietly.
 
 `TRAINING_ARTIFACTS.md` keeps the six-adapter training table, which is
@@ -98,21 +98,21 @@ bash scripts/serve-frontend.sh         # dashboard on http://127.0.0.1:5173
 ```
 
 Windows: the same names as `.ps1`. There is also a container image
-(`docker build -t ely-eye .`), and CI runs the whole suite on Linux.
+(`docker build -t elysium .`), and CI runs the whole suite on Linux.
 
 ```bash
-ely-eye ingest ~/some/package --cartridge-name project
-ely-eye search "where did we put the archive key" --as-holder wife
-ely-eye remember "the archive key is in the second drawer" --holder wife --scenario home
-ely-eye who-knows "archive key"
-ely-eye ask "where is the archive key" --as-holder husband
-ely-eye card
-ely-eye mounts && ely-eye mount project && ely-eye unmount
-ely-eye backup ./backup && ely-eye doctor
+elysium ingest ~/some/package --cartridge-name project
+elysium search "where did we put the archive key" --as-holder wife
+elysium remember "the archive key is in the second drawer" --holder wife --scenario home
+elysium who-knows "archive key"
+elysium ask "where is the archive key" --as-holder husband
+elysium card
+elysium mounts && elysium mount project && elysium unmount
+elysium backup ./backup && elysium doctor
 bash scripts/mcp_write_smoke.sh        # two processes, one store, one SQLite
 ```
 
-The dashboard is served by the API itself once `ELY_EYE_UI_DIR` points at
+The dashboard is served by the API itself once `ELYSIUM_UI_DIR` points at
 `frontend/dist`. `scripts/ui_smoke.sh` drives it in a real browser against a
 fresh store and fails if any of it stops working. The CLI does everything the
 console does, so nothing requires a browser.
@@ -120,38 +120,38 @@ console does, so nothing requires a browser.
 ## Retrieval
 
 Three legs, fused by rank. The words leg always runs. The dense leg runs only
-when `ELY_EYE_DENSE_EMBEDDINGS_ENABLED=1` and an embedding model is configured.
+when `ELYSIUM_DENSE_EMBEDDINGS_ENABLED=1` and an embedding model is configured.
 On the shipped page that leg moves recall from 0.863 to 0.860 while p50 goes
 from 122 ms to 713 ms; on a wider page both reach 0.873 while p50 goes from
 84 ms to 579 ms. It buys the memory questions (multi-session 0.857 → 0.920,
 preference 0.800 → 0.960) and costs the picture ones (image 0.720 → 0.680),
 which is why it is opt-in rather than the default. The picture leg runs only
-when the words page comes back thin and `ELY_EYE_CLIP_MODEL_DIR` is set.
+when the words page comes back thin and `ELYSIUM_CLIP_MODEL_DIR` is set.
 Vectors live in the database beside the atoms, written in the same transaction
 as the memory itself, so a memory is findable the moment it is stored and there
 is no index to rebuild.
 
 ## MCP server for coding agents
 
-`ely-eye-mcp/` is a Go MCP server. One command builds a native binary and
+`elysium-mcp/` is a Go MCP server. One command builds a native binary and
 registers it with Codex and Claude Code. Reads mirror the store; writes go
 through the API, so the write rules live in one place. A read with no
-`ELY_EYE_AUTH_TOKEN` sees only memories nobody owns and memories marked for
-everyone; `ely_eye_card` answers "can this store answer my kind of question"
+`ELYSIUM_AUTH_TOKEN` sees only memories nobody owns and memories marked for
+everyone; `elysium_card` answers "can this store answer my kind of question"
 before anything sensitive is sent, and it carries no memory text.
 
 ```bash
-bash ./ely-eye-mcp/install.sh --client both
+bash ./elysium-mcp/install.sh --client both
 ```
 
-See `ely-eye-mcp/README.md` for the full tool list.
+See `elysium-mcp/README.md` for the full tool list.
 
 ## Data layout
 
-Runtime state lives under `.ely_eye/` (git-ignored):
+Runtime state lives under `.elysium/` (git-ignored):
 
 ```text
-.ely_eye/
+.elysium/
 ├─ data/         the SQLite store: atoms, FTS, vectors (vec0), edges, mounts
 ├─ objects/      ingested source files
 ├─ cache/        compiled-context cache and the picture index
@@ -171,7 +171,7 @@ backend/     Python: ingestion, retrieval, memory, runtime, training, FastAPI
 bench/       the benchmark suite: frozen third-party corpora, harnesses, reports
 frontend/    the local dashboard (Vite + React)
 scripts/     install, serving, runtimes, smoke (.sh on Linux/macOS, .ps1 on Windows)
-ely-eye-mcp/ Go: the MCP server
+elysium-mcp/ Go: the MCP server
 ```
 
 `CHECKLIST.md` is the ordered work list with the acceptance line for every item;

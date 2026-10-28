@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import ely_eye.api as api_module
-from ely_eye.config import Settings
+import elysium.api as api_module
+from elysium.config import Settings
 
 KEYS = "我们的钥匙放在玄关抽屉里"
 

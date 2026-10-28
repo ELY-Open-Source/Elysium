@@ -15,14 +15,14 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from ely_eye.clip_encoder import ClipEncoder
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.memory import MemoryService
-from ely_eye.retrieval import RetrievalService
-from ely_eye.schemas import EvidenceAtom, Modality, SourceRecord, TrustScores
-from ely_eye.storage import ObjectStore
-from ely_eye.visual_index import VisualIndex, is_visual
+from elysium.clip_encoder import ClipEncoder
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.memory import MemoryService
+from elysium.retrieval import RetrievalService
+from elysium.schemas import EvidenceAtom, Modality, SourceRecord, TrustScores
+from elysium.storage import ObjectStore
+from elysium.visual_index import VisualIndex, is_visual
 
 DIM = 4
 
@@ -191,7 +191,7 @@ def test_a_missing_snapshot_is_named_rather_than_mumbled(tmp_path: Path) -> None
     index = VisualIndex(settings, Database(settings))
 
     assert not index.available()
-    with pytest.raises(SystemExit, match="ELY_EYE_CLIP_MODEL_DIR"):
+    with pytest.raises(SystemExit, match="ELYSIUM_CLIP_MODEL_DIR"):
         index.encoder()
 
 

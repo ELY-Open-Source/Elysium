@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from ely_eye import api as api_module
-from ely_eye.config import Settings
+from elysium import api as api_module
+from elysium.config import Settings
 
 
 def _client(settings: Settings, monkeypatch) -> TestClient:
@@ -19,11 +19,11 @@ def _client(settings: Settings, monkeypatch) -> TestClient:
 def test_a_built_interface_is_served_from_the_api_origin(tmp_path: Path, monkeypatch) -> None:
     ui = tmp_path / "dist"
     ui.mkdir()
-    (ui / "index.html").write_text("<html><body>ely-eye</body></html>", encoding="utf-8")
+    (ui / "index.html").write_text("<html><body>elysium</body></html>", encoding="utf-8")
     settings = Settings(home=tmp_path / "home", ui_dir=ui)
     client = _client(settings, monkeypatch)
     answer = client.get("/")
-    assert answer.status_code == 200 and "ely-eye" in answer.text
+    assert answer.status_code == 200 and "elysium" in answer.text
     assert client.get("/api/status").status_code == 200
 
 

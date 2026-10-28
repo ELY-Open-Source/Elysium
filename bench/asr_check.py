@@ -18,7 +18,7 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
-from ely_eye.asr import (
+from elysium.asr import (
     CPU_THREADS,
     TRANSCRIBE_KNOBS,
     SpeechSegment,
@@ -26,10 +26,10 @@ from ely_eye.asr import (
     SpokenWord,
     audio_duration,
 )
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.ingestion import IngestionService
-from ely_eye.schemas import Modality
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.ingestion import IngestionService
+from elysium.schemas import Modality
 
 from bench.systems import machine_facts
 

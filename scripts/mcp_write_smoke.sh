@@ -5,10 +5,10 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 home="$(mktemp -d)"
 port="${PORT:-8799}"
-export ELY_EYE_HOME="$home"
-export ELY_EYE_API="http://127.0.0.1:${port}"
+export ELYSIUM_HOME="$home"
+export ELYSIUM_API="http://127.0.0.1:${port}"
 # The server decides who may write; the MCP child inherits this and sends it on every mutation.
-export ELY_EYE_AUTH_TOKEN="smoke-token"
+export ELYSIUM_AUTH_TOKEN="smoke-token"
 
 python_bin="$root/.venv/bin/python"
 [ -x "$python_bin" ] || python_bin="python3"
@@ -24,7 +24,7 @@ cat > "$model_dir/config.json" <<'JSON'
 JSON
 printf '{"version": "1.0"}' > "$model_dir/tokenizer.json"
 printf '{"metadata": {}, "weight_map": {"model-00001.safetensors": "0"}}' > "$model_dir/model.safetensors.index.json"
-export ELY_EYE_MODEL_DIR="$model_dir"
+export ELYSIUM_MODEL_DIR="$model_dir"
 
 api=""
 wife_api=""
@@ -42,13 +42,13 @@ if curl -sf "http://127.0.0.1:${port}/api/status" >/dev/null 2>&1; then
   exit 1
 fi
 
-"$python_bin" -m ely_eye.cli serve --port "$port" >"$home/api.log" 2>&1 &
+"$python_bin" -m elysium.cli serve --port "$port" >"$home/api.log" 2>&1 &
 api=$!
 
 ready=0
 for _ in $(seq 1 80); do
   if ! kill -0 "$api" 2>/dev/null; then
-    echo "FAIL: the Ely-Eye API process exited before it was ready"
+    echo "FAIL: the Elysium API process exited before it was ready"
     cat "$home/api.log"
     exit 1
   fi
@@ -56,7 +56,7 @@ for _ in $(seq 1 80); do
   sleep 0.5
 done
 if [ "$ready" -ne 1 ]; then
-  echo "FAIL: the Ely-Eye API did not start"
+  echo "FAIL: the Elysium API did not start"
   cat "$home/api.log"
   exit 1
 fi
@@ -65,7 +65,7 @@ fi
 # /api/memory/working exists only on builds that carry the memory tiers, so a server left over from
 # an older tree answers 404 here. Checking the MCP reply instead would prove nothing — the Go layer
 # decodes into its own struct and re-emits a missing field as 0, so an old server still passes.
-status="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
+status="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${ELYSIUM_AUTH_TOKEN}" \
   "http://127.0.0.1:${port}/api/memory/working?holder=fingerprint&session=probe")"
 if [ "$status" != "200" ]; then
   echo "FAIL: port ${port} answers /api/status but returns HTTP $status for /api/memory/working;"
@@ -82,19 +82,19 @@ if [ "$status" != "401" ]; then
   exit 1
 fi
 status="$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:${port}/api/memory" \
-  -H 'content-type: application/json' -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
+  -H 'content-type: application/json' -H "Authorization: Bearer ${ELYSIUM_AUTH_TOKEN}" \
   -d '{"text":"a write with the token"}')"
 if [ "$status" != "200" ]; then
   echo "FAIL: a tokened write returned HTTP $status, want 200"
   exit 1
 fi
 
-(cd "$root/ely-eye-mcp" && go build -o "$home/ely-eye-mcp" ./cmd/ely-eye-mcp)
+(cd "$root/elysium-mcp" && go build -o "$home/elysium-mcp" ./cmd/elysium-mcp)
 
 # A second principal on the same SQLite file. The server, not the client, decides who a memory
 # belongs to, so the only way to write as the wife is to ask a server whose principal is the wife.
 wife_port=$((port + 1))
-ELY_EYE_DEFAULT_HOLDER=wife "$python_bin" -m ely_eye.cli serve --port "$wife_port" >"$home/wife-api.log" 2>&1 &
+ELYSIUM_DEFAULT_HOLDER=wife "$python_bin" -m elysium.cli serve --port "$wife_port" >"$home/wife-api.log" 2>&1 &
 wife_api=$!
 ready=0
 for _ in $(seq 1 80); do
@@ -102,21 +102,21 @@ for _ in $(seq 1 80); do
   sleep 0.5
 done
 if [ "$ready" -ne 1 ]; then
-  echo "FAIL: the wife's Ely-Eye API did not start"
+  echo "FAIL: the wife's Elysium API did not start"
   cat "$home/wife-api.log"
   exit 1
 fi
 secret="护照在书房第二个抽屉里"
 curl -sf -X POST "http://127.0.0.1:${wife_port}/api/memory" -H 'content-type: application/json' \
-  -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
+  -H "Authorization: Bearer ${ELYSIUM_AUTH_TOKEN}" \
   -d "{\"text\":\"${secret}\",\"scenario\":\"home\"}" >/dev/null
 curl -sf -X POST "http://127.0.0.1:${wife_port}/api/holders/wife" -H 'content-type: application/json' \
-  -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
+  -H "Authorization: Bearer ${ELYSIUM_AUTH_TOKEN}" \
   -d '{"name":"小美","kind":"person","knows_about":["护照"],"contact":{"channel":"signal","address":"+86-555"}}' >/dev/null
 
 printf 'the pantry keeps flour\n' > "$home/pantry.txt"
 uploaded="$(curl -sf -X POST "http://127.0.0.1:${port}/api/ingest/upload?cartridge_name=home" \
-  -H "Authorization: Bearer ${ELY_EYE_AUTH_TOKEN}" \
+  -H "Authorization: Bearer ${ELYSIUM_AUTH_TOKEN}" \
   -F "files=@${home}/pantry.txt;type=text/plain")"
 cartridge_id="$(printf '%s' "$uploaded" | "$python_bin" -c 'import json,sys; print(json.load(sys.stdin)["cartridge_id"])')"
 if [ -z "$cartridge_id" ] || [ "$cartridge_id" = "None" ]; then
@@ -124,7 +124,7 @@ if [ -z "$cartridge_id" ] || [ "$cartridge_id" = "None" ]; then
   exit 1
 fi
 
-"$python_bin" - "$home/ely-eye-mcp" "$cartridge_id" "$model_dir" "$secret" <<'PY'
+"$python_bin" - "$home/elysium-mcp" "$cartridge_id" "$model_dir" "$secret" <<'PY'
 import json
 import pathlib
 import subprocess
@@ -171,7 +171,7 @@ def tool(name, arguments):
 call(1, "initialize", {
     "protocolVersion": "2025-06-18",
     "capabilities": {},
-    "clientInfo": {"name": "ely-eye-smoke", "version": "0"},
+    "clientInfo": {"name": "elysium-smoke", "version": "0"},
 })
 send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
@@ -179,7 +179,7 @@ names = [item["name"] for item in call(2, "tools/list", {})["tools"]]
 for required in ("remember", "supersede_memory", "forget_memory", "mounted_cartridges",
                  "mount_cartridge", "switch_cartridge", "unmount_cartridge", "append_to_cartridge",
                  "who_knows", "ask", "list_holders", "working_set", "memory_conflicts",
-                 "ely_eye_card"):
+                 "elysium_card"):
     if required not in names:
         raise SystemExit(f"FAIL: {required} is not registered; tools are {names}")
 
@@ -318,7 +318,7 @@ if not any(hit["atom"]["atom_id"] == newer["atom_id"] for hit in settled):
 
 # The card is derived, not declared: it says what this store can answer, and it is
 # safe to read before trusting the store because it carries no memory text.
-card = tool("ely_eye_card", {})["card"]
+card = tool("elysium_card", {})["card"]
 if card["schema_version"] < 11 or card["has_audio"]:
     raise SystemExit(f"FAIL: the capability card misreports the store: {card}")
 wife_card = next((item for item in card["holders"] if item["holder_id"] == "wife"), None)
@@ -326,7 +326,7 @@ if not wife_card or wife_card["memories"] < 1 or "护照" not in wife_card["know
     raise SystemExit(f"FAIL: the card does not say what the wife holds: {card['holders']}")
 if secret in json.dumps(card, ensure_ascii=False):
     raise SystemExit(f"FAIL: the capability card carried private text: {card}")
-single = tool("ely_eye_card", {"holder_id": "wife"})["holder"]
+single = tool("elysium_card", {"holder_id": "wife"})["holder"]
 if single["memories"] != wife_card["memories"] or single["newest_memory"] != wife_card["newest_memory"]:
     raise SystemExit(f"FAIL: the one-holder card disagrees with the store card: {single}")
 
@@ -336,7 +336,7 @@ PY
 # The boundary, proved from the outside: a caller with no token is nobody, and a holder's
 # token reads her own memories and nobody else's. The MCP process is re-run without the
 # operator token so the Go path is measured against the same rule, not assumed.
-"$python_bin" - "$home/ely-eye-mcp" "$port" "$secret" "$ELY_EYE_AUTH_TOKEN" <<'PY'
+"$python_bin" - "$home/elysium-mcp" "$port" "$secret" "$ELYSIUM_AUTH_TOKEN" <<'PY'
 import json
 import os
 import subprocess
@@ -402,7 +402,7 @@ if status != 200 or card["schema_version"] < 11:
 if secret in json.dumps(card, ensure_ascii=False):
     raise SystemExit("FAIL: the capability card carried private text")
 
-env = {key: value for key, value in os.environ.items() if key != "ELY_EYE_AUTH_TOKEN"}
+env = {key: value for key, value in os.environ.items() if key != "ELYSIUM_AUTH_TOKEN"}
 proc = subprocess.Popen([binary, "server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                         stderr=subprocess.DEVNULL, text=True, env=env)
 
@@ -433,10 +433,10 @@ def tool(name, arguments):
 
 
 call(1, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
-                       "clientInfo": {"name": "ely-eye-stranger", "version": "0"}})
+                       "clientInfo": {"name": "elysium-stranger", "version": "0"}})
 send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
-stranger_card = tool("ely_eye_card", {})["card"]
+stranger_card = tool("elysium_card", {})["card"]
 if stranger_card["schema_version"] != card["schema_version"]:
     raise SystemExit(f"FAIL: the tokenless card reports a different schema: {stranger_card}")
 stranger_hits = tool("search_atoms", {"query": secret})["hits"]

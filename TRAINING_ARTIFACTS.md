@@ -1,10 +1,10 @@
-# Ely-Eye Training Artifacts
+# Elysium Training Artifacts
 
 ## What this file is, and what it is not
 
 It is a record of what was produced on **2026-05-28** on the Windows + RTX 4090
 machine that trained the adapters, from a `PRD.md` that no longer exists in this
-repository. The adapters themselves, the cartridge, and every `.ely_eye/` path
+repository. The adapters themselves, the cartridge, and every `.elysium/` path
 listed below are runtime state and are **not tracked by git**, so a clone of this
 repository cannot reproduce them.
 
@@ -18,7 +18,7 @@ says what the number actually measures.
 
 Generated on 2026-05-28 from the local `PRD.md`, ingested Evidence Atom
 `PRD_0b88b12114634a56:text`, visual Evidence Atom
-`ely_eye_dashboard_0180927ffdd3f8b0:image`, local UI proof images, and Qwen
+`elysium_dashboard_0180927ffdd3f8b0:image`, local UI proof images, and Qwen
 model snapshots. Every adapter has `training_trace.jsonl`, `training_summary.json`,
 and `training_proof.json` with RTX 4090 CUDA BF16 execution metadata, proof
 version 2, BF16 LoRA method, 8192-token max length, paged 8-bit AdamW,
@@ -51,36 +51,36 @@ Adapter weight proof:
 Local adapter roots:
 
 ```text
-.ely_eye/adapters/hme_core_lora_qwen35_9b
-.ely_eye/adapters/hme_vision_lora_qwen35_9b
-.ely_eye/adapters/hme_ttt_vl_qwen35_9b
-.ely_eye/adapters/hme_visual_mtp_qwen35_9b
-.ely_eye/adapters/hme_router_qwen35_08b
-.ely_eye/adapters/hme_retrieval_qwen3_vl_embedding_8b
+.elysium/adapters/hme_core_lora_qwen35_9b
+.elysium/adapters/hme_vision_lora_qwen35_9b
+.elysium/adapters/hme_ttt_vl_qwen35_9b
+.elysium/adapters/hme_visual_mtp_qwen35_9b
+.elysium/adapters/hme_router_qwen35_08b
+.elysium/adapters/hme_retrieval_qwen3_vl_embedding_8b
 ```
 
 Cartridge binding:
 
 ```text
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/adapters/hme_core_lora
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/adapters/hme_vision_lora
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/adapters/hme_ttt_vl
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/adapters/hme_visual_mtp
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/adapters/hme_router
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/adapters/hme_retrieval
+.elysium/cartridges/elysium_prd_7e5cd27b8284/adapters/hme_core_lora
+.elysium/cartridges/elysium_prd_7e5cd27b8284/adapters/hme_vision_lora
+.elysium/cartridges/elysium_prd_7e5cd27b8284/adapters/hme_ttt_vl
+.elysium/cartridges/elysium_prd_7e5cd27b8284/adapters/hme_visual_mtp
+.elysium/cartridges/elysium_prd_7e5cd27b8284/adapters/hme_router
+.elysium/cartridges/elysium_prd_7e5cd27b8284/adapters/hme_retrieval
 ```
 
 PRD proof suite:
 
 ```text
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/proof_suite.json
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/proof_suite.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/proof_suite.json
+.elysium/cartridges/elysium_prd_7e5cd27b8284/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/proof_suite.json
 ```
 
 Runtime generation proof:
 
 ```text
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/runtime_generation.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/runtime_generation.json
 transformers generated 218 tokens with hme_core_lora citation accuracy 1.00
 ```
 
@@ -92,9 +92,9 @@ used by that check contained its own answer.
 100M memory capsule proof:
 
 ```text
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/memory_capsule.json.zst
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/memory_capsule_index.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/memory_capsule.json
+.elysium/cartridges/elysium_prd_7e5cd27b8284/memory_capsule.json.zst
+.elysium/cartridges/elysium_prd_7e5cd27b8284/memory_capsule_index.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/memory_capsule.json
 The Context Cartridge materialized a 100,000,000 token-equivalent memory capsule with 4,096 committed segments and a verified segment Merkle root.
 
 The 100M is a property of a capsule the check generated for itself, not 100
@@ -108,13 +108,13 @@ cache at 148.9 GB in fp16.
 Model-solved HashHop proofs:
 
 ```text
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/0a10e6394ada0da7/model_text_hashhop.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/60c9d5f5f1648ea0/model_visual_hashhop.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/a29a310b31f9cef5/model_visual_hashhop.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/7f7b8b1f54ec3d75/model_visual_hashhop.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/4f24efd13342694c/model_visual_hashhop.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/a3f49402ef2710a3/model_visual_hashhop.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/0bd17526ab51392b/model_visual_hashhop.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/0a10e6394ada0da7/model_text_hashhop.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/60c9d5f5f1648ea0/model_visual_hashhop.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/a29a310b31f9cef5/model_visual_hashhop.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/7f7b8b1f54ec3d75/model_visual_hashhop.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/4f24efd13342694c/model_visual_hashhop.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/a3f49402ef2710a3/model_visual_hashhop.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/hashhop/0bd17526ab51392b/model_visual_hashhop.json
 Qwen/Qwen3.5-9B with HME-Core-LoRA solved a 1.01M token-equivalent 2-hop text HashHop and 6 Visual HashHop arenas at 262K token-equivalent.
 
 The check that produced this collected proofs until its pass-rate target was
@@ -126,9 +126,9 @@ reports the rate it got.
 Benchmark source and sample proof:
 
 ```text
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_sources.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_samples.json
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_predictions.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_sources.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_samples.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/standard_benchmark_predictions.json
 MMMU-Pro, OCRBench, MMLongBench-Doc, VideoMME, LongVideoBench, RULER, and LongBench v2 loaded official streaming samples or official public metadata samples with sample hashes and source dataset SHA values. LongVideoBench uses `longvideobench/LongVideoBench-Meta` validation metadata with canonical `longvideobench/LongVideoBench` registry tracking.
 
 No benchmark score is quoted here. The prediction step read **one** sample per
@@ -142,7 +142,7 @@ reports measured numbers, on corpora with hundreds of queries.
 Repository input proof:
 
 ```text
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/repository_input.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/repository_input.json
 The repository input proof indexed 94 files, 49 code files, 11,977 call graph edges, and 26 local git commits for PRD 10.1 code repository coverage.
 
 That is a snapshot of the repository as it stood on 2026-05-28; the repository is
@@ -153,11 +153,11 @@ treated as evidence of anything today.
 Runtime profile readiness:
 
 ```text
-.ely_eye/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/runtime_profiles.json
+.elysium/data/eval_proofs/prd_proof_suite_b03b88d7cfe5ba96/runtime_profiles.json
 SGLang 0.5.12.post1, vLLM 0.21.0, KTransformers 0.6.2.post4, WSL RTX 4090 GPU visibility, launcher module probes, and winget llama-server help output are verified.
 
 Verified inside WSL on that machine, against the fixed distro name the launcher
-used at the time. The launch profiles now read `ELY_EYE_WSL_DISTRO`, every
+used at the time. The launch profiles now read `ELYSIUM_WSL_DISTRO`, every
 `.ps1` has a `.sh` twin for Linux and macOS, and CI runs the suite on Linux — so
 this line is a record of one machine, not a portability claim.
 ```
@@ -191,12 +191,12 @@ that cannot run says what it could not run instead of passing.
 Cartridge physical assets:
 
 ```text
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/text_vectors.fp16.zstd
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/visual_vectors.int8.zstd  # item_count=1
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/kv_snapshots.kivi
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/memory_capsule.json.zst   # token_equivalent=100000000, segment_count=4096
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/ttt_vl_adapter.safetensors
-.ely_eye/cartridges/ely_eye_prd_7e5cd27b8284/visual_mtp_head.safetensors
+.elysium/cartridges/elysium_prd_7e5cd27b8284/text_vectors.fp16.zstd
+.elysium/cartridges/elysium_prd_7e5cd27b8284/visual_vectors.int8.zstd  # item_count=1
+.elysium/cartridges/elysium_prd_7e5cd27b8284/kv_snapshots.kivi
+.elysium/cartridges/elysium_prd_7e5cd27b8284/memory_capsule.json.zst   # token_equivalent=100000000, segment_count=4096
+.elysium/cartridges/elysium_prd_7e5cd27b8284/ttt_vl_adapter.safetensors
+.elysium/cartridges/elysium_prd_7e5cd27b8284/visual_mtp_head.safetensors
 ```
 
 A cartridge written today is not this list. `cartridge.py` now writes

@@ -40,7 +40,7 @@ def _release(scratch: Path) -> None:
 
 def copy_store(home: Path, scratch: Path) -> tuple[Path, float]:
     """Work on a copy: the baseline store is frozen evidence and must not be migrated in place."""
-    source = home / "data" / "ely_eye.sqlite"
+    source = home / "data" / "elysium.sqlite"
     if not source.is_file():
         raise SystemExit(
             f"{source}: no product database, build it with python -m bench.ingest_baseline"

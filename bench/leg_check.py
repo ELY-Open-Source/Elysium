@@ -77,8 +77,8 @@ def prepare(
             source = clip_index / name
             if not source.exists():
                 raise SystemExit(
-                    f"{source}: the picture index has not been built; run `ely-eye index-visual` "
-                    "with ELY_EYE_CLIP_MODEL_DIR set, or point --clip-index at its cache"
+                    f"{source}: the picture index has not been built; run `elysium index-visual` "
+                    "with ELYSIUM_CLIP_MODEL_DIR set, or point --clip-index at its cache"
                 )
             (copy_home / "cache").mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, copy_home / "cache" / name)
@@ -100,7 +100,7 @@ def _dense_vectors(store: Path) -> int:
     import sqlite3
 
     import sqlite_vec
-    from ely_eye import vector_index
+    from elysium import vector_index
 
     if vector_index.TABLE != "vec_atoms":
         raise SystemExit(f"the dense table is now {vector_index.TABLE}; update this harness's count")
@@ -144,7 +144,7 @@ def encode_rate(clip_model: Path, objects: Path, count: int) -> dict[str, Any]:
     """Pictures per second the encoder manages, measured on a sample instead of remembered."""
     import time
 
-    from ely_eye.clip_encoder import ClipEncoder
+    from elysium.clip_encoder import ClipEncoder
     from PIL import Image
 
     suffixes = {".png", ".jpg", ".jpeg"}
@@ -166,13 +166,13 @@ def encode_rate(clip_model: Path, objects: Path, count: int) -> dict[str, Any]:
 def _schema(home: Path) -> int:
     import sqlite3
 
-    with sqlite3.connect(home / "data" / "ely_eye.sqlite") as connection:
+    with sqlite3.connect(home / "data" / "elysium.sqlite") as connection:
         return int(connection.execute("PRAGMA user_version").fetchone()[0])
 
 
 def rank_all(service: Any, ids: dict[str, str], probes: list[Any], top_k: int) -> tuple[list[list[str]], list[int], list[float]]:
     """Ask the product as each probe's own holder and collapse atoms to sources by first hit."""
-    from ely_eye.schemas import SearchFilters
+    from elysium.schemas import SearchFilters
 
     rankings: list[list[str]] = []
     distinct: list[int] = []
@@ -221,9 +221,9 @@ def _groups(
 
 def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: int, models: dict[str, Path]) -> dict[str, Any]:
     """Score every configuration on the same probes, one warm service per configuration."""
-    from ely_eye.config import Settings
-    from ely_eye.db import Database
-    from ely_eye.retrieval import RetrievalService
+    from elysium.config import Settings
+    from elysium.db import Database
+    from elysium.retrieval import RetrievalService
 
     shipped = Settings().retrieval_top_k
     if shipped != SHIPPED_TOP_K:
@@ -245,7 +245,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
     print(f"{len(answerable)} answerable queries scored, {len(timed)} of them timed", flush=True)
     times = source_times()
 
-    vectors = _dense_vectors(home / "data" / "ely_eye.sqlite")
+    vectors = _dense_vectors(home / "data" / "elysium.sqlite")
     source_schema = _schema(home)
     if vectors == 0 and any(config["dense"] for config in CONFIGS):
         raise SystemExit(
@@ -316,7 +316,7 @@ def measure(home: Path, scratch: Path, objects: Path, clip_index: Path, probes: 
         "commit": git_commit(),
         "schema_version": _schema(copy_home),
         "source_schema_version": source_schema,
-        "store": str(scratch / "data" / "ely_eye.sqlite"),
+        "store": str(scratch / "data" / "elysium.sqlite"),
         "source_store": str(home),
         "dense_vectors": vectors,
         "picture_index": picture,

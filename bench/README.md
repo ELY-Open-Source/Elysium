@@ -5,7 +5,7 @@ Everything here measures the product as it is. No arm may read a benchmark gold 
 ## run order
 
 ```bash
-python -m bench.fetch_corpus      # 19 GB of third-party material -> bench/corpus + ~/ely_eye_bench_data
+python -m bench.fetch_corpus      # 19 GB of third-party material -> bench/corpus + ~/elysium_bench_data
 python -m bench.build_sets        # freeze the 6 query sets -> bench/sets/
 python -m bench.validate_sets     # schema + gold + scope + modality checks (b-2 gate)
 python -m bench.fetch_models      # dense + rerank models used by the ablation arms
@@ -33,7 +33,7 @@ database and reports its latency plus how far its top-10 differs from the fast B
 ## known environment artifact
 
 pi-lens' pyright reports `Import "bench.sets_common" could not be resolved` (and the same for
-`bench.metrics`, `bench.systems`, `ely_eye.*`, `cv2`, `onnxruntime`, `pypdf.errors`) even though
+`bench.metrics`, `bench.systems`, `elysium.*`, `cv2`, `onnxruntime`, `pypdf.errors`) even though
 every one of those imports works. It is not a repo defect:
 
 - `effective_config` on any bench file returns `0 config file(s)` with `resolvedCwd` at the repo
@@ -43,7 +43,7 @@ every one of those imports works. It is not a repo defect:
 
 ```bash
 .venv/bin/python -c "import bench.sets_common, bench.metrics, bench.systems, bench.run, bench.ingest_baseline, \
-bench.build_mmlongbench, ely_eye.config, ely_eye.db, cv2, onnxruntime, pypdf.errors; print('runtime proof OK')"
+bench.build_mmlongbench, elysium.config, elysium.db, cv2, onnxruntime, pypdf.errors; print('runtime proof OK')"
 ```
 
 Treat that command as the check of record for import health; treat pyright's *type* findings

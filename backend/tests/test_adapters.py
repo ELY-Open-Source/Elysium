@@ -14,12 +14,12 @@ import pytest
 import torch
 from fastapi.testclient import TestClient
 
-from ely_eye import adapters, api
-from ely_eye.cartridge_store import set_mounts
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.runtime import QwenRuntime
-from ely_eye.schemas import CartridgeManifest, TrainingAdapterKind
+from elysium import adapters, api
+from elysium.cartridge_store import set_mounts
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.runtime import QwenRuntime
+from elysium.schemas import CartridgeManifest, TrainingAdapterKind
 
 CORE = TrainingAdapterKind.hme_core_lora
 MODEL = "Qwen/Qwen3.5-9B"

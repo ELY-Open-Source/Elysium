@@ -28,9 +28,9 @@ DEFAULT_PROBES = 300
 
 def measure(home: Path, scratch: Path, probes: int) -> dict[str, Any]:
     """Open a copy of the product store (migrating it if it is old) and time real searches."""
-    from ely_eye.config import Settings
-    from ely_eye.db import Database
-    from ely_eye.retrieval import RetrievalService
+    from elysium.config import Settings
+    from elysium.db import Database
+    from elysium.retrieval import RetrievalService
 
     copy_home, copy_seconds = copy_store(home, scratch)
     settings = Settings(home=copy_home)

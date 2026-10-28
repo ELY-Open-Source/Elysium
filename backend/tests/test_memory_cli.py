@@ -9,10 +9,10 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from ely_eye import cli as cli_module
-from ely_eye.cli import app
-from ely_eye.config import Settings
-from ely_eye.db import Database
+from elysium import cli as cli_module
+from elysium.cli import app
+from elysium.config import Settings
+from elysium.db import Database
 
 runner = CliRunner()
 

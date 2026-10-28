@@ -9,12 +9,12 @@ import pytest
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-import ely_eye.api as api_module
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.memory import MemoryService
-from ely_eye.schemas import EvidenceAtom, MemoryOrigin, Modality, SourceRecord, TrustScores
-from ely_eye.storage import ObjectStore
+import elysium.api as api_module
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.memory import MemoryService
+from elysium.schemas import EvidenceAtom, MemoryOrigin, Modality, SourceRecord, TrustScores
+from elysium.storage import ObjectStore
 
 PNG = b"\x89PNG\r\n\x1a\n"
 BASE = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)

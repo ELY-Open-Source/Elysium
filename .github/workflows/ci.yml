@@ -29,12 +29,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-          cache-dependency-path: ely-eye-mcp/go.sum
+          cache-dependency-path: elysium-mcp/go.sum
       - name: Build, vet and test
-        working-directory: ely-eye-mcp
+        working-directory: elysium-mcp
         run: go build ./... && go vet ./... && go test ./...
       - name: gofmt is clean
-        working-directory: ely-eye-mcp
+        working-directory: elysium-mcp
         run: test -z "$(gofmt -l .)"
 
   interface:
@@ -54,10 +54,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the image from a clean clone
-        run: docker build -t ely-eye:ci .
+        run: docker build -t elysium:ci .
       - name: The container answers on both faces
         run: |
-          docker run -d --name elyeye -p 8765:8765 ely-eye:ci
+          docker run -d --name elysium -p 8765:8765 elysium:ci
           url=http://127.0.0.1:8765/api/status
           for attempt in $(seq 1 30); do
             curl -fsS "$url" -o /tmp/status.json && break
@@ -65,4 +65,4 @@ jobs:
           done
           cat /tmp/status.json
           curl -fsS http://127.0.0.1:8765/ | grep -q '<div id="root">'
-          docker logs elyeye
+          docker logs elysium

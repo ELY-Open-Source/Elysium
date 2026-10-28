@@ -16,7 +16,7 @@ import type {
   SystemStatus,
 } from './types';
 
-const TOKEN_KEY = 'ely_eye_token';
+const TOKEN_KEY = 'elysium_token';
 
 /** The write token lives in the browser, not in the bundle: a served page must not ship the owner's secret. */
 export function readToken(): string {

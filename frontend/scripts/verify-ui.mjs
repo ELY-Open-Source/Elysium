@@ -3,11 +3,11 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(process.cwd(), '..');
-const outputDir = process.env.ELY_EYE_UI_SMOKE_DIR ?? path.join(root, '.ely_eye', 'proofs');
+const outputDir = process.env.ELYSIUM_UI_SMOKE_DIR ?? path.join(root, '.elysium', 'proofs');
 await mkdir(outputDir, { recursive: true });
 
-const apiBase = process.env.ELY_EYE_API ?? 'http://127.0.0.1:8765';
-const uiUrl = process.env.ELY_EYE_UI_URL ?? 'http://127.0.0.1:5173/';
+const apiBase = process.env.ELYSIUM_API ?? 'http://127.0.0.1:8765';
+const uiUrl = process.env.ELYSIUM_UI_URL ?? 'http://127.0.0.1:5173/';
 // Mirrors PAGE_SIZE in frontend/src/components/MemoryPanel.tsx; the pager is only provable against a known page size.
 const PAGE_SIZE = 12;
 
@@ -243,7 +243,7 @@ for (const [state, reason] of states) {
 }
 observed.adapters = `${states.length} kinds: ${states.map(([state]) => state).join(', ')}`;
 
-await page.screenshot({ path: path.join(outputDir, 'ely-eye-dashboard.png'), fullPage: true });
+await page.screenshot({ path: path.join(outputDir, 'elysium-dashboard.png'), fullPage: true });
 const status = await page.locator('.kpi-grid').innerText();
 await browser.close();
 
@@ -259,7 +259,7 @@ if (unexpected.length > 0 || consoleErrors.length > 0) {
 console.log(
   JSON.stringify(
     {
-      screenshot: path.join(outputDir, 'ely-eye-dashboard.png'),
+      screenshot: path.join(outputDir, 'elysium-dashboard.png'),
       mount: observed.mount,
       adapters: observed.adapters,
       expected_failures: expectedFailures.filter((line) => failedRequests.includes(line)),

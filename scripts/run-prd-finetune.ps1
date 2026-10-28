@@ -11,10 +11,10 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$dataset = Join-Path $root ".ely_eye\training\hme_prd_sft.jsonl"
-$adapter = Join-Path $root ".ely_eye\adapters\hme_core_lora_qwen35_9b"
+$dataset = Join-Path $root ".elysium\training\hme_prd_sft.jsonl"
+$adapter = Join-Path $root ".elysium\adapters\hme_core_lora_qwen35_9b"
 
-.\.venv\Scripts\ely-eye.exe build-prd-training-data `
+.\.venv\Scripts\elysium.exe build-prd-training-data `
   --prd-path .\PRD.md `
   --output-path $dataset `
   --max-sections 48
@@ -35,7 +35,7 @@ if ($CartridgeId.Length -gt 0) {
   $args += @("--cartridge-id", $CartridgeId)
 }
 
-.\.venv\Scripts\ely-eye.exe @args
+.\.venv\Scripts\elysium.exe @args
 
 Write-Host "Adapter ready: $adapter"
-Write-Host "Use with: `$env:ELY_EYE_ADAPTER_DIR='$adapter'"
+Write-Host "Use with: `$env:ELYSIUM_ADAPTER_DIR='$adapter'"

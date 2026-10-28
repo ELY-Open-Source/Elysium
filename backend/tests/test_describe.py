@@ -13,12 +13,12 @@ from typing import cast
 import pytest
 from PIL import Image
 
-import ely_eye.ingestion_media as media_module
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.describe import DEFERRED, VisionDescriber
-from ely_eye.ingestion import IngestionService
-from ely_eye.ocr import OcrResult
+import elysium.ingestion_media as media_module
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.describe import DEFERRED, VisionDescriber
+from elysium.ingestion import IngestionService
+from elysium.ocr import OcrResult
 
 CAPTION = "一个购物车图标停在结算按钮旁边"
 
@@ -55,7 +55,7 @@ def _ingest(tmp_path: Path, describer: object, ocr_text: str = "") -> tuple[Sett
 
 
 def test_a_wordless_picture_ingested_with_a_model_carries_the_caption(tmp_path: Path) -> None:
-    from ely_eye.storage import token_equivalent, visual_token_equivalent
+    from elysium.storage import token_equivalent, visual_token_equivalent
 
     _, database = _ingest(tmp_path, FakeDescriber())
 
@@ -104,5 +104,5 @@ def test_a_missing_snapshot_is_named_as_a_setup_step(tmp_path: Path) -> None:
     describer = VisionDescriber(settings)
 
     assert not describer.available()
-    with pytest.raises(SystemExit, match="ELY_EYE_VLM_MODEL_DIR"):
+    with pytest.raises(SystemExit, match="ELYSIUM_VLM_MODEL_DIR"):
         describer.describe(_picture(tmp_path))

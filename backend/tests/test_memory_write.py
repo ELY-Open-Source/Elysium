@@ -9,12 +9,12 @@ from typing import Any
 
 import pytest
 
-from ely_eye.cache_fabric import CacheFabric
-from ely_eye.cartridge_store import add_membership
-from ely_eye.config import Settings
-from ely_eye.db import Database
-from ely_eye.memory import MemoryService
-from ely_eye.schemas import (
+from elysium.cache_fabric import CacheFabric
+from elysium.cartridge_store import add_membership
+from elysium.config import Settings
+from elysium.db import Database
+from elysium.memory import MemoryService
+from elysium.schemas import (
     EvidenceAtom,
     MemoryOrigin,
     Modality,
@@ -22,7 +22,7 @@ from ely_eye.schemas import (
     TimePrecision,
     TrustScores,
 )
-from ely_eye.vector_index import VectorIndex
+from elysium.vector_index import VectorIndex
 
 KEYS = "我们的钥匙放在玄关抽屉里"
 NOW = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)

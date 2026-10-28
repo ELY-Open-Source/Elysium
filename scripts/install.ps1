@@ -18,4 +18,4 @@ Pop-Location
 
 Copy-Item .env.example .env -ErrorAction SilentlyContinue
 
-.\.venv\Scripts\ely-eye.exe status
+.\.venv\Scripts\elysium.exe status

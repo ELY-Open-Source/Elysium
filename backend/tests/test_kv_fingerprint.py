@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
-from ely_eye.config import Settings
-from ely_eye.kv_fingerprint import (
+from elysium.config import Settings
+from elysium.kv_fingerprint import (
     FORMAT_SEMVER,
     KvFingerprint,
     adapter_hashes,
