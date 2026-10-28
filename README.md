@@ -1,8 +1,8 @@
 # Elysium · 往世乐土
 
-Elysium (Chinese name 往世乐土) is a local memory store for AI. Every memory it keeps carries who it
-belongs to, where it came from, when it was true, in what situation, and who may
-read it. Retrieval answers as the person asking, so a store shared by several
+Elysium (往世乐土) is a local memory store for AI. Every memory it keeps carries
+who it belongs to, where it came from, when it was true, in what situation, and
+who may read it. Retrieval answers as the person asking, so a store shared by several
 people and several agents does not blend them into one voice. A Context
 Cartridge is a scope you mount, not only a bundle you export. Coding agents
 reach the same store over MCP.
@@ -19,28 +19,35 @@ command that re-measures it, or it is marked as not measured.
 
 | question | answer | report |
 | --- | --- | --- |
-| can it find the memory that answers a question? | recall@10 **0.863**, MRR 0.682, over 300 answerable probes drawn from six third-party corpora, each asked as the holder that corpus assigns it | `bench/reports/LEGS.md` |
+| can it find the memory that answers a question? | recall@10 **0.857**, MRR 0.697, over all 2,928 answerable queries from six third-party corpora, each asked as the holder that corpus assigns it, with speech ingested; **0.848** on the frozen stores, which hold no speech | `bench/reports/VIDEO_AUDIO.md`, `bench/reports/LEGS.md` |
 | is that any good? | a Mem0-style counterpart on the same corpus scores **0.866** inside one holder's memory and **0.412** across all of them; chance is 0.0002 whole-corpus and 0.369 inside one holder | `bench/reports/BASELINE_EXTERNAL.md` |
 | does the holder boundary matter? | **+0.454 recall@10** with an identical ranker and identical items — the gain is scoping, not ranking | same report |
 | how fast at corpus size? | p50 **0.072 s**, p95 0.218 s over 165,973 atoms; the search this replaced took 20.16 s on the same corpus | `bench/reports/SCALE.md` |
 | how much does it hold? | 165,973 atoms and 153,857 vectors in one SQLite file; the vector build runs 106 memories/s. One million is an extrapolation, not a measurement | `bench/reports/DENSE.md` |
 | can a wordless picture be found? | yes for icon crops, weakly for whole screenshots — the report shows every arm, including the ones that hurt | `bench/reports/VISUAL.md` |
 | what does speech cost? | WER **0.242** over 533 reference words; 258.18 s of audio transcribed in 3.12 s (68.4–111.2× realtime per video, CPU int8), byte-identical across two passes | `bench/reports/ASR.md` |
-| is the acceptance bar met? | **no.** The bar is recall@10 ≥ 0.90; shipped is 0.863 | `bench/reports/LEGS.md` |
+| what is speech worth? | video recall@10 **0.493 → 0.651** over all 215 video questions; the whole suite 0.848 → 0.857 | `bench/reports/VIDEO_AUDIO.md` |
+| is the acceptance bar met? | **no.** The bar is recall@10 ≥ 0.90; measured is 0.857, short by 0.043 | `bench/reports/VIDEO_AUDIO.md` |
 
-Where the deficit lives, by modality (recall@10, same run): code 0.945,
-conversation 1.000, pdf 0.885, ui_screenshot 0.818, image 0.720, video 0.455.
-Video is the worst because the frozen stores hold no audio atoms — a video is
-sampled frames plus OCR, so a question answered by speech has nothing to match.
-Images and screenshots are limited because CLIP cannot localize an icon inside a
-screenshot. `bench/reports/LEGS.md` names the arms; nothing here rounds those
-numbers up.
+Where the deficit lives, by modality (recall@10, every answerable query, speech
+ingested): code 0.941, conversation 0.907, pdf 0.876, image 0.781, video 0.651,
+ui_screenshot 0.659. Weighted by how many questions each holds, the 0.043 short
+of the bar is mostly screenshots (0.659 → 0.95 would add 0.032) and video
+(0.651 → 0.90 would add 0.018); code, PDF and conversation have little left to
+give. Both are content problems, not ranking ones: a screenshot question often
+names an icon that has no text, and CLIP cannot point at an icon inside a whole
+screen (crops were tried and lost to on-screen text, `CHECKLIST.md` p2-6.2); a
+video question often asks what was shown, not said, and frames carry only OCR.
+The two capabilities that would close it — a vision model describing regions,
+and a UI widget tree — are not in this repository; the 8B vision model was not
+downloaded for this round. Nothing here rounds those numbers up.
 
 Re-measure any of them:
 
 ```bash
 python -m bench.validate_sets                      # the frozen corpus and its gold
-python -m bench.leg_check --probes 300             # the shipped retrieval path
+python -m bench.leg_check --probes 300             # every leg, every answerable query
+python -m bench.video_audio_check --speech-home bench/runs/video_audio_speech   # speech (drop the flag to re-ingest, ~5 h)
 python -m bench.run_external                       # the counterparts and the chance floor
 python -m bench.dense_scale                        # the vector leg at corpus size
 ```
@@ -119,13 +126,15 @@ console does, so nothing requires a browser.
 
 ## Retrieval
 
-Three legs, fused by rank. The words leg always runs. The dense leg runs only
+Three legs, fused by rank. The words leg always runs; speech is words, so a
+transcript ranks in the same page as everything else. The dense leg runs only
 when `ELYSIUM_DENSE_EMBEDDINGS_ENABLED=1` and an embedding model is configured.
-On the shipped page that leg moves recall from 0.863 to 0.860 while p50 goes
-from 122 ms to 713 ms; on a wider page both reach 0.873 while p50 goes from
-84 ms to 579 ms. It buys the memory questions (multi-session 0.857 → 0.920,
-preference 0.800 → 0.960) and costs the picture ones (image 0.720 → 0.680),
-which is why it is opt-in rather than the default. The picture leg runs only
+Over every answerable query, at ten atoms it moves recall from 0.834 to 0.847,
+and on a 30-atom page from 0.851 to 0.860, at several times the latency
+(`bench/reports/LEGS.md` holds the timings and the load they were taken under).
+It buys the memory questions (multi-session 0.857 → 0.920, preference 0.800 →
+0.960) and costs the picture ones (image 0.781 → 0.773), which is why it is
+opt-in rather than the default. The picture leg runs only
 when the words page comes back thin and `ELYSIUM_CLIP_MODEL_DIR` is set.
 Vectors live in the database beside the atoms, written in the same transaction
 as the memory itself, so a memory is findable the moment it is stored and there
