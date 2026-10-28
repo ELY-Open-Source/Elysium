@@ -173,6 +173,34 @@ class Database:
         by_id = {row["atom_id"]: row_to_atom(row) for row in rows}
         return [by_id[atom_id] for atom_id in atom_ids if atom_id in by_id]
 
+    def stored_provenance(self, source_ids: list[str]) -> dict[str, EvidenceAtom]:
+        """One stored atom per source, so a re-ingest keeps who that source belongs to and when it was true.
+
+        A source whose atoms disagree on those facts is refused: copying either side onto the new
+        atoms would hand one holder's memory to the other's readers.
+        """
+        if not source_ids:
+            return {}
+        with self.connect() as connection:
+            split = connection.execute(
+                "SELECT source_id FROM atoms WHERE source_id IN (SELECT value FROM json_each(?)) "
+                "GROUP BY source_id HAVING count(DISTINCT holder_id || char(31) || scenario || char(31) || "
+                "visibility_json || char(31) || coalesce(retention_until, '') || char(31) || "
+                "coalesce(event_time, '') || char(31) || coalesce(event_time_end, '') || char(31) || "
+                "event_time_precision || char(31) || event_time_source) > 1",
+                (to_json(source_ids),),
+            ).fetchall()
+            if split:
+                raise ValueError(
+                    f"source {split[0]['source_id']}: its stored atoms disagree about who holds them or "
+                    "when they were true, so a re-ingest cannot tell which to keep"
+                )
+            rows = connection.execute(
+                "SELECT * FROM atoms WHERE source_id IN (SELECT value FROM json_each(?)) GROUP BY source_id",
+                (to_json(source_ids),),
+            ).fetchall()
+        return {str(row["source_id"]): row_to_atom(row) for row in rows}
+
     def source_id_of_atom(self, atom_id: str) -> str | None:
         with self.connect() as connection:
             row = connection.execute("SELECT source_id FROM atoms WHERE atom_id = ?", (atom_id,)).fetchone()

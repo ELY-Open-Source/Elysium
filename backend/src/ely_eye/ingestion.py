@@ -86,6 +86,7 @@ class IngestionService(MediaIngest, RepositoryIngest):
             batch.sources.extend(repository_batch.sources)
             batch.atoms.extend(repository_batch.atoms)
 
+        batch.atoms = keep_provenance(batch.atoms, self.db.stored_provenance([source.source_id for source in batch.sources]))
         self.db.upsert_sources(batch.sources)
         trust.stamp(batch.atoms, origin=origin)
         self.db.upsert_atoms(batch.atoms)
@@ -188,3 +189,30 @@ class IngestionService(MediaIngest, RepositoryIngest):
         batch.atoms[0].metadata["line_count"] = source_text.count("\n") + 1
         return batch
 
+
+# What the store already knows about a source outlives a re-read of its bytes; ingest knows none of it.
+PROVENANCE = (
+    "holder_id",
+    "scenario",
+    "visibility",
+    "retention_until",
+    "event_time",
+    "event_time_end",
+    "event_time_precision",
+    "event_time_source",
+)
+
+
+def keep_provenance(atoms: list[EvidenceAtom], stored: dict[str, EvidenceAtom]) -> list[EvidenceAtom]:
+    """Give every re-ingested atom the holder, scenario and event time its source already carries.
+
+    Ingest stamps no holder, so without this a second read of a file someone owns writes every
+    atom back as nobody's, and nobody's memory is readable by every caller. Atoms new to a known
+    source, such as speech added to a video, join that source's owner instead of the public.
+    """
+    return [
+        atom
+        if atom.source_id not in stored
+        else atom.model_copy(update={field: getattr(stored[atom.source_id], field) for field in PROVENANCE})
+        for atom in atoms
+    ]

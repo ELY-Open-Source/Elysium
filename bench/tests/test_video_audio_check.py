@@ -56,21 +56,20 @@ def test_a_committed_report_is_frozen_without_any_stub(tmp_path: Path) -> None:
     video_audio_check.refuse_frozen_overwrite(elsewhere)
 
 
-def test_the_probe_arm_switches_off_rather_than_ranking_nothing() -> None:
-    """--probes 0 means "skip that arm"; a small count with the smoke knob means "you measured nothing"."""
-    assert video_audio_check.probe_sample(0, 0) == []
-    # The shipped sample keeps every modality; the smoke knob narrows it to video, where a small count can miss one entirely.
-    assert any(query.modality == video_audio_check.VIDEO_MODALITY for query in video_audio_check.probe_sample(300, 0))
-    for probes in (1, 5):
-        with pytest.raises(SystemExit, match=f"--probes {probes} picked no answerable video query"):
-            video_audio_check.probe_sample(probes, probes)
+def test_the_suite_arm_scores_every_answerable_query_and_the_smoke_knob_keeps_every_kind() -> None:
+    """The cost of speech lands on the other modalities, so the after row must see all of them."""
+    whole = video_audio_check.answerable_suite(0)
+    assert all(query.gold for query in whole)
+    assert {query.modality for query in whole} == set(video_audio_check.MODALITY_ORDER)
+    smoke = video_audio_check.answerable_suite(60)
+    assert 0 < len(smoke) <= 60
+    assert {query.modality for query in smoke} == set(video_audio_check.MODALITY_ORDER)
 
 
 def test_an_empty_video_arm_is_a_lie_not_a_zero() -> None:
     """The video arm is the point of the harness; a row of zeros there must stop the run."""
     with pytest.raises(SystemExit, match="nothing to rank"):
         video_audio_check._required(None, "every video question")
-    assert video_audio_check._score_of(None) == "skipped"
 
 
 def test_a_missing_speech_snapshot_says_so_before_ranking(tmp_path: Path) -> None:
@@ -104,3 +103,62 @@ def test_every_measured_video_query_carries_gold() -> None:
     assert queries, "the frozen suite must carry answerable video queries"
     assert all(query.modality == video_audio_check.VIDEO_MODALITY for query in queries)
     assert all(query.gold for query in queries)
+
+
+def _store(home: Path, videos: list[str], speech: int) -> Path:
+    """A store with just the columns the reuse guard reads."""
+    import sqlite3
+
+    (home / "data").mkdir(parents=True)
+    with sqlite3.connect(home / "data" / "ely_eye.sqlite") as connection:
+        connection.execute("CREATE TABLE sources (source_id TEXT, kind TEXT)")
+        connection.execute("CREATE TABLE atoms (modality TEXT, text TEXT, holder_id TEXT DEFAULT 'wife')")
+        connection.executemany("INSERT INTO sources VALUES (?, 'video')", [(name,) for name in videos])
+        connection.executemany("INSERT INTO atoms (modality, text) VALUES ('audio', 'said')", [() for _ in range(speech)])
+    return home
+
+
+def test_a_reused_speech_store_must_be_the_same_videos_with_speech(tmp_path: Path) -> None:
+    home = _store(tmp_path / "home", ["a", "b"], speech=0)
+    speech = _store(tmp_path / "speech", ["a", "b"], speech=3)
+
+    reused = video_audio_check.reuse_speech(home, speech, tmp_path / "scratch")
+
+    assert reused == {"reused": str(speech), "files": 2, "seconds": None}
+
+
+def test_a_store_without_speech_is_not_reused(tmp_path: Path) -> None:
+    home = _store(tmp_path / "home", ["a"], speech=0)
+    silent = _store(tmp_path / "silent", ["a"], speech=0)
+
+    with pytest.raises(SystemExit, match="carries no speech atoms"):
+        video_audio_check.reuse_speech(home, silent, tmp_path / "scratch")
+
+
+def test_a_store_of_other_videos_is_not_reused(tmp_path: Path) -> None:
+    home = _store(tmp_path / "home", ["a", "b"], speech=0)
+    other = _store(tmp_path / "other", ["a", "c"], speech=3)
+
+    with pytest.raises(SystemExit, match="different video sources"):
+        video_audio_check.reuse_speech(home, other, tmp_path / "scratch")
+
+
+def test_the_scratch_cannot_be_the_store_it_reuses(tmp_path: Path) -> None:
+    home = _store(tmp_path / "home", ["a"], speech=0)
+    speech = _store(tmp_path / "speech", ["a"], speech=3)
+
+    with pytest.raises(SystemExit, match="overwrite the very store"):
+        video_audio_check.reuse_speech(home, speech, speech)
+
+
+def test_a_store_with_atoms_nobody_holds_is_not_ranked(tmp_path: Path) -> None:
+    """Re-ingest once wrote every video atom back as nobody's, and every holder's query ranked them."""
+    import sqlite3
+
+    store = _store(tmp_path / "speech", ["a"], speech=2)
+    video_audio_check.require_owned(store, "after")
+    with sqlite3.connect(store / "data" / "ely_eye.sqlite") as connection:
+        connection.execute("UPDATE atoms SET holder_id = '' WHERE rowid = 1")
+
+    with pytest.raises(SystemExit, match="1 atoms in .* have no holder"):
+        video_audio_check.require_owned(store, "after")
