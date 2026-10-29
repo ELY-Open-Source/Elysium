@@ -17,6 +17,7 @@ from pathlib import Path
 import httpx
 from PIL import Image
 
+from . import trust
 from .config import Settings, get_settings
 from .db import Database
 from .schemas import EvidenceAtom
@@ -32,8 +33,8 @@ SETUP_HINT = "serve a vision-language model (scripts/launch-vllm-live.sh) and se
 DEFERRED = "deferred: no vision-language model is served"
 DESCRIBED = "vlm"
 BATCH = 64
-# A stalled server once held 28 requests for minutes with no token out; a hang must surface, not wait forever.
-REQUEST_SECONDS = 300.0
+# A stalled server held 28 requests for minutes with no byte out; that long without progress is a hang.
+STALL_SECONDS = 300.0
 # Runs of ~2000x2000 figures (~3,700 tokens each) stalled the served engine where single ones did not; 1024x1024 keeps a picture near 1,000 tokens.
 MAX_PIXELS = 1024 * 1024
 
@@ -94,7 +95,7 @@ class VisionDescriber:
             "chat_template_kwargs": {"enable_thinking": False},
         }
         try:
-            response = httpx.post(f"{self.base_url()}/chat/completions", json=payload, timeout=REQUEST_SECONDS)
+            response = httpx.post(f"{self.base_url()}/chat/completions", json=payload, timeout=STALL_SECONDS)
             response.raise_for_status()
         except httpx.HTTPError as error:
             raise RuntimeError(f"{path}: the vision model at {self.base_url()} failed: {error}") from error
@@ -134,7 +135,8 @@ def describe_pictures(settings: Settings, database: Database, workers: int) -> d
     """Describe every picture a store already holds that no model has described yet.
 
     A store ingested before a vision model was served keeps OCR text only; this brings it to
-    what ingest would write today. It resumes: a described atom says so and is skipped.
+    what ingest would write today, quarantine check included. It resumes: a described atom says
+    so and is skipped, and a vector an interrupted run left on the old words is re-encoded.
     """
     describer = VisionDescriber(settings)
     if not describer.available():
@@ -150,10 +152,15 @@ def describe_pictures(settings: Settings, database: Database, workers: int) -> d
             batch = pending[start : start + BATCH]
             paths = [objects.resolve(str(atom.image_ref)) for atom in batch]
             texts = list(pool.map(describer.describe, paths))
-            database.upsert_atoms([with_description(atom, text) for atom, text in zip(batch, texts, strict=True)])
+            described_batch = [with_description(atom, text) for atom, text in zip(batch, texts, strict=True)]
+            for atom in described_batch:
+                trust.stamp([atom], origin=atom.origin)
+            database.upsert_atoms(described_batch)
             vectors.sync_atoms([atom.atom_id for atom in batch])
             described += len(batch)
             print(f"described {described}/{len(pending)}", flush=True)
+    if settings.dense_embeddings_enabled:
+        vectors.sync()
     return {"pending": len(pending), "described": described}
 
 
