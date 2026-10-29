@@ -3,7 +3,7 @@
 真相来源：`Gaps.md` 的 P0→P1→P2。从上到下一条一条做，禁止跳项。
 每完成一条：跑「验收」列的命令，把结果贴进 `证据:` 行，再打勾。
 主 agent 独自完成。禁止 subagent、worktree、新分支、并行。
-每条完成后用 `/herdr` 在右侧 split panel 起 pi review（`strata/qwen3.8-flash-next-abliterated-iq3_s` Sol High），最多 5 轮。
+每条完成后用 `/herdr` 在右侧 split panel 起 `codex --yolo`（GPT-6.1-Sol，xhigh，fast：`-m gpt-6.1-sol -c model_reasoning_effort=xhigh -c service_tier=fast`）review，同一条最多 3 轮。
 
 状态记号：`[ ]` 待办 `[~]` 进行中 `[x]` 已过审 `[D]` DEFERRED（代码就绪、未真跑，不计入 pass）
 

@@ -91,7 +91,9 @@ the commit you branched from, do not assume it.
 ## Review protocol
 
 Every task lands through an independent reviewer running in a `herdr` pane
-against the commit, not against a description of it. Findings are numbered
+against the commit, not against a description of it. The reviewer is
+`codex --yolo -m gpt-6.1-sol -c model_reasoning_effort=xhigh -c service_tier=fast`,
+at most 3 rounds per item. Findings are numbered
 `D1…Dn`; fix the mechanism, not the wording, and re-measure. A checklist item is
 not `[x]` before the reviewer returns PASS. Read the reviewer's verdict from its
 session JSONL (the last assistant text block), not from a pane scroll-back that
