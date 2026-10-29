@@ -488,3 +488,5 @@
   - 6 卡带即作用域 PASS：`ingest --cartridge-name 甲/乙` + `finalize-cartridge` + `mount/switch/unmount`，挂载后搜索只从卡带出（月岩灰 1/花岗岩 0 → 切换后 0/1 → 卸载后 1），把模型快照的 rope factor 改成 2.0 之后 `mount 甲` 拒绝并点名 `rope: factor: cartridge 4.0 vs local 2.0`（还带 model_hash）。
   - 7 卡带省算力 **PARTLY MEASURED**：可观测那半边已实测——同一题编译两次返回同一份正文（`cache_trace_id` 相同，1 个 atom），第二次落在语义缓存（`cache_events` layer=semantic：hit=1 miss=1）。省的那笔是首字时间（TTFT），本仓从没跑过 9B 生成器（树里没有模型快照），`/api/chat` 无运行时 503，所以 TTFT 那半边仍未测。今天存在的是作用域（mount/switch/unmount/append）和 `profiles.py` 里那些尚未接地的启动旗标。
   - 未标绿的原因（两条都量着）：场景 7 的省算力半边未测；验收线 recall@10 ≥ 0.90 仍未达（**全库可答题 2,928 题实测 0.857**（含语音，words-only，top_k 24，各自 holder，`bench/reports/VIDEO_AUDIO.md`；冻结库无语音 0.848），dense 10 atom 0.847、30 atom 0.860（`bench/reports/LEGS.md`）；300 分层探针读 0.863，比全库高是因为抽样把 ui_screenshot 抽重了：样本 0.818 vs 全量 0.659；外部对手 holder 作用域 0.866，chance 0.0002；缺口在视觉与视频的内容表示：含语音后 ui_screenshot 0.659、video 0.651、image 0.781，见 p2-6.3）。报告并排：`bench/reports/BASELINE.md`（本项目基线）、`BASELINE_EXTERNAL.md`（Mem0/Zep 式对手 + chance 行）、`LEGS.md`（当前各腿）、`QUANT.md`/`DENSE.md`/`SCALE.md`（向量与规模）、`VISUAL.md`（图片腿）、`ASR.md`（语音）。
+
+阶段 4（recall@10 ≥ 0.92、9B 实测）在 `CHECKLIST_P4.md`。

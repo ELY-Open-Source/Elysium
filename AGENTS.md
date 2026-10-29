@@ -8,7 +8,7 @@ ignored `ELY_EYE_AUTH_TOKEN` would start a server with no token. The repository 
 The bench data root stays `~/ely_eye_bench_data` because the frozen stores record 50,155 source paths
 under it.
 
-Read `CHECKLIST.md` for the ordered work list and `Gaps.md` for the audit the
+Read `CHECKLIST.md` (phases 0–3) and `CHECKLIST_P4.md` (phase 4) for the ordered work list and `Gaps.md` for the audit the
 work started from. Measured results live in `bench/reports/`. If a sentence in
 this repository states a capability, there must be a command that demonstrates
 it — otherwise the sentence belongs in the "not measured" section.
