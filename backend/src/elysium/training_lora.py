@@ -238,7 +238,7 @@ def train_lora(
     final_trainable_l2 = trainable_l2_norm(trainable_tensors)
     max_update_l2 = max((item["update_l2"] for item in optimizer_updates), default=None)
     loss_delta = losses[0] - losses[-1] if len(losses) >= 2 else None
-    model.save_pretrained(output_dir)
+    model.save_pretrained(str(output_dir))
     processor.save_pretrained(output_dir)
     write_lora_config(settings, output_dir, kind, rank, alpha, model_id)
     weight_stats = safetensor_weight_stats(output_dir / "adapter_model.safetensors")

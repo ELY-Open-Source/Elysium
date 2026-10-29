@@ -176,18 +176,24 @@ class Database:
     def stored_provenance(self, source_ids: list[str]) -> dict[str, EvidenceAtom]:
         """One stored atom per source, so a re-ingest keeps who that source belongs to and when it was true.
 
-        A source whose atoms disagree on those facts is refused: copying either side onto the new
-        atoms would hand one holder's memory to the other's readers.
+        A source whose atoms disagree on any one of those facts is refused: copying either side onto
+        the new atoms would hand one holder's memory to the other's readers. Each column is compared
+        on its own, because a joined string lets two different rows read the same.
         """
         if not source_ids:
             return {}
         with self.connect() as connection:
             split = connection.execute(
                 "SELECT source_id FROM atoms WHERE source_id IN (SELECT value FROM json_each(?)) "
-                "GROUP BY source_id HAVING count(DISTINCT holder_id || char(31) || scenario || char(31) || "
-                "visibility_json || char(31) || coalesce(retention_until, '') || char(31) || "
-                "coalesce(event_time, '') || char(31) || coalesce(event_time_end, '') || char(31) || "
-                "event_time_precision || char(31) || event_time_source) > 1",
+                "GROUP BY source_id HAVING "
+                "count(DISTINCT holder_id) > 1 "
+                "OR count(DISTINCT scenario) > 1 "
+                "OR count(DISTINCT visibility_json) > 1 "
+                "OR count(DISTINCT retention_until) + max(retention_until IS NULL) > 1 "
+                "OR count(DISTINCT event_time) + max(event_time IS NULL) > 1 "
+                "OR count(DISTINCT event_time_end) + max(event_time_end IS NULL) > 1 "
+                "OR count(DISTINCT event_time_precision) > 1 "
+                "OR count(DISTINCT event_time_source) > 1",
                 (to_json(source_ids),),
             ).fetchall()
             if split:

@@ -326,7 +326,7 @@ def merkle_root(hashes: list[str]) -> str:
 
 def write_compressed_npz(path: Path, arrays: dict[str, np.ndarray]) -> None:
     buffer = io.BytesIO()
-    np.savez(buffer, **arrays)
+    np.savez(buffer, allow_pickle=False, **arrays)
     compressed = zstd.ZstdCompressor(level=9).compress(buffer.getvalue())
     path.write_bytes(compressed)
 

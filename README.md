@@ -47,7 +47,8 @@ Re-measure any of them:
 ```bash
 python -m bench.validate_sets                      # the frozen corpus and its gold
 python -m bench.leg_check --probes 300             # every leg, every answerable query
-python -m bench.video_audio_check --speech-home bench/runs/video_audio_speech   # speech (drop the flag to re-ingest, ~5 h)
+python -m bench.video_audio_check --speech-home bench/runs/video_audio_speech \
+  --report /tmp/VIDEO_AUDIO.md --payload /tmp/video_audio.json   # speech; drop --speech-home to re-ingest (~5 h)
 python -m bench.run_external                       # the counterparts and the chance floor
 python -m bench.dense_scale                        # the vector leg at corpus size
 ```

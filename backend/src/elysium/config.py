@@ -5,6 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from dotenv import dotenv_values
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -104,29 +105,25 @@ def refuse_old_names(settings: Settings, environment: dict[str, str], cwd: Path)
     Ignoring ELY_EYE_AUTH_TOKEN would start a server with no token at all, and an old home or
     database left where the new one is looked for would be silently replaced by a fresh one.
     """
-    old = sorted(name for name in environment if name.startswith(OLD_ENV_PREFIX))
-    dotenv = Path(".env")
-    if dotenv.is_file():
-        old += sorted(
-            line.split("=", 1)[0].strip()
-            for line in dotenv.read_text(encoding="utf-8").splitlines()
-            if line.strip().startswith(OLD_ENV_PREFIX)
-        )
+    dotenv = cwd / ".env"
+    names = list(environment) + (list(dotenv_values(dotenv)) if dotenv.is_file() else [])
+    old = sorted(name for name in names if name.startswith(OLD_ENV_PREFIX))
     if old:
         raise SystemExit(
             f"{old[0]} is set, but this project is now Elysium and reads ELYSIUM_{old[0][len(OLD_ENV_PREFIX):]}; "
             "rename every ELY_EYE_* variable (under the old name it would be ignored)"
         )
-    legacy_home = cwd / OLD_HOME_NAME
-    if settings.home == cwd / ".elysium" and legacy_home.is_dir() and not settings.home.exists():
-        raise SystemExit(f"{legacy_home} is the data home from before the rename; move it to {settings.home}")
-    legacy_database = settings.data_dir / OLD_DATABASE_NAME
-    if legacy_database.is_file() and not settings.db_path.exists():
+    home = (cwd / settings.home).resolve()
+    legacy_home = home.parent / OLD_HOME_NAME
+    if home.name == ".elysium" and legacy_home.is_dir() and not home.exists():
+        raise SystemExit(f"{legacy_home} is the data home from before the rename; move it to {home}")
+    database = home / settings.db_path.relative_to(settings.home)
+    legacy_database = database.with_name(OLD_DATABASE_NAME)
+    if legacy_database.is_file() and not database.exists():
         raise SystemExit(
-            f"{legacy_database} is a store from before the rename; move it to {settings.db_path} "
+            f"{legacy_database} is a store from before the rename; move it to {database} "
             "(the bytes are unchanged) rather than letting a second, empty store start beside it"
         )
-
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

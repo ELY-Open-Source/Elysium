@@ -142,11 +142,11 @@ def make_optimizer(model: Any, learning_rate: float) -> tuple[Any, str]:
     params = [param for param in model.parameters() if param.requires_grad]
     try:
         with bitsandbytes_gaudi_probe_guard():
-            import bitsandbytes as bnb
+            from bitsandbytes.optim.adamw import PagedAdamW8bit
     except Exception as exc:
         raise RuntimeError("PRD 12.2 training requires bitsandbytes PagedAdamW8bit.") from exc
     try:
-        return bnb.optim.PagedAdamW8bit(params, lr=learning_rate), "paged_adamw_8bit"
+        return PagedAdamW8bit(params, lr=learning_rate), "paged_adamw_8bit"
     except Exception as exc:
         raise RuntimeError("bitsandbytes PagedAdamW8bit failed to initialize.") from exc
 

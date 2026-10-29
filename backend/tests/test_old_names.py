@@ -29,6 +29,24 @@ def test_an_old_variable_in_the_dotenv_file_is_refused(tmp_path: Path, monkeypat
         Settings(home=tmp_path / "home")
 
 
+def test_an_exported_old_variable_in_the_dotenv_file_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """dotenv reads `export NAME=value`; a guard that only matched the bare form let the old token slip past."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("export ELY_EYE_AUTH_TOKEN=x\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="ELY_EYE_AUTH_TOKEN is set"):
+        Settings(home=tmp_path / "home")
+
+
+def test_a_relative_home_beside_the_old_one_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """.env.example ships ELYSIUM_HOME=.elysium; a relative home must not slip past the absolute comparison."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".ely_eye" / "data").mkdir(parents=True)
+
+    with pytest.raises(SystemExit, match=r"\.ely_eye is the data home from before the rename"):
+        Settings(home=Path(".elysium"))
+
+
 def test_the_old_default_home_is_not_passed_over(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".ely_eye" / "data").mkdir(parents=True)

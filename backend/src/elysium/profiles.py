@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Literal, TypedDict
 
 from .config import Settings
 from .runtime_schemas import RuntimeLaunchProfile, RuntimeProfileReport, RuntimeProfileValidation
@@ -229,7 +230,7 @@ def validate_runtime_profiles(
         ".venv-linux": linux_package_versions(root, ".venv-linux", settings),
         ".venv-linux-vllm": linux_package_versions(root, ".venv-linux-vllm", settings),
     }
-    probe_cache: dict[tuple[str, str, str | None], dict[str, object]] = {}
+    probe_cache: dict[tuple[str, str, str | None], LauncherProbe] = {}
     llama_server = resolve_llama_server()
     validations: list[RuntimeProfileValidation] = []
     for profile in profiles:
@@ -244,7 +245,7 @@ def validate_runtime_profiles(
         if probe_key not in probe_cache:
             probe_cache[probe_key] = runtime_launcher_probe(root, profile.runtime, env_name, executable, settings)
         probe = probe_cache[probe_key]
-        probe_status = str(probe.get("status", "skipped"))
+        probe_status = probe["status"]
         probe_passed = probe_status == "passed"
         if profile.runtime in {"SGLang", "vLLM", "KTransformers"}:
             ready = script_exists and bool(package_version) and gpu and probe_passed
@@ -280,10 +281,10 @@ def validate_runtime_profiles(
                 package_version=package_version,
                 executable=executable,
                 gpu_available=gpu,
-                probe_command=[str(item) for item in probe.get("command", [])],
+                probe_command=probe["command"],
                 probe_status=probe_status,
-                probe_exit_code=probe.get("exit_code") if isinstance(probe.get("exit_code"), int) else None,
-                probe_output=probe.get("output") if isinstance(probe.get("output"), str) else None,
+                probe_exit_code=probe["exit_code"],
+                probe_output=probe["output"],
                 detail=detail,
             )
         )
@@ -334,13 +335,20 @@ def linux_package_versions(root: Path, env_name: str, settings: Settings) -> dic
         return {}
 
 
+class LauncherProbe(TypedDict):
+    status: Literal["passed", "failed", "skipped"]
+    command: list[str]
+    exit_code: int | None
+    output: str
+
+
 def runtime_launcher_probe(
     root: Path,
     runtime: str,
     env_name: str,
     executable: str | None,
     settings: Settings,
-) -> dict[str, object]:
+) -> LauncherProbe:
     if runtime == "SGLang":
         probe_script = (
             "import importlib.util, sys; "
@@ -363,7 +371,7 @@ def runtime_launcher_probe(
     elif runtime == "llama.cpp" and executable:
         command = [executable, "--help"]
     else:
-        return {"status": "skipped", "command": [], "output": "no launcher probe configured"}
+        return {"status": "skipped", "command": [], "exit_code": None, "output": "no launcher probe configured"}
     try:
         completed = subprocess.run(
             command,

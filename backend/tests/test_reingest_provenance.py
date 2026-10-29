@@ -80,6 +80,37 @@ def test_a_source_whose_atoms_disagree_about_their_holder_is_refused(tmp_path: P
         service.ingest_path(note)
 
 
+def test_two_rows_that_only_join_to_the_same_string_still_disagree(tmp_path: Path) -> None:
+    """("alice", "team\x1fhome") and ("alice\x1fteam", "home") once compared equal and the source was handed to alice."""
+    service, settings = _service(tmp_path)
+    note = _note(tmp_path, "the spare keys are in the glovebox")
+    service.ingest_path(note)
+    database = Database(settings)
+    (stored,) = database.list_atoms()
+    database.upsert_atoms(
+        [
+            stored.model_copy(update={"holder_id": "alice", "scenario": "team\x1fhome"}),
+            stored.model_copy(update={"atom_id": f"{stored.atom_id}:2", "holder_id": "alice\x1fteam", "scenario": "home"}),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="disagree about who holds them"):
+        service.ingest_path(note)
+
+
+def test_a_time_on_one_atom_and_none_on_another_is_a_disagreement(tmp_path: Path) -> None:
+    service, settings = _service(tmp_path)
+    note = _note(tmp_path, "the spare keys are in the glovebox")
+    service.ingest_path(note)
+    _own(settings, "wife")
+    database = Database(settings)
+    (stored,) = database.list_atoms()
+    database.upsert_atoms([stored.model_copy(update={"atom_id": f"{stored.atom_id}:2", "event_time": None})])
+
+    with pytest.raises(ValueError, match="disagree about who holds them"):
+        service.ingest_path(note)
+
+
 def test_a_new_file_is_still_nobody_s_until_someone_claims_it(tmp_path: Path) -> None:
     service, settings = _service(tmp_path)
     service.ingest_path(_note(tmp_path, "the spare keys are in the glovebox"))

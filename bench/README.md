@@ -5,7 +5,7 @@ Everything here measures the product as it is. No arm may read a benchmark gold 
 ## run order
 
 ```bash
-python -m bench.fetch_corpus      # 19 GB of third-party material -> bench/corpus + ~/elysium_bench_data
+python -m bench.fetch_corpus      # 19 GB of third-party material -> bench/corpus + ~/ely_eye_bench_data
 python -m bench.build_sets        # freeze the 6 query sets -> bench/sets/
 python -m bench.validate_sets     # schema + gold + scope + modality checks (b-2 gate)
 python -m bench.fetch_models      # dense + rerank models used by the ablation arms

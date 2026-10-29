@@ -24,11 +24,13 @@ import time
 from pathlib import Path
 from typing import Any
 
+from bench.counterpart import load_source_index
 from bench.leg_check import SHIPPED_TOP_K, _groups, _source_ids, rank_all
 from bench.metrics import aggregate, score_query
 from bench.query_set import load_queries, scale_probes, source_times
 from bench.report import git_commit
 from bench.run import latency
+from bench.run_external import chance_rows
 from bench.scratch import copy_store
 from bench.sets_common import DATA_ROOT
 from bench.stamp_holders import stamp
@@ -37,6 +39,7 @@ from bench.systems import machine_facts
 DEFAULT_HOME = Path("bench/runs/dense_scale")
 DEFAULT_SCRATCH = Path("bench/runs/video_audio")
 DEFAULT_ASR = Path("bench/models/faster-whisper-tiny")
+ASKED = {"video": "every video question", "suite": "every answerable question"}
 MODALITY_ORDER = ("code", "conversation", "image", "pdf", "ui_screenshot", "video")
 VIDEO_MODALITY = "video"
 REPORT = Path("bench/reports/VIDEO_AUDIO.md")
@@ -138,7 +141,7 @@ def rank_arm(home: Path, probes: list[Any], top_k: int) -> dict[str, Any] | None
         "recall_at_10": summary["recall_at_10"],
         "mrr": summary["mrr"],
         "hit_at_10": summary["hit_at_10"],
-        "wilson_lower": summary["hit_at_10_wilson_lower"],
+        "hit_at_10_wilson_lower": summary["hit_at_10_wilson_lower"],
         "p50_seconds": timing["p50"],
         "p95_seconds": timing["p95"],
         "median_distinct_sources": statistics.median(distinct),
@@ -249,7 +252,10 @@ def measure(
         f"suite {after_suite['recall_at_10']:.3f}, speech atoms {after_speech['atoms']}",
         flush=True,
     )
+    index = load_source_index()
     return {
+        "meta": {"queries": len(load_queries()), "answerable": len(suite), "limit_per_modality": limit or None},
+        "chance": {**chance_rows(index, suite), "video": chance_rows(index, whole)},
         "commit": git_commit(),
         "machine": machine_facts(),
         "source_store": str(home),
@@ -259,9 +265,22 @@ def measure(
         "ingest": ingest,
         "speech_before": before_speech,
         "speech_after": after_speech,
-        "before": {"video": before_video, "suite": before_suite},
-        "after": {"video": after_video, "suite": after_suite},
+        "arms": [
+            {"arm": f"{stage}: {ASKED[asked]}", "stage": stage, "asked": asked, "overall": row}
+            for stage, asked, row in (
+                ("before", "video", before_video),
+                ("before", "suite", before_suite),
+                ("after", "video", after_video),
+                ("after", "suite", after_suite),
+            )
+        ],
     }
+
+
+def arm(report: dict[str, Any], stage: str, asked: str) -> dict[str, Any]:
+    """One scored row of the payload, found by when it was measured and what it asked."""
+    (row,) = [entry["overall"] for entry in report["arms"] if entry["stage"] == stage and entry["asked"] == asked]
+    return row
 
 
 def _required(row: dict[str, Any] | None, label: str) -> dict[str, Any]:
@@ -298,20 +317,28 @@ def write_markdown(report: dict[str, Any], destination: Path) -> None:
             f"- speech atoms: {report['speech_before']['atoms']} before → {report['speech_after']['atoms']} after"
             f" ({report['speech_after']['characters']} characters)"
         ),
-        "- chance floor and the external counterpart for the same suite: `bench/reports/BASELINE_EXTERNAL.md`",
+        (
+            f"- chance: a random ranking scores recall@10 {report['chance']['recall_at_10']:.5f} over the whole corpus; "
+            "each query here is asked as its own holder, so the floor it must beat is the holder-scoped row in the table"
+        ),
+        "- the external counterpart on the same suite: `bench/reports/BASELINE_EXTERNAL.md`",
         "",
         "The only difference between the rows is the speech: same store, same files, same queries, same words-only path.",
         "",
         "| asked | n | recall@10 | MRR | hit@10 | 95% lower | p50 s |",
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
-    arms = (("video", "every video question"), ("suite", "every answerable question"))
+    for asked, chance in (("video", report["chance"]["video"]), ("suite", report["chance"])):
+        lines.append(
+            f"| {ASKED[asked]} (chance, random ranking inside the asker's holder) | {arm(report, 'before', asked)['queries']} | "
+            f"{chance['recall_at_10_holder_scope']:.4f} | — | — | — | — |"
+        )
     for stage in ("before", "after"):
-        for arm, label in arms:
-            row = report[stage][arm]
+        for asked, label in ASKED.items():
+            row = arm(report, stage, asked)
             lines.append(
                 f"| {label} ({stage}) | {row['queries']} | {row['recall_at_10']:.3f} | {row['mrr']:.3f} | "
-                f"{row['hit_at_10']:.3f} | {row['wilson_lower']:.3f} | {row['p50_seconds']:.3f} |"
+                f"{row['hit_at_10']:.3f} | {row['hit_at_10_wilson_lower']:.3f} | {row['p50_seconds']:.3f} |"
             )
     lines += [
         "",
@@ -321,14 +348,14 @@ def write_markdown(report: dict[str, Any], destination: Path) -> None:
         "| --- |" + " --- |" * len(MODALITY_ORDER),
     ]
     for stage in ("before", "after"):
-        modalities = report[stage]["suite"]["by_modality"]
+        modalities = arm(report, stage, "suite")["by_modality"]
         cells = " | ".join("—" if name not in modalities else f"{modalities[name]:.3f}" for name in MODALITY_ORDER)
         lines.append(f"| {stage} | {cells} |")
-    counts = report["after"]["suite"]["modality_counts"]
+    counts = arm(report, "after", "suite")["modality_counts"]
     lines.append("")
     lines.append("_Query counts: " + ", ".join(f"{name} {counts.get(name, 0)}" for name in MODALITY_ORDER) + "._")
-    gained = report["after"]["video"]["recall_at_10"] - report["before"]["video"]["recall_at_10"]
-    overall = report["after"]["suite"]["recall_at_10"] - report["before"]["suite"]["recall_at_10"]
+    gained = arm(report, "after", "video")["recall_at_10"] - arm(report, "before", "video")["recall_at_10"]
+    overall = arm(report, "after", "suite")["recall_at_10"] - arm(report, "before", "suite")["recall_at_10"]
     lines += [
         "",
         f"Speech moved video recall@10 by {gained:+.3f} and the whole answerable suite by {overall:+.3f}.",

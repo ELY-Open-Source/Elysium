@@ -118,7 +118,8 @@ def vision_inputs(messages: list[dict[str, Any]]) -> tuple[list[Any] | None, lis
         return None, None
     from qwen_vl_utils import process_vision_info
 
-    return process_vision_info(messages)
+    images, videos, *_ = process_vision_info(messages)
+    return images, videos
 
 def prepare_training_image(source: Path, media_dir: Path, max_side: int = 896) -> Path:
     from PIL import Image
