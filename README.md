@@ -26,7 +26,7 @@ command that re-measures it, or it is marked as not measured.
 | how much does it hold? | 165,973 atoms and 153,857 vectors in one SQLite file; the vector build runs 106 memories/s. One million is an extrapolation, not a measurement | `bench/reports/DENSE.md` |
 | can a wordless picture be found? | yes for icon crops, weakly for whole screenshots — the report shows every arm, including the ones that hurt | `bench/reports/VISUAL.md` |
 | what does speech cost? | WER **0.242** over 533 reference words; 258.18 s of audio transcribed in 3.12 s (68.4–111.2× realtime per video, CPU int8), byte-identical across two passes | `bench/reports/ASR.md` |
-| what is speech worth? | video recall@10 **0.493 → 0.651** over all 215 video questions; the whole suite 0.848 → 0.857 | `bench/reports/VIDEO_AUDIO.md` |
+| what is speech worth? | video recall@10 **0.493 → 0.651** over all 215 video questions, against a chance floor of 0.504 inside the asker's holder: frames and OCR alone ranked at chance, speech puts video 0.147 above it; the whole suite 0.848 → 0.857 against a holder-scoped floor of 0.510 | `bench/reports/VIDEO_AUDIO.md` |
 | is the acceptance bar met? | **no.** The bar is recall@10 ≥ 0.90; measured is 0.857, short by 0.043 | `bench/reports/VIDEO_AUDIO.md` |
 
 Where the deficit lives, by modality (recall@10, every answerable query, speech
