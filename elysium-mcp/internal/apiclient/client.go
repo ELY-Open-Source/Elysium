@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 )
 
 const maxErrorBody = 4096

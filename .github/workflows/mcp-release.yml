@@ -37,7 +37,7 @@ jobs:
           version="${GITHUB_REF_NAME#mcp-}"
           binary="elysium-mcp"
           if [ "$GOOS" = "windows" ]; then binary="elysium-mcp.exe"; fi
-          ldflags="-s -w -X git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/cli.version=${version}"
+          ldflags="-s -w -X github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/cli.version=${version}"
           mkdir -p dist
           go build -trimpath -ldflags "$ldflags" -o "dist/${binary}" ./cmd/elysium-mcp
           base="elysium-mcp_${GOOS}_${GOARCH}"

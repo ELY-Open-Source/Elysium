@@ -3,7 +3,7 @@ package mcpserver
 import (
 	"context"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

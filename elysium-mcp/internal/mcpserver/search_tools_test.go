@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/apiclient"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/apiclient"
 )
 
 func searchTestServer(t *testing.T, recorded *map[string]any) *httptest.Server {

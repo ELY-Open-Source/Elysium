@@ -3,10 +3,10 @@
 The project is **Elysium** (往世乐土), renamed from Ely-Eye: the package is `elysium`, the CLI
 `elysium`, the Go server `elysium-mcp`, variables `ELYSIUM_*`, the store `.elysium/data/elysium.sqlite`.
 Any old name stops the process (`config.refuse_old_names`, `elysium-mcp/internal/config`), because an
-ignored `ELY_EYE_AUTH_TOKEN` would start a server with no token. The hosted repository path is still
-`ZacharyZhang-NY/ely-eye`, so the Go module path keeps that segment until the host repository is renamed,
-and the bench data root stays `~/ely_eye_bench_data` because the frozen stores record 50,155 source
-paths under it.
+ignored `ELY_EYE_AUTH_TOKEN` would start a server with no token. The repository is
+`github.com/ELY-Open-Source/Elysium` and the Go module is `github.com/ELY-Open-Source/Elysium/elysium-mcp`.
+The bench data root stays `~/ely_eye_bench_data` because the frozen stores record 50,155 source paths
+under it.
 
 Read `CHECKLIST.md` for the ordered work list and `Gaps.md` for the audit the
 work started from. Measured results live in `bench/reports/`. If a sentence in

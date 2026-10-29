@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"path/filepath"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/config"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/config"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 	_ "modernc.org/sqlite"
 )
 

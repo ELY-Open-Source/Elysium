@@ -70,10 +70,10 @@ go run ./cmd/elysium-mcp server --elysium-home /path/to/.elysium
 
 ## Releases
 
-Pushing a `mcp-v*` tag runs `.github/workflows/mcp-release.yml`, which Gitea Actions
-picks up, cross-compiles the pure-Go server (CGO disabled) for Linux, macOS, and
-Windows on amd64 and arm64, then publishes the archives with a `SHA256SUMS`
-manifest to a release on git.zacharyzhang.com. The installers consume those assets.
+Pushing a `mcp-v*` tag runs `.github/workflows/mcp-release.yml`, which cross-compiles
+the pure-Go server (CGO disabled) for Linux, macOS, and Windows on amd64 and arm64,
+then publishes the archives with a `SHA256SUMS` manifest to a GitHub Release on
+`ELY-Open-Source/Elysium`. The installers consume those assets.
 
 ## Security posture
 

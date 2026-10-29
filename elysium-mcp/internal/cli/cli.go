@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"os"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/config"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/mcpserver"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/setup"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/store"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/config"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/mcpserver"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/setup"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/store"
 )
 
 // version is stamped at release build time via -ldflags -X. The default is the

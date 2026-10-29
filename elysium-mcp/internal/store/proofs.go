@@ -9,7 +9,7 @@ import (
 	"sort"
 	"time"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 )
 
 type proofDir struct {

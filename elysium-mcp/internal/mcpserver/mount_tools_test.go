@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/apiclient"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/apiclient"
 )
 
 const manifestBody = `{"cartridge_id":"home_1","name":"home","created_at":"2026-05-01T12:00:00Z",` +

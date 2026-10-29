@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/cli"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/cli"
 )
 
 func main() {

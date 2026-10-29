@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 )
 
 func (s *Store) evalProofsRoot() string {

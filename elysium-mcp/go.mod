@@ -1,4 +1,4 @@
-module git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp
+module github.com/ELY-Open-Source/Elysium/elysium-mcp
 
 go 1.25.0
 

@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/apiclient"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/apiclient"
 )
 
 // askingServer records the path and query string of every request so a test can

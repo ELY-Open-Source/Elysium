@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 )
 
 func (s *Store) ListCartridges(ctx context.Context, limit int) ([]domain.Cartridge, error) {

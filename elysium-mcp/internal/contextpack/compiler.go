@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 )
 
 var profileBudgets = map[string]int64{

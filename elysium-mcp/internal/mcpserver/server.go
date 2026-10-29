@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/apiclient"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/config"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/store"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/apiclient"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/config"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/store"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

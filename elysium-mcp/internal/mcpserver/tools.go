@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/apiclient"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/contextpack"
-	"git.zacharyzhang.com/ZacharyZhang-NY/ely-eye/elysium-mcp/internal/domain"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/apiclient"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/contextpack"
+	"github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/domain"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
