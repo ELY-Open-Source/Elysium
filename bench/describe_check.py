@@ -37,6 +37,7 @@ from bench.video_audio_check import (
 
 DEFAULT_HOME = Path("bench/runs/video_audio_speech")
 DEFAULT_SCRATCH = Path("bench/runs/describe")
+DEFAULT_OBJECTS = Path("bench/runs/baseline/objects")
 DEFAULT_WORKERS = 32
 SPLITS = ("dev", "test", "whole")
 REPORT = Path("bench/reports/DESCRIBE.md")
@@ -105,7 +106,19 @@ def rank_stage(home: Path, groups: dict[str, list[Any]], stage: str) -> list[dic
     return rows
 
 
-def measure(home: Path, scratch: Path, workers: int, described_home: Path | None) -> dict[str, Any]:
+def link_objects(store: Path, objects: Path) -> None:
+    """A copy carries the database only; its pictures are read from the content-addressed objects the corpus was ingested into."""
+    if not (objects / "images").is_dir():
+        raise SystemExit(f"{objects}: no ingested pictures here; pass --objects pointing at the store's objects directory")
+    link = store / "objects"
+    if link.is_symlink() and link.resolve() == objects.resolve():
+        return
+    if link.exists() or link.is_symlink():
+        raise SystemExit(f"{link} already exists and is not a link to {objects}; remove it or pass another --scratch")
+    link.symlink_to(objects.resolve())
+
+
+def measure(home: Path, scratch: Path, workers: int, described_home: Path | None, objects: Path) -> dict[str, Any]:
     """Score dev, test and the whole suite before and after the pictures are described."""
     groups = suites()
     before_home, _ = copy_store(home, scratch / "before")
@@ -117,6 +130,7 @@ def measure(home: Path, scratch: Path, workers: int, described_home: Path | None
 
     source = home if described_home is None else described_home
     after_home, _ = copy_store(source, scratch / "after")
+    link_objects(after_home, objects)
     stamp(after_home / "data" / "elysium.sqlite")
     require_owned(after_home, "after")
     describe = describe_copy(after_home, workers) if described_home is None else {"reused": str(described_home)}
@@ -184,6 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--home", type=Path, default=DEFAULT_HOME, help="store to copy")
     parser.add_argument("--scratch", type=Path, default=DEFAULT_SCRATCH, help="where the copies live")
+    parser.add_argument("--objects", type=Path, default=DEFAULT_OBJECTS, help="the objects the store's pictures live in")
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="description requests in flight")
     parser.add_argument("--described-home", type=Path, default=None, help="a store an earlier run already described")
     parser.add_argument("--report", type=Path, default=REPORT, help="markdown destination")
@@ -191,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     for destination in (arguments.report, arguments.payload):
         refuse_frozen_overwrite(destination)
-    report = measure(arguments.home, arguments.scratch, arguments.workers, arguments.described_home)
+    report = measure(arguments.home, arguments.scratch, arguments.workers, arguments.described_home, arguments.objects)
     arguments.payload.parent.mkdir(parents=True, exist_ok=True)
     arguments.payload.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     write_markdown(report, arguments.report)
