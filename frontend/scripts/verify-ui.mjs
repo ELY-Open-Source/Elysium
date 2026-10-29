@@ -111,6 +111,16 @@ async function evidence(label) {
 }
 
 await page.goto(uiUrl, { waitUntil: 'networkidle' });
+// Playwright clicks only after painted frames; this host's headless Chromium has taken 14 s to paint its first.
+const paintStarted = Date.now();
+const painted = await Promise.race([
+  page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(true)))),
+  new Promise((resolve) => setTimeout(() => resolve(false), 60_000)),
+]);
+if (!painted) {
+  throw new Error('the headless browser drew no frame in 60 s, so no click can land; the browser is stalled, not the console');
+}
+console.log(`first frame painted after ${Date.now() - paintStarted} ms`);
 await page.getByRole('heading', { name: 'Local VLM Context OS' }).waitFor();
 await page.getByLabel('system status').getByText('Qwen/Qwen3.5-9B').waitFor();
 await page.getByRole('heading', { name: 'Adapter Matrix' }).waitFor();
