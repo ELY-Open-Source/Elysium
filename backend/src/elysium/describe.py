@@ -10,10 +10,12 @@ talks to it over the OpenAI-compatible API the runtime already uses.
 from __future__ import annotations
 
 import base64
+import io
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import httpx
+from PIL import Image
 
 from .config import Settings, get_settings
 from .db import Database
@@ -30,6 +32,10 @@ SETUP_HINT = "serve a vision-language model (scripts/launch-vllm-live.sh) and se
 DEFERRED = "deferred: no vision-language model is served"
 DESCRIBED = "vlm"
 BATCH = 64
+# A stalled server once held 28 requests for minutes with no token out; a hang must surface, not wait forever.
+REQUEST_SECONDS = 300.0
+# Runs of ~2000x2000 figures (~3,700 tokens each) stalled the served engine where single ones did not; 1024x1024 keeps a picture near 1,000 tokens.
+MAX_PIXELS = 1024 * 1024
 
 
 class VisionDescriber:
@@ -70,14 +76,14 @@ class VisionDescriber:
     def _describe(self, path: Path) -> str:
         if not path.is_file():
             raise ValueError(f"{path}: no picture to describe")
-        encoded = base64.b64encode(path.read_bytes()).decode()
+        media, encoded = _encoded(path)
         payload = {
             "model": self.settings.model_id,
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/{path.suffix.lstrip('.')};base64,{encoded}"}},
+                        {"type": "image_url", "image_url": {"url": f"data:image/{media};base64,{encoded}"}},
                         {"type": "text", "text": PROMPT},
                     ],
                 }
@@ -88,7 +94,7 @@ class VisionDescriber:
             "chat_template_kwargs": {"enable_thinking": False},
         }
         try:
-            response = httpx.post(f"{self.base_url()}/chat/completions", json=payload, timeout=None)
+            response = httpx.post(f"{self.base_url()}/chat/completions", json=payload, timeout=REQUEST_SECONDS)
             response.raise_for_status()
         except httpx.HTTPError as error:
             raise RuntimeError(f"{path}: the vision model at {self.base_url()} failed: {error}") from error
@@ -96,6 +102,19 @@ class VisionDescriber:
         if not text:
             raise ValueError(f"{path}: the vision model answered with nothing")
         return text
+
+
+def _encoded(path: Path) -> tuple[str, str]:
+    """The picture as sent: its own bytes when small enough, otherwise scaled down whole, aspect kept."""
+    with Image.open(path) as picture:
+        area = picture.width * picture.height
+        if area <= MAX_PIXELS:
+            return path.suffix.lstrip(".").lower(), base64.b64encode(path.read_bytes()).decode()
+        scale = (MAX_PIXELS / area) ** 0.5
+        smaller = picture.convert("RGB").resize((max(1, int(picture.width * scale)), max(1, int(picture.height * scale))))
+    buffer = io.BytesIO()
+    smaller.save(buffer, format="PNG")
+    return "png", base64.b64encode(buffer.getvalue()).decode()
 
 
 def with_description(atom: EvidenceAtom, description: str) -> EvidenceAtom:

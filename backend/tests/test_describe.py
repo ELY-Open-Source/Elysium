@@ -133,6 +133,50 @@ def test_the_request_carries_the_picture_and_turns_thinking_off(
     assert parts[0]["image_url"]["url"].startswith("data:image/png;base64,")
 
 
+def test_a_server_that_never_answers_is_an_error_naming_the_picture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[object] = []
+
+    def stall(url: str, json: dict[str, Any], timeout: object) -> httpx.Response:
+        seen.append(timeout)
+        raise httpx.ReadTimeout("timed out", request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(describe_module.httpx, "post", stall)
+    settings = Settings(home=tmp_path / "home", vlm_base_url="http://127.0.0.1:8001/v1")
+
+    with pytest.raises(RuntimeError, match=r"scene\.png: the vision model at http://127\.0\.0\.1:8001/v1 failed: timed out"):
+        VisionDescriber(settings).describe(_picture(tmp_path))
+    assert seen == [describe_module.REQUEST_SECONDS], "a request is never sent without a deadline"
+
+
+def test_an_oversized_picture_is_sent_scaled_down_whole(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import base64
+    import io
+
+    sent: list[str] = []
+
+    def answer(url: str, json: dict[str, Any], timeout: object) -> httpx.Response:
+        sent.append(json["messages"][0]["content"][0]["image_url"]["url"])
+        return httpx.Response(200, json={"choices": [{"message": {"content": CAPTION}}]}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(describe_module.httpx, "post", answer)
+    big = tmp_path / "figure.png"
+    Image.new("RGBA", (2016, 1871), (1, 2, 3, 255)).save(big)
+    small = _picture(tmp_path)
+    describer = VisionDescriber(Settings(home=tmp_path / "home", vlm_base_url="http://127.0.0.1:8001/v1"))
+
+    describer.describe(big)
+    describer.describe(small)
+
+    header, encoded = sent[0].split(",", 1)
+    assert header == "data:image/png;base64"
+    with Image.open(io.BytesIO(base64.b64decode(encoded))) as scaled:
+        assert scaled.width * scaled.height <= describe_module.MAX_PIXELS
+        assert abs(scaled.width / scaled.height - 2016 / 1871) < 0.01, "the whole picture, aspect kept"
+    assert base64.b64decode(sent[1].split(",", 1)[1]) == small.read_bytes(), "a small picture is sent as it is"
+
+
 def test_an_empty_answer_is_an_error_not_a_description(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     def answer(url: str, json: dict[str, Any], timeout: object) -> httpx.Response:
         return httpx.Response(200, json={"choices": [{"message": {"content": ""}}]}, request=httpx.Request("POST", url))
