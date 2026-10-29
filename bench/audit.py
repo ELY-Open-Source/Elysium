@@ -31,7 +31,7 @@ SCORE_WORDS = ("pass_rate", "pass_target", "accuracy", "recall", "hit_rate", "sc
 RETRY_MARKERS = ("best_of", "bestof", "reroll", "re_roll", "until_pass", "retry_until")
 # The scorer must stay a pure function of (query, ranked ids, gold ids), or the thing being graded starts grading itself.
 SCORER_FORBIDDEN = ("elysium", "transformers", "sentence_transformers", "torch", "bench.systems", "bench.counterpart")
-FROZEN_REPORTS = ("baseline.json", "baseline_external.json", "video_audio.json")
+FROZEN_REPORTS = ("baseline.json", "baseline_external.json", "video_audio.json", "describe.json")
 
 
 def _words_in(node: ast.AST) -> set[str]:
