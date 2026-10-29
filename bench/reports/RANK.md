@@ -1,9 +1,9 @@
 # The ranking on the described store
 
-- commit: `56ce642a50318e7bcfe0b098c11ac6302b609004`
+- commit: `f5c47d97f57322a556380dbff83a045cbf265385`
 - store measured: a copy of `bench/runs/describe/after`, holders re-stamped; 47775 of 47775 pictures carry a description
 - before: the `after` rows of `bench/reports/describe.json`, commit `3993644c65407f33213357eee1d1100636eaeb38`
-- machine: 32 cpus, load [1.33, 1.17, 1.15]
+- machine: 32 cpus, load [2.05, 2.29, 2.2]
 - the external counterpart on the same suite: `bench/reports/BASELINE_EXTERNAL.md`
 
 | split | n | chance (inside the asker's holder) | recall@10 before | recall@10 now | MRR now | 95% lower now |
@@ -19,7 +19,7 @@
 | chance | 0.7143 | 0.2084 | 0.0110 | 0.5820 | 0.1514 | 0.5129 |
 | before | 0.948 | 0.909 | 0.827 | 0.891 | 0.676 | 0.821 |
 | now | 0.979 | 0.909 | 0.827 | 0.891 | 0.712 | 0.821 |
-| 9B judge over the first 40 atoms | 0.623 | 0.296 | 0.160 | 0.875 | 0.234 | 0.857 |
+| 9B judge over the first 40 atoms | 0.984 | 0.965 | 0.880 | 0.894 | 0.730 | 0.875 |
 
 ## recall@10 by modality, test
 
@@ -37,6 +37,6 @@
 | before | 0.928 | 0.914 | 0.827 | 0.886 | 0.713 | 0.819 |
 | now | 0.963 | 0.907 | 0.827 | 0.886 | 0.728 | 0.819 |
 
-The judge on dev: recall@10 0.606 against 0.901 as shipped, MRR 0.296.
+The judge on dev: recall@10 0.916 against 0.901 as shipped, MRR 0.795.
 
 Latency moves with machine load and is kept in the JSON only; the recall columns do not.
