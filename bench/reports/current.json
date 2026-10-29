@@ -589,7 +589,7 @@
   "corpus_manifest_sha256": "8fc1ed861c891d778853d41107630869f9eb267a669c5d1038e389de80114347",
   "corpus_sources": 50278,
   "generated_at": "2026-10-08T20:17:12+00:00",
-  "git_commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
+  "git_commit": "685e59a6caa7aa9049b106ef67fcf6566c181814",
   "limit_per_modality": null,
   "machine": {
    "cpus": 32,

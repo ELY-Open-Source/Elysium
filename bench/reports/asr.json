@@ -1,6 +1,6 @@
 {
   "generated_utc": "2026-10-08T02:37:10+00:00",
-  "commit": "10a39c5125ebaf73e0ff7174b3af7af4c32bcf05",
+  "commit": "d6f5e99a04d85d1d683d5b47c9bbde52805b0a78",
   "model": {
     "id": "Systran/faster-whisper-tiny",
     "sha256_model_bin": "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1",

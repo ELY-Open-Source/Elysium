@@ -1,4 +1,4 @@
-# ASR: what the speech reader hears (commit 10a39c512)
+# ASR: what the speech reader hears (commit d6f5e99a0)
 
 - generated 2026-10-08T02:37:10+00:00
 - model: Systran/faster-whisper-tiny (cpu int8, 4 threads), model.bin sha256 dcb76c6586fc06cb…

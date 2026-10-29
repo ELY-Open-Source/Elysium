@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-10-08T00:37:50.278445+00:00",
-  "commit": "7e1fe649f68bcb25108e2781d912c8a80e3bbfc8",
+  "commit": "966fccee6a27894487cb42a26cc206a7cdf1cb37",
   "dataset": "OS-Copilot/ScreenSpot-v2 (icon instructions)",
   "model": {
     "repo": "Xenova/chinese-clip-vit-base-patch16",

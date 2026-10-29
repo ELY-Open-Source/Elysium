@@ -1,6 +1,6 @@
 # BASELINE_EXTERNAL: memory counterparts on the same corpus
 
-- generated 2026-10-07T19:16:08+00:00 at commit 3d792417cfd0
+- generated 2026-10-07T19:16:08+00:00 at commit 5cc731a65aa0
 - 5308 queries (2928 answerable) against 50789 sources
 - machine: 32 cores, load average 2.9 when the report was written
 - extraction is lexical for both stores; Mem0's real add() and Zep's graph builder call a generator model, which this round does not have

@@ -1,5 +1,5 @@
 {
-  "commit": "dff5977ab638896cc8685c78ee41e5195fc0fbf2",
+  "commit": "685e59a6caa7aa9049b106ef67fcf6566c181814",
   "database": "bench/runs/scale/data/ely_eye.sqlite",
   "atoms": 165973,
   "copy_seconds": 4.996028091998596,

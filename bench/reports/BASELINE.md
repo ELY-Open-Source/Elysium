@@ -1,6 +1,6 @@
 # BASELINE: what the product retrieves today
 
-- generated 2026-10-07T15:33:42+00:00 at commit 29163632af74
+- generated 2026-10-07T15:33:42+00:00 at commit b6503112a0c5
 - corpus 50278 sources, 5308 queries (2928 answerable)
 - models: dense `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, rerank `BAAI/bge-reranker-base`
 

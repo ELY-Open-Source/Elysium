@@ -1,4 +1,4 @@
-# DENSE: the vector leg at corpus size (commit 71733d86d)
+# DENSE: the vector leg at corpus size (commit 80ffd9781)
 
 - database: `bench/runs/dense_scale/data/ely_eye.sqlite`
 - atoms: 165973, memories with words: 153857, vectors: 153857, pending: 0

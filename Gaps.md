@@ -1,7 +1,7 @@
 # Gaps.md — Elysium（往世乐土，原名 Ely-Eye）现状与目标之间的差距
 
 > 审查方式：全仓库通读（86 文件 / 17,146 行）+ 14 个并行审计 lane（6 个代码审计 + 8 个外部调研），
-> 每条结论都带 `file:line` 或一手来源。审查日期对应 HEAD `4cd29f9`。
+> 每条结论都带 `file:line` 或一手来源。审查日期对应 HEAD `18e70f7`。
 > 本文只描述差距，不含实现；末尾给出优先级与验收标准。
 
 ---
@@ -27,17 +27,17 @@
 | 差距 | 状态 | 证据（跑过的命令 / 报告） |
 |---|---|---|
 | 3.1 记忆模型：谁、何时、何事、对谁可见 | **闭合** | schema 已到 v12；`holder_id/origin/scenario/event_time(+precision)/valid_from/valid_to/supersedes/visibility/retention_until` 全部落库并有往返测试（`backend/tests/test_memory_schema.py`）；会话、重要度、归档层、冲突清单在 p2-3 落地（`test_memory_tiers.py`、`test_memory_conflicts.py`）；「当时为真」能问回来（`SearchFilters.as_of`，`test_as_of_search.py`） |
-| 3.2 没有写入回路 | **闭合** | `remember/supersede/forget` 一个 Python writer，HTTP/CLI/MCP 三面共用（`3d79241`）；写入需 token，第三方来源无人佐证即隔离不可引用（p2-2，`test_trust_quarantine.py`） |
-| 3.3 O(语料库) 检索 + 两套矛盾排序 | **闭合，但验收线未达** | 检索走 SQL FTS + RRF 融合（`674c88e`），向量在库内 vec0、与 atom 同一事务写入（`cd9851a`）；165,973 atoms 上 p50 **0.0717 s**，替换掉的是 **20.16 s**（`bench/reports/SCALE.md`）。recall@10 **全库 2,928 道可答题实测 0.857**（words-only top_k 24，含语音；冻结库无语音时 0.848，`bench/reports/VIDEO_AUDIO.md` 两行对照），验收线 0.90 **未达，差 0.043**；dense 腿 10 atom 0.847、30 atom 0.860（无语音，`bench/reports/LEGS.md`）；外部对手同批条目 holder 作用域 0.866，chance 0.0002（`bench/reports/BASELINE_EXTERNAL.md`）。注：300 分层探针读 0.863，比全库高，因为抽样偏重了 ui_screenshot（样本 0.818 vs 全量 0.659） |
-| 3.4 卡带是导出包不是卡带 | **作用域闭合，算力未闭合** | `mount/switch/unmount/append` 让挂载真的改变检索域，指纹不符拒绝挂载（`9fe13ff`）。原文里「省下真实算力（前缀/KV 复用）」**没做**：`profiles.py` 的 YaRN/量化/CPU-offload 仍是引擎启动参数，没有前缀复用实现 |
-| 3.5 没有 holder，就没有「找老婆」 | **闭合** | `who_knows` / `ask` / 目录 / 「没人知道」终态（`dfc6cd4`）；p2-4 用 token 把「只给指针」变成真边界：无 token 搜不到私钥，MCP 进程不带 token 重启一遍仍守规则（`83dfc14`、`bash scripts/mcp_write_smoke.sh` 两行 PASS） |
+| 3.2 没有写入回路 | **闭合** | `remember/supersede/forget` 一个 Python writer，HTTP/CLI/MCP 三面共用（`5cc731a`）；写入需 token，第三方来源无人佐证即隔离不可引用（p2-2，`test_trust_quarantine.py`） |
+| 3.3 O(语料库) 检索 + 两套矛盾排序 | **闭合，但验收线未达** | 检索走 SQL FTS + RRF 融合（`87661ab`），向量在库内 vec0、与 atom 同一事务写入（`187f0e0`）；165,973 atoms 上 p50 **0.0717 s**，替换掉的是 **20.16 s**（`bench/reports/SCALE.md`）。recall@10 **全库 2,928 道可答题实测 0.857**（words-only top_k 24，含语音；冻结库无语音时 0.848，`bench/reports/VIDEO_AUDIO.md` 两行对照），验收线 0.90 **未达，差 0.043**；dense 腿 10 atom 0.847、30 atom 0.860（无语音，`bench/reports/LEGS.md`）；外部对手同批条目 holder 作用域 0.866，chance 0.0002（`bench/reports/BASELINE_EXTERNAL.md`）。注：300 分层探针读 0.863，比全库高，因为抽样偏重了 ui_screenshot（样本 0.818 vs 全量 0.659） |
+| 3.4 卡带是导出包不是卡带 | **作用域闭合，算力未闭合** | `mount/switch/unmount/append` 让挂载真的改变检索域，指纹不符拒绝挂载（`f788945`）。原文里「省下真实算力（前缀/KV 复用）」**没做**：`profiles.py` 的 YaRN/量化/CPU-offload 仍是引擎启动参数，没有前缀复用实现 |
+| 3.5 没有 holder，就没有「找老婆」 | **闭合** | `who_knows` / `ask` / 目录 / 「没人知道」终态（`51279e2`）；p2-4 用 token 把「只给指针」变成真边界：无 token 搜不到私钥，MCP 进程不带 token 重启一遍仍守规则（`dcacba5`、`bash scripts/mcp_write_smoke.sh` 两行 PASS） |
 | 3.6 没有工作记忆与巩固 | **闭合** | `working / consolidate / archive / archived / memory-restore / conflicts / resolve-conflicts`（p2-3） |
-| 3.7 无文字图像结构性不可见 | **部分闭合** | CLIP 图文互查（`03ca357`）与语音+词级时间戳（`9f0f799`）已实现。语音进视频后（129 个视频 28,363 段转写，`bench/reports/VIDEO_AUDIO.md`）video **0.493 → 0.651**（holder 内随机排序的 chance 是 0.504：只有帧与 OCR 时视频题处于随机水平，语音让它高出 chance 0.148）；全库实测 recall@10 现为 ui_screenshot **0.659** / video **0.651** / image **0.781**（code 0.941、pdf 0.876、conversation 0.907）。剩下的是内容表示：截图题常问一个没有文字的图标，CLIP 无法在整屏截图里定位它（OCR 框裁块试过，0.475 仍输给屏上文字 0.584，见 CHECKLIST p2-6.2）；视频题常问画面里出现了什么而不是说了什么，帧只有 OCR。补上它的两样能力——VLM 区域描述、UI widget tree——本仓库没有，本轮按 m00217 没有下载 8B VLM |
+| 3.7 无文字图像结构性不可见 | **部分闭合** | CLIP 图文互查（`a9c6eba`）与语音+词级时间戳（`46060c1`）已实现。语音进视频后（129 个视频 28,363 段转写，`bench/reports/VIDEO_AUDIO.md`）video **0.493 → 0.651**（holder 内随机排序的 chance 是 0.504：只有帧与 OCR 时视频题处于随机水平，语音让它高出 chance 0.148）；全库实测 recall@10 现为 ui_screenshot **0.659** / video **0.651** / image **0.781**（code 0.941、pdf 0.876、conversation 0.907）。剩下的是内容表示：截图题常问一个没有文字的图标，CLIP 无法在整屏截图里定位它（OCR 框裁块试过，0.475 仍输给屏上文字 0.584，见 CHECKLIST p2-6.2）；视频题常问画面里出现了什么而不是说了什么，帧只有 OCR。补上它的两样能力——VLM 区域描述、UI widget tree——本仓库没有，本轮按 m00217 没有下载 8B VLM |
 | 3.8 6 个 adapter 只有 1 个真被加载 | **加载闭合，效果未测** | `adapters.py` 统一加载/校验/缓存（p1-3）。9B 生成、HashHop、标准基准在本仓库**没跑过**，所以 README 与 `TRAINING_ARTIFACTS.md` 不再引用任何未跑分数 |
 | 3.9 证明外壳比能力跑得远 | **闭合** | `evals.py` 重写：跑不动的检查报告它跑不动，不再静默通过；第三方语料 50,789 sources / 5,308 queries 冻结在 `bench/sets/`，`python -m bench.validate_sets` 校验；`python -m bench.audit --product` 专抓「harness 自证」 |
 | 3.10 工程与可复现性 | **闭合** | 15 个 `.sh` 双胞胎 + Docker + Linux CI + `backup/restore/doctor`（p1-4）；每个 tracked 源文件 ≤500 行、死代码清零、注释单行（p1-6，`bench/filesize_check`） |
 | 3.11 能取不能记，能看不能操作 | **闭合** | HTTP 路由 21 → **38**；CLI 命令 **59**；MCP 工具 9 只读 → **23**（写/挂载/分层/目录/能力卡） |
-| 3.12 安全与隐私 | **闭合** | 写入门禁 + 每 holder 独立 token（库里只存 sha256）+ 服务器决定眼睛 + 能力卡不含正文（p2-2、p2-4）。p2-6.1 实测出并修掉一处泄漏：同一文件重新摄入会把 atom 的 holder 写回空串、即对所有人可见（`c1c9ad0`，`backend/tests/test_reingest_provenance.py`） |
+| 3.12 安全与隐私 | **闭合** | 写入门禁 + 每 holder 独立 token（库里只存 sha256）+ 服务器决定眼睛 + 能力卡不含正文（p2-2、p2-4）。p2-6.1 实测出并修掉一处泄漏：同一文件重新摄入会把 atom 的 holder 写回空串、即对所有人可见（`33ec81d`，`backend/tests/test_reingest_provenance.py`） |
 
 四个根因现在的状态：**「命名即实现」**被 `bench.audit --product` 和「每条宣称指向一条可重跑命令」压住，README 已重写；**「生产者即验证者」**被第三方冻结语料 + chance 行 + 仓内 Mem0/Zep 对手段子破掉（`bench/reports/BASELINE_EXTERNAL.md`：同一 ranker 同一批条目，holder 作用域 0.866 对全库 0.412，**相差 0.454**——该报告只给两行与「这段差值是 holder 边界的价值、不是更好排序器的价值」这句话，差值是这里减出来的）；**「语料库而非记忆」**随 3.1/3.5/3.6 闭合不再成立；**「单用户·单轮·只读」**随 3.2/3.5/3.11/3.12 闭合不再成立。
 

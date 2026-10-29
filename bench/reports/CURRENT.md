@@ -1,6 +1,6 @@
 # CURRENT: what the product retrieves at this build
 
-- generated 2026-10-08T20:17:12+00:00 at commit dff5977ab638
+- generated 2026-10-08T20:17:12+00:00 at commit 685e59a6caa7
 - measured store schema: v8
 - corpus 50278 sources, 5308 queries (2928 answerable)
 - models: dense `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, rerank `BAAI/bge-reranker-base`

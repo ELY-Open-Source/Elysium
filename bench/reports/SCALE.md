@@ -1,6 +1,6 @@
 # SCALE: the product's own search at corpus size
 
-- commit: `dff5977ab638896cc8685c78ee41e5195fc0fbf2`
+- commit: `685e59a6caa7aa9049b106ef67fcf6566c181814`
 - database: bench/runs/scale/data/ely_eye.sqlite
 - copied from the frozen baseline in 5.0s and migrated in 0.0s to schema 8; the baseline store itself is left untouched
 - atoms: 165973, probes: 300 (code, image, pdf, ui_screenshot, video)

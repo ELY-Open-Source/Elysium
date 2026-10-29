@@ -1,6 +1,6 @@
 # LEGS: what each retrieval leg is worth
 
-- commit: `3b87b77b7f73ceca0e43dfc07cc689a6365fd673`, schema v12 — the copy arrives at v9 and the product migrates it when it opens, so every arm ran on v12
+- commit: `28c15d70509e08de15569e75d9c5a88cf25877c3`, schema v12 — the copy arrives at v9 and the product migrates it when it opens, so every arm ran on v12
 - store: bench/runs/leg_check/data/ely_eye.sqlite — a copy of bench/runs/dense_scale, which carries 153,857 dense vectors built by bench/dense_scale. The build sits outside the measured latency, and the frozen baseline itself holds no vectors, so a dense arm there would rank an empty index.
 - 2,928 answerable queries scored whole, each asked as the holder the frozen set assigns it; latency is timed on a stratified sample of 300, because a sample sized for timing is not sized for a modality's recall — the 300-probe sample this harness used before read the screenshot modality 0.818 where all 320 of its answerable queries read 0.659
 - picture index: 53,668 atoms at 512 dimensions, 109,912,192 bytes, read from bench/runs/leg_check_index

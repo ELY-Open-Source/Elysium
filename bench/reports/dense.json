@@ -1,5 +1,5 @@
 {
-  "commit": "71733d86d6d27d1f1ebb75205d5e0599f253f791",
+  "commit": "80ffd9781dd24edbbd03bc208c47416549dcc1de",
   "database": "bench/runs/dense_scale/data/ely_eye.sqlite",
   "atoms": 165973,
   "memories_with_words": 153857,

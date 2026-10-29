@@ -1,4 +1,4 @@
-# QUANT: what each vector encoding buys (commit cd9851a12)
+# QUANT: what each vector encoding buys (commit 187f0e0ea)
 
 - corpus: 165973 vectors, 384 dimensions, 200 probes, top 10
 - machine: Linux 6.18.40.1-microsoft-standard-WSL2, 32 cores, 4 threads per query, load [2.46, 4.17, 4.58]

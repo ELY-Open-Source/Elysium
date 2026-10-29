@@ -1,5 +1,5 @@
 {
-  "commit": "3b87b77b7f73ceca0e43dfc07cc689a6365fd673",
+  "commit": "28c15d70509e08de15569e75d9c5a88cf25877c3",
   "schema_version": 12,
   "source_schema_version": 9,
   "store": "bench/runs/leg_check/data/ely_eye.sqlite",

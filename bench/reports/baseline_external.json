@@ -9,7 +9,7 @@
   "answerable": 2928,
   "extraction": "lexical (see bench/counterpart.py); LLM extraction deferred with the generator",
   "generated_at": "2026-10-07T19:16:08+00:00",
-  "git_commit": "3d792417cfd0554cbe2bae0cfc098bb5bb07e28c",
+  "git_commit": "5cc731a65aa0ff0270e8fcca7b6afc3f5537d84b",
   "limit_per_modality": null,
   "machine": {
    "cpus": 32,

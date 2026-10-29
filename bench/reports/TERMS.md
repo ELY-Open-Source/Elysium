@@ -1,6 +1,6 @@
 # TERMS: which query words are worth paying for
 
-- commit: `dff5977ab638896cc8685c78ee41e5195fc0fbf2`
+- commit: `685e59a6caa7aa9049b106ef67fcf6566c181814`
 - store: bench/runs/term_sweep/data/ely_eye.sqlite (copied from the frozen baseline in 5.1s)
 - 173 answerable probes, each asked as the holder the frozen set assigns it, ranked by the unmodified `RetrievalService`
 - the bound the product ships is 0.05; the measured recall peak sits at 0.05

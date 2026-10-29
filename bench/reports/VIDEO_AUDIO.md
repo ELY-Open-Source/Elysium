@@ -1,6 +1,6 @@
 # What speech is worth on the video questions
 
-- commit: `c2343033253984bbc77893afef9f7ff1771dddff`
+- commit: `fbfbe2a3fa9b119806f10cafda0f28b75429d24e`
 - store measured: a copy of `bench/runs/dense_scale`; the source is never opened for write
 - machine: 32 cpus, load [1.16, 1.03, 0.85]
 - speech snapshot: `bench/models/faster-whisper-tiny` (the shipped default; its word error rate is in ASR.md)
