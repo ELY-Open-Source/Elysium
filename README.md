@@ -31,7 +31,7 @@ command that re-measures it, or it is marked as not measured.
 
 Where the deficit lives, by modality (recall@10, every answerable query, speech
 ingested), each beside the chance floor of a random ranking inside the asker's
-holder: code 0.941 (0.696), conversation 0.907 (0.210), pdf 0.876 (0.578),
+holder: code 0.941 (0.696), conversation 0.907 (0.210), pdf 0.876 (0.577),
 image 0.781 (0.011), video 0.651 (0.504), ui_screenshot 0.659 (0.147). Weighted
 by how many questions each holds, the 0.043 short of the bar is mostly
 screenshots (0.659 → 0.95 would add 0.032) and video (0.651 → 0.90 would add
