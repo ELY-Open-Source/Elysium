@@ -106,8 +106,8 @@ def require_owned(store: Path, label: str) -> None:
         )
 
 
-def rank_arm(home: Path, probes: list[Any], top_k: int) -> dict[str, Any] | None:
-    """Rank the probes through the shipped words-only path and score them; None skips the arm."""
+def rank_arm(home: Path, probes: list[Any], top_k: int, rerank_url: str | None = None) -> dict[str, Any] | None:
+    """Rank the probes through the shipped words-only path, reranked when a judge is served; None skips the arm."""
     from elysium.config import Settings
     from elysium.db import Database
     from elysium.retrieval import RetrievalService
@@ -119,6 +119,7 @@ def rank_arm(home: Path, probes: list[Any], top_k: int) -> dict[str, Any] | None
         dense_embeddings_enabled=False,
         embedding_model_dir=None,
         clip_model_dir=None,
+        rerank_base_url=rerank_url,
     )
     if settings.retrieval_top_k != SHIPPED_TOP_K:
         raise SystemExit(

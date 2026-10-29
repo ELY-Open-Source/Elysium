@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     clip_model_dir: Path | None = None
     vlm_base_url: str | None = None
     vlm_max_new_tokens: int = 192
+    rerank_base_url: str | None = None
     asr_model_dir: Path | None = None
     adapter_dir: Path | None = None
     runtime_backend: Literal["sglang", "transformers"] = "transformers"

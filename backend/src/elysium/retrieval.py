@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import cartridge_store, lifecycle_store
+from . import cartridge_store, lifecycle_store, rerank
 from .config import Settings, get_settings
 from .db import Database
 from .embeddings import EmbeddingService
@@ -90,6 +90,7 @@ class RetrievalService:
             for atom_id, cosine in visual.items():
                 scores[atom_id]["visual_score"] = cosine
         hits = self._settle_conflicts(self._rank(rankings, scores, limit * CANDIDATE_WINDOW))[:limit]
+        hits = rerank.reorder(self.settings, query, hits) if query.strip() else hits
         lifecycle_store.touch_recalls(self.db, [hit.atom.atom_id for hit in hits], utc_now())
         more = page.has_more or len(rankings[0]) > limit
         return SearchResult(

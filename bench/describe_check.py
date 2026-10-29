@@ -94,11 +94,11 @@ def describe_copy(home: Path, workers: int) -> dict[str, Any]:
     return {**counts, "seconds": time.perf_counter() - began, "vlm_base_url": settings.vlm_base_url, "model_id": settings.model_id}
 
 
-def rank_stage(home: Path, groups: dict[str, list[Any]], stage: str) -> list[dict[str, Any]]:
-    """One row per split, each ranked through the shipped words-only path."""
+def rank_stage(home: Path, groups: dict[str, list[Any]], stage: str, rerank_url: str | None = None) -> list[dict[str, Any]]:
+    """One row per split, each ranked through the shipped words-only path, reranked when a judge is served."""
     rows = []
     for name in SPLITS:
-        row = rank_arm(home, groups[name], SHIPPED_TOP_K)
+        row = rank_arm(home, groups[name], SHIPPED_TOP_K, rerank_url)
         if row is None:
             raise SystemExit(f"{stage}/{name}: nothing to rank, so this run would print a row of zeros")
         rows.append({"arm": f"{stage}: {name}", "stage": stage, "asked": name, "overall": row})
