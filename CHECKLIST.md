@@ -273,6 +273,7 @@
     - 六个跨 WSL 的 `.ps1` 改成 `$distro = if ($env:ELYSIUM_WSL_DISTRO) { $env:ELYSIUM_WSL_DISTRO } else { "Ubuntu" }` 再 `wsl.exe -d $distro`
     - 诚实记录两处没证到的：这台机器没有 PowerShell 解析器，那六个 `.ps1` 的改动是机械替换、未经语法校验；`scripts/run-all-prd-finetunes.ps1`（100 行）还没有 `.sh` 对应
   - [x] p1-4.7 `LICENSE`
+    - 2026-10-29 许可证改为 **MIT**（所有者决定）：`LICENSE` 换成 MIT 全文，`backend/pyproject.toml` 与 `frontend/package.json` 的 `license` 改为 `MIT`；下面两行是当时选 AGPL 的记录。PyMuPDF 仍是 AGPL-3.0 / Artifex 商业双许可，README 写明它的条款跟着该依赖走。
     - 选 **AGPL-3.0-only**，依据是查来的不是猜的：`pymupdf` 安装元数据写 `Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License`，而 `gh repo view --json visibility` → **PUBLIC**，分发真的发生，所以 AGPL 的 network 条款真的会咬人。PyMuPDF 是 PDF 页/区块 atom 的承重墙，只要它还在，写 MIT 就是不诚实
     - `LICENSE` 与 gnu.org 原文逐字节相同（sha256 `0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0`）；`backend/pyproject.toml` 加 `license = "AGPL-3.0-only"`，`pip wheel` 实测元数据出 `License-Expression: AGPL-3.0-only`；`frontend/package.json` 同值；README 新增 License 段写明版权人与「买 Artifex 商业授权才谈得上宽松许可」
     - 这是业务决定不是工程决定：owner 若要 MIT，得先处置 PyMuPDF（买授权或换 reader），我在 README 与这里都标出来

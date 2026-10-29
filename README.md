@@ -191,8 +191,8 @@ elysium-mcp/ Go: the MCP server
 
 ## License
 
-AGPL-3.0-only. Copyright © 2026 雷电芽衣 <zhangyanghaha0407@outlook.com>.
+MIT. Copyright © 2026 雷电芽衣 <yang@zacharyzhang.com>. See `LICENSE`.
 
-The PDF reader (PyMuPDF) is dual-licensed under AGPL-3.0 or an Artifex
-Commercial license, so this project ships under AGPL while that dependency is
-in use. Buying the Artifex license is what would allow a permissive one.
+Dependencies keep their own licenses. The PDF reader, PyMuPDF, is AGPL-3.0 or
+an Artifex commercial license; whoever distributes or serves Elysium with it
+installed takes on PyMuPDF's terms for that component.
