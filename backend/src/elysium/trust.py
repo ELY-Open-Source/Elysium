@@ -302,7 +302,7 @@ def quantity_conflict(older_text: str, newer_text: str) -> QuantityConflict | No
     if not older.subject or older.subject != newer.subject:
         return None
     subject = older.subject
-    if subject in newer.values and _as_float(older.values[subject]) != _as_float(newer.values[subject]):
+    if subject in older.values and subject in newer.values and _as_float(older.values[subject]) != _as_float(newer.values[subject]):
         # The subject itself carries the two values, so it is named rather than the verb beside it.
         return QuantityConflict(term=subject, older_value=older.values[subject], newer_value=newer.values[subject])
     term = conflicting_number(older.values, newer.values)

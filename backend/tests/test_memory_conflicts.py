@@ -331,3 +331,13 @@ def test_a_second_number_in_one_memory_hides_the_update(tmp_path) -> None:
         "the fail-closed side of the boundary: nothing is suppressed, the reader sees both readings "
         "and decides for themselves"
     )
+
+
+def test_a_memory_with_no_number_cannot_disagree_with_one_that_has_one(tmp_path) -> None:
+    """The older side stated no quantity, so the subject's value existed on one side only; that read crashed."""
+    settings = Settings(home=tmp_path)
+    service = MemoryService(settings=settings, database=Database(settings))
+    service.remember("plot axis series of the graph", holder_id="flot", origin=MemoryOrigin.self_)
+    service.remember("plot axis series of the graph 0", holder_id="flot", origin=MemoryOrigin.self_)
+
+    assert service.conflicts("flot") == []

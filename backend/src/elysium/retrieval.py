@@ -65,7 +65,7 @@ class RetrievalService:
         criteria["cartridge_ids"] = scope
         # A picture-only question has no words for BM25, so the word ranking is skipped rather than matching an empty expression.
         page = (
-            search_atoms(self.db, query, limit=limit * CANDIDATE_WINDOW, offset=offset, **criteria)
+            search_atoms(self.db, query, limit=limit * CANDIDATE_WINDOW, offset=offset, fill=limit, **criteria)
             if query.strip()
             else FtsPage(rows=[], has_more=False)
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -40,6 +41,7 @@ def search_atoms(
     min_trust: float | None = None,
     cartridge_ids: list[str] | None = None,
     as_holder: str | None = None,
+    fill: int = 0,
 ) -> FtsPage:
     """BM25 over the FTS index joined to memories that answer for the moment being asked about.
 
@@ -56,92 +58,105 @@ def search_atoms(
     ones naming it in visible_to, the ones marked for everyone, and the ones nobody owns; the
     empty string is a caller who is nobody, so only the last two; None runs over the whole
     library, which is what an operator or a process that owns the store reads with. A memory with
-    no holder cannot be private to a holder that does not exist."""
+    no holder cannot be private to a holder that does not exist.
+
+    The common words are dropped by a count over the whole library, but the search runs inside one
+    holder's scope. A scope of four functions that shares only `axis` and `series` with a question
+    keeps nothing when those words are common elsewhere, so when the rare words match fewer than
+    `fill` atoms in scope, the search runs again with every word. Every page is read from the first
+    row, so each page counts the same rows and a cursor never switches expressions halfway."""
     as_of_iso = None if as_of is None else as_of.isoformat()
     with database.connect() as connection:
-        expression = fts_expression(rare_terms(connection, fts_terms(query)))
-        rows = connection.execute(
-            """
-            SELECT f.atom_id, bm25(atom_fts) AS score
-            FROM atom_fts AS f
-            JOIN atoms AS a ON a.atom_id = f.atom_id
-            WHERE atom_fts MATCH ?
-              AND (
-                    (? IS NULL
-                        AND (a.valid_to IS NULL
-                             OR a.valid_to > strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
-                        AND a.archived_at IS NULL
-                        AND (a.valid_from IS NULL
-                             OR a.valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
-                        AND (a.retention_until IS NULL
-                             OR a.retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')))
-                    OR (? IS NOT NULL
-                        AND (a.valid_from IS NULL OR a.valid_from <= ?)
-                        AND (a.valid_to IS NULL OR a.valid_to > ?)
-                        AND (a.event_time IS NULL OR a.event_time <= ?)
-                        AND (a.retention_until IS NULL OR a.retention_until > ?))
-              )
-              AND (? IS NULL OR a.holder_id = ?)
-              AND (? IS NULL OR a.scenario = ?)
-              AND (? IS NULL OR a.source_id = ?)
-              AND (? IS NULL OR a.modality = ?)
-              AND (? IS NULL OR (a.event_time IS NOT NULL AND a.event_time >= ?))
-              AND (? IS NULL OR (a.event_time IS NOT NULL AND a.event_time <= ?))
-              AND (? IS NULL OR (
-                    a.trust_json IS NOT NULL
-                    AND min(
-                        json_extract(a.trust_json, '$.parser'),
-                        json_extract(a.trust_json, '$.ocr'),
-                        json_extract(a.trust_json, '$.model')
-                    ) >= ?
-              ))
-              AND (? IS NULL OR EXISTS (
-                    SELECT 1 FROM cartridge_atoms AS ca
-                    WHERE ca.atom_id = f.atom_id
-                      AND ca.cartridge_id IN (SELECT value FROM json_each(?))
-              ))
-              AND (? IS NULL
-                    OR a.holder_id = ''
-                    OR json_extract(a.visibility_json, '$.scope') = 'everyone'
-                    OR (? <> '' AND (a.holder_id = ?
-                          OR EXISTS (
-                                SELECT 1 FROM json_each(json_extract(a.visibility_json, '$.holders'))
-                                WHERE value = ?
-                          ))))
-            ORDER BY score
-            LIMIT ? OFFSET ?
-            """,
-            (
-                expression,
-                as_of_iso,
-                as_of_iso,
-                as_of_iso,
-                as_of_iso,
-                as_of_iso,
-                as_of_iso,
-                holder,
-                holder,
-                scenario,
-                scenario,
-                source_id,
-                source_id,
-                modality,
-                modality,
-                None if since is None else since.isoformat(),
-                None if since is None else since.isoformat(),
-                None if until is None else until.isoformat(),
-                None if until is None else until.isoformat(),
-                min_trust,
-                min_trust,
-                None if cartridge_ids is None else to_json(cartridge_ids),
-                None if cartridge_ids is None else to_json(cartridge_ids),
-                as_holder,
-                as_holder,
-                as_holder,
-                as_holder,
-                limit + 1,
-                offset,
-            ),
-        ).fetchall()
-    matched = [(str(row["atom_id"]), -float(row["score"])) for row in rows[:limit]]
-    return FtsPage(rows=matched, has_more=len(rows) > limit)
+        terms = fts_terms(query)
+        rare = rare_terms(connection, terms)
+
+        def match(chosen: list[str]) -> list[sqlite3.Row]:
+            return connection.execute(
+                """
+                SELECT f.atom_id, bm25(atom_fts) AS score
+                FROM atom_fts AS f
+                JOIN atoms AS a ON a.atom_id = f.atom_id
+                WHERE atom_fts MATCH ?
+                  AND (
+                        (? IS NULL
+                            AND (a.valid_to IS NULL
+                                 OR a.valid_to > strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
+                            AND a.archived_at IS NULL
+                            AND (a.valid_from IS NULL
+                                 OR a.valid_from <= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now'))
+                            AND (a.retention_until IS NULL
+                                 OR a.retention_until >= strftime('%Y-%m-%dT%H:%M:%f+00:00', 'now')))
+                        OR (? IS NOT NULL
+                            AND (a.valid_from IS NULL OR a.valid_from <= ?)
+                            AND (a.valid_to IS NULL OR a.valid_to > ?)
+                            AND (a.event_time IS NULL OR a.event_time <= ?)
+                            AND (a.retention_until IS NULL OR a.retention_until > ?))
+                  )
+                  AND (? IS NULL OR a.holder_id = ?)
+                  AND (? IS NULL OR a.scenario = ?)
+                  AND (? IS NULL OR a.source_id = ?)
+                  AND (? IS NULL OR a.modality = ?)
+                  AND (? IS NULL OR (a.event_time IS NOT NULL AND a.event_time >= ?))
+                  AND (? IS NULL OR (a.event_time IS NOT NULL AND a.event_time <= ?))
+                  AND (? IS NULL OR (
+                        a.trust_json IS NOT NULL
+                        AND min(
+                            json_extract(a.trust_json, '$.parser'),
+                            json_extract(a.trust_json, '$.ocr'),
+                            json_extract(a.trust_json, '$.model')
+                        ) >= ?
+                  ))
+                  AND (? IS NULL OR EXISTS (
+                        SELECT 1 FROM cartridge_atoms AS ca
+                        WHERE ca.atom_id = f.atom_id
+                          AND ca.cartridge_id IN (SELECT value FROM json_each(?))
+                  ))
+                  AND (? IS NULL
+                        OR a.holder_id = ''
+                        OR json_extract(a.visibility_json, '$.scope') = 'everyone'
+                        OR (? <> '' AND (a.holder_id = ?
+                              OR EXISTS (
+                                    SELECT 1 FROM json_each(json_extract(a.visibility_json, '$.holders'))
+                                    WHERE value = ?
+                              ))))
+                ORDER BY score
+                LIMIT ?
+                """,
+                (
+                    fts_expression(chosen),
+                    as_of_iso,
+                    as_of_iso,
+                    as_of_iso,
+                    as_of_iso,
+                    as_of_iso,
+                    as_of_iso,
+                    holder,
+                    holder,
+                    scenario,
+                    scenario,
+                    source_id,
+                    source_id,
+                    modality,
+                    modality,
+                    None if since is None else since.isoformat(),
+                    None if since is None else since.isoformat(),
+                    None if until is None else until.isoformat(),
+                    None if until is None else until.isoformat(),
+                    min_trust,
+                    min_trust,
+                    None if cartridge_ids is None else to_json(cartridge_ids),
+                    None if cartridge_ids is None else to_json(cartridge_ids),
+                    as_holder,
+                    as_holder,
+                    as_holder,
+                    as_holder,
+                    offset + limit + 1,
+                ),
+            ).fetchall()
+
+        rows = match(rare)
+        if len(rows) < fill and rare != terms:
+            rows = match(terms)
+    page = rows[offset:]
+    matched = [(str(row["atom_id"]), -float(row["score"])) for row in page[:limit]]
+    return FtsPage(rows=matched, has_more=len(page) > limit)
