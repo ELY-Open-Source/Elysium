@@ -255,7 +255,15 @@ def measure(
     index = load_source_index()
     return {
         "meta": {"queries": len(load_queries()), "answerable": len(suite), "limit_per_modality": limit or None},
-        "chance": {**chance_rows(index, suite), "video": chance_rows(index, whole)},
+        "chance": {
+            **chance_rows(index, suite),
+            "video": chance_rows(index, whole),
+            "by_modality": {
+                name: chance_rows(index, [query for query in suite if query.modality == name])["recall_at_10_holder_scope"]
+                for name in MODALITY_ORDER
+                if any(query.modality == name for query in suite)
+            },
+        },
         "commit": git_commit(),
         "machine": machine_facts(),
         "source_store": str(home),
@@ -347,6 +355,12 @@ def write_markdown(report: dict[str, Any], destination: Path) -> None:
         "| stage | " + " | ".join(MODALITY_ORDER) + " |",
         "| --- |" + " --- |" * len(MODALITY_ORDER),
     ]
+    floors = report["chance"]["by_modality"]
+    lines.append(
+        "| chance (inside the asker's holder) | "
+        + " | ".join("—" if name not in floors else f"{floors[name]:.4f}" for name in MODALITY_ORDER)
+        + " |"
+    )
     for stage in ("before", "after"):
         modalities = arm(report, stage, "suite")["by_modality"]
         cells = " | ".join("—" if name not in modalities else f"{modalities[name]:.3f}" for name in MODALITY_ORDER)
