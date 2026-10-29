@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     embedding_model_id: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     embedding_model_dir: Path | None = None
     clip_model_dir: Path | None = None
-    vlm_model_dir: Path | None = None
-    vlm_max_new_tokens: int = 96
+    vlm_base_url: str | None = None
+    vlm_max_new_tokens: int = 192
     asr_model_dir: Path | None = None
     adapter_dir: Path | None = None
     runtime_backend: Literal["sglang", "transformers"] = "transformers"
@@ -108,6 +108,11 @@ def refuse_old_names(settings: Settings, environment: dict[str, str], cwd: Path)
     dotenv = cwd / ".env"
     names = list(environment) + (list(dotenv_values(dotenv)) if dotenv.is_file() else [])
     old = sorted(name for name in names if name.startswith(OLD_ENV_PREFIX))
+    if "ELYSIUM_VLM_MODEL_DIR" in names:
+        raise SystemExit(
+            "ELYSIUM_VLM_MODEL_DIR is set, but pictures are now described by a served model: "
+            "set ELYSIUM_VLM_BASE_URL to its /v1 URL (scripts/launch-vllm-live.sh serves one)"
+        )
     if old:
         raise SystemExit(
             f"{old[0]} is set, but this project is now Elysium and reads ELYSIUM_{old[0][len(OLD_ENV_PREFIX):]}; "

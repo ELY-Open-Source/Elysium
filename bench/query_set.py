@@ -18,6 +18,7 @@ class Query:
     answerable: bool
     as_of: str | None
     category: str | None = None
+    split: str | None = None
 
 
 
@@ -46,6 +47,7 @@ def load_queries(modalities: Sequence[str] = MODALITIES) -> list[Query]:
                     answerable=answerable,
                     as_of=record.get("as_of"),
                     category=(record.get("origin") or {}).get("category"),
+                    split=record.get("split"),
                 )
             )
     if not queries:

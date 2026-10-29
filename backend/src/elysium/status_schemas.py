@@ -61,7 +61,7 @@ class SenseStatus(BaseModel):
     captioning: SenseState
     clip_path: str | None = None
     asr_path: str | None = None
-    vlm_path: str | None = None
+    vlm_url: str | None = None
 
 
 class SystemStatus(BaseModel):

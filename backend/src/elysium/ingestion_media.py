@@ -13,7 +13,7 @@ from .asr import DEFERRED as SPEECH_DEFERRED
 from .asr import SpeechSegment, SpeechTranscriber
 from .config import Settings
 from .db import Database
-from .describe import DEFERRED, VisionDescriber
+from .describe import DEFERRED, VisionDescriber, with_description
 from .ingestion_common import (
     IngestBatch,
     image_metadata,
@@ -68,17 +68,7 @@ class MediaIngest(ABC):
         source = self._source_record(path, self._image_kind(path), metadata=image_metadata(path))
         image_ref = self.objects.put_file(path, "images")
         ocr = read_text_from_image(path)
-        caption = ""
-        caption_note = ""
-        if not ocr.text.strip():
-            # Words already on the picture are free; only a wordless one is worth a model call.
-            try:
-                caption = self.describer.describe_or_none(path) or ""
-            except (OSError, RuntimeError, ValueError) as error:
-                caption, caption_note = "", f"failed: {error}"
-            else:
-                caption_note = "vlm" if caption else DEFERRED
-        text = caption or ocr.text
+        text = ocr.text
         width, height = image_size(path)
         atom = EvidenceAtom(
             atom_id=f"{source.source_id}:image",
@@ -88,15 +78,21 @@ class MediaIngest(ABC):
             text=text,
             image_ref=image_ref,
             layout=LayoutBox(x=0, y=0, w=width, h=height),
-            trust=TrustScores(parser=1.0, ocr=ocr.confidence, model=0.6 if caption else 0.0),
+            trust=TrustScores(parser=1.0, ocr=ocr.confidence, model=0.0),
             token_equivalent=token_equivalent(text) + visual_token_equivalent(width, height),
-            metadata={
-                "ocr_regions": ocr.regions,
-                "caption": caption_note,
-                **image_metadata(path),
-            },
+            metadata={"ocr_regions": ocr.regions, **image_metadata(path)},
         )
-        return IngestBatch(sources=[source], atoms=[atom])
+        return IngestBatch(sources=[source], atoms=[self._described(atom, path)])
+
+    def _described(self, atom: EvidenceAtom, path: Path) -> EvidenceAtom:
+        """Printed words do not say what a picture shows, so every picture is described when a model is served."""
+        try:
+            description = self.describer.describe_or_none(path)
+        except (OSError, RuntimeError, ValueError) as error:
+            return atom.model_copy(update={"metadata": {**atom.metadata, "caption": f"failed: {error}"}})
+        if description is None:
+            return atom.model_copy(update={"metadata": {**atom.metadata, "caption": DEFERRED}})
+        return with_description(atom, description)
 
     def _ingest_pdf(self, path: Path) -> IngestBatch:
         source = self._source_record(path, "pdf")
@@ -203,11 +199,8 @@ class MediaIngest(ABC):
                 temp_path = Path(temp_file.name)
             try:
                 ocr = read_text_from_image(temp_path)
-            finally:
-                temp_path.unlink(missing_ok=True)
-            height, width = frame.shape[:2]
-            atoms.append(
-                EvidenceAtom(
+                height, width = frame.shape[:2]
+                frame_atom = EvidenceAtom(
                     atom_id=f"{source.source_id}:frame:{frame_index:08d}",
                     modality=Modality.video_frame,
                     source_id=source.source_id,
@@ -219,7 +212,9 @@ class MediaIngest(ABC):
                     token_equivalent=token_equivalent(ocr.text) + visual_token_equivalent(width, height),
                     metadata={"frame_index": frame_index, "second": second, "ocr_regions": ocr.regions},
                 )
-            )
+                atoms.append(self._described(frame_atom, temp_path))
+            finally:
+                temp_path.unlink(missing_ok=True)
             frame_index += step
         capture.release()
         segments, note = self._speech(path)

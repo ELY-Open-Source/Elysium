@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .config import Settings
 from .db import Database
+from .describe import VisionDescriber
 from .status_schemas import DenseState, SenseState, SenseStatus, VisualState
 from .vector_index import VectorIndex, expected_vectors
 from .visual_index import VisualIndex
@@ -26,10 +27,10 @@ def sense_facts(settings: Settings, database: Database, visual: VisualIndex | No
         visual=_visual_state(index, on_disk),
         audio_atoms=_audio_count(database),
         speech=_sense_state(settings.asr_model_dir),
-        captioning=_sense_state(settings.vlm_model_dir),
+        captioning=_captioning(settings),
         clip_path=_stated(settings.clip_model_dir),
         asr_path=_stated(settings.asr_model_dir),
-        vlm_path=_stated(settings.vlm_model_dir),
+        vlm_url=settings.vlm_base_url,
     )
 
 
@@ -61,6 +62,14 @@ def _picture_claim(database: Database) -> int:
             "SELECT COUNT(*) FROM v_atoms_current WHERE image_ref IS NOT NULL AND image_ref != ''"
         ).fetchone()
     return int(row[0])
+
+
+def _captioning(settings: Settings) -> SenseState:
+    """No URL is absent; a URL whose server does not answer is missing, because new pictures then go undescribed."""
+    describer = VisionDescriber(settings)
+    if not describer.available():
+        return "absent"
+    return "ready" if describer.answers() else "missing"
 
 
 def _sense_state(model_dir: Path | None) -> SenseState:

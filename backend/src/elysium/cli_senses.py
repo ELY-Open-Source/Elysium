@@ -17,7 +17,7 @@ from .asr import SpeechTranscriber
 from .cli_common import json_dump
 from .config import Settings
 from .db import Database
-from .describe import DEFERRED, VisionDescriber
+from .describe import DEFERRED, VisionDescriber, describe_pictures
 from .vector_index import VectorIndex
 from .visual_index import VisualIndex
 
@@ -39,8 +39,8 @@ def senses_report(settings: Settings, db: Database) -> dict[str, dict[str, objec
             "index": "present" if index_present else "absent",
         },
         "picture_description": {
-            "model_dir": str(describer.model_dir() or ""),
-            "model_ready": describer.available(),
+            "base_url": describer.base_url() or "",
+            "model_ready": describer.available() and describer.answers(),
             "note": "" if describer.available() else DEFERRED,
         },
         "speech": {
@@ -64,6 +64,11 @@ def register(app: typer.Typer, settings: Callable[[], Settings]) -> None:
     def describe_image(path: Path) -> None:
         """Say what a picture shows; names the setup step when no vision model is installed."""
         typer.echo(json_dump({"image": str(path), "caption": VisionDescriber(settings()).describe(path)}))
+
+    @app.command("describe-pictures")
+    def describe_pictures_command(workers: int = typer.Option(32, help="requests in flight at once")) -> None:
+        """Write what each stored picture shows into its text; resumes where a previous run stopped."""
+        typer.echo(json_dump(describe_pictures(settings(), Database(settings()), workers)))
 
     @app.command("index-visual")
     def index_visual() -> None:

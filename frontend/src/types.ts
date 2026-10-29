@@ -44,7 +44,7 @@ export interface SenseStatus {
   captioning: 'absent' | 'missing' | 'ready';
   clip_path: string | null;
   asr_path: string | null;
-  vlm_path: string | null;
+  vlm_url: string | null;
 }
 
 export interface SystemStatus {

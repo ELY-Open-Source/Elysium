@@ -30,7 +30,7 @@ export function SensesPanel({ senses }: { senses: SenseStatus | null }) {
               state={senses.speech}
               detail={`${formatNumber(senses.audio_atoms)} audio atoms`}
             />
-            <SenseRow label="captioning" state={senses.captioning} detail="turns a wordless picture into text" />
+            <SenseRow label="captioning" state={senses.captioning} detail="writes what a picture shows into its text" />
           </>
         )}
         {!senses && <Quiet>Waiting for status.</Quiet>}
@@ -39,7 +39,7 @@ export function SensesPanel({ senses }: { senses: SenseStatus | null }) {
         <div className="adapter-metrics">
           <small title={senses.clip_path ?? undefined}>{senses.clip_path ? `clip ${senses.clip_path}` : 'no CLIP snapshot configured'}</small>
           <small title={senses.asr_path ?? undefined}>{senses.asr_path ? `asr ${senses.asr_path}` : 'no speech snapshot configured'}</small>
-          <small title={senses.vlm_path ?? undefined}>{senses.vlm_path ? `vlm ${senses.vlm_path}` : 'no captioning model configured'}</small>
+          <small title={senses.vlm_url ?? undefined}>{senses.vlm_url ? `vlm ${senses.vlm_url}` : 'no captioning model served'}</small>
         </div>
       )}
     </Panel>

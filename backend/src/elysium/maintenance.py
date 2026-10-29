@@ -192,8 +192,8 @@ def _check_senses(facts: SenseStatus, warnings: list[str]) -> None:
             f"the store holds {facts.audio_atoms} audio {_atoms_word(facts.audio_atoms)} but no speech snapshot is set "
             "(ELYSIUM_ASR_MODEL_DIR), so new audio will not be transcribed"
         )
-    if facts.vlm_path is not None and facts.captioning == "missing":
-        warnings.append(f"the captioning model at {facts.vlm_path} is missing, so images stay uncaptioned")
+    if facts.vlm_url is not None and facts.captioning == "missing":
+        warnings.append(f"the vision model at {facts.vlm_url} does not answer, so new pictures are ingested undescribed")
 
 
 def _check_indexes(facts: SenseStatus, warnings: list[str]) -> None:
