@@ -53,7 +53,7 @@ JUDGE_INSTRUCT = "Given a search query, judge whether this stored memory is the 
 
 
 def judge(client: httpx.Client, url: str, model: str, query: str, text: str) -> float:
-    """P(yes) over yes+no for one candidate; a reply carrying neither token is an error, not a zero."""
+    """P(yes) over yes+no for one candidate, every spelling of each summed; a reply with neither is an error."""
     body = {
         "model": model,
         "max_tokens": 1,
@@ -69,7 +69,11 @@ def judge(client: httpx.Client, url: str, model: str, query: str, text: str) -> 
     response = client.post(f"{url}/chat/completions", json=body)
     response.raise_for_status()
     top = response.json()["choices"][0]["logprobs"]["content"][0]["top_logprobs"]
-    odds = {entry["token"].strip().lower(): math.exp(entry["logprob"]) for entry in top}
+    # "yes", " yes" and "Yes" are separate tokens for one answer; their chances add, none overwrites another.
+    odds: dict[str, float] = {}
+    for entry in top:
+        word = entry["token"].strip().lower()
+        odds[word] = odds.get(word, 0.0) + math.exp(entry["logprob"])
     yes, no = odds.get("yes", 0.0), odds.get("no", 0.0)
     if yes + no == 0.0:
         raise SystemExit(f"the judge answered neither yes nor no for {query!r}: {[entry['token'] for entry in top]}")
