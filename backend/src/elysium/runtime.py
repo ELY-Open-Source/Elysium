@@ -134,55 +134,27 @@ class QwenRuntime:
             return False, f"Transformers backend import failed: {exc}"
 
     def _generate_sglang(self, question: str, context: CompiledContext) -> RuntimeGeneration:
-        prompt = build_prompt(question, context)
-        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-        for image_path in self._context_images(context)[:6]:
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": image_data_url(image_path)},
-                }
-            )
-        payload = {
-            "model": self.settings.model_id,
-            "messages": [{"role": "user", "content": content}],
-            "temperature": self.settings.temperature,
-            "max_tokens": self.settings.max_new_tokens,
-        }
-        try:
-            with httpx.Client(timeout=None) as client:
-                response = client.post(
-                    f"{self.settings.sglang_base_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {self.settings.sglang_api_key}"},
-                    json=payload,
-                )
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise RuntimeUnavailableError(f"SGLang generation failed: {exc}") from exc
-        data = response.json()
-        usage = data.get("usage") if isinstance(data, dict) else None
-        return RuntimeGeneration(
-            text=data["choices"][0]["message"]["content"],
-            backend="sglang",
-            **self._generation_adapter_fields(),
-            input_tokens=usage.get("prompt_tokens") if isinstance(usage, dict) else None,
-            output_tokens=usage.get("completion_tokens") if isinstance(usage, dict) else None,
-        )
+        return self._chat(build_prompt(question, context), self._context_images(context))
 
     def _generate_sglang_prompt(self, prompt: str, image_paths: list[Path]) -> RuntimeGeneration:
+        return self._chat(prompt, image_paths)
+
+    def _chat(self, prompt: str, image_paths: list[Path]) -> RuntimeGeneration:
+        """Ask the served model once; an answer it never reached is an error, not an empty string.
+
+        Qwen3.5 thinks before it answers, and the thinking spends the same token budget: with it on,
+        a 512-token budget ran out on a screenshot before a word of answer (finish_reason "length",
+        content null). The answer is grounded in the compiled context, so it is asked for directly.
+        """
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
         for image_path in image_paths[:6]:
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": image_data_url(image_path)},
-                }
-            )
+            content.append({"type": "image_url", "image_url": {"url": image_data_url(image_path)}})
         payload = {
             "model": self.settings.model_id,
             "messages": [{"role": "user", "content": content}],
             "temperature": self.settings.temperature,
             "max_tokens": self.settings.max_new_tokens,
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         try:
             with httpx.Client(timeout=None) as client:
@@ -195,9 +167,16 @@ class QwenRuntime:
         except httpx.HTTPError as exc:
             raise RuntimeUnavailableError(f"SGLang generation failed: {exc}") from exc
         data = response.json()
+        choice = data["choices"][0]
+        text = choice["message"].get("content")
+        if not text:
+            raise RuntimeUnavailableError(
+                f"the model returned no answer (finish_reason {choice.get('finish_reason')!r} "
+                f"after {self.settings.max_new_tokens} tokens)"
+            )
         usage = data.get("usage") if isinstance(data, dict) else None
         return RuntimeGeneration(
-            text=data["choices"][0]["message"]["content"],
+            text=text,
             backend="sglang",
             **self._generation_adapter_fields(),
             input_tokens=usage.get("prompt_tokens") if isinstance(usage, dict) else None,
