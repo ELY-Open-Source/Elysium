@@ -110,6 +110,7 @@ def judge_arm(home: Path, queries: list[Any], url: str) -> dict[str, Any]:
         "top_k": JUDGE_WINDOW,
         "recall_at_10": summary["recall_at_10"],
         "mrr": summary["mrr"],
+        "hit_at_10": summary["hit_at_10"],
         "hit_at_10_wilson_lower": summary["hit_at_10_wilson_lower"],
         "by_modality": {name: sum(rows) / len(rows) for name, rows in sorted(by_modality.items())},
     }
