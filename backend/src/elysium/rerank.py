@@ -2,8 +2,9 @@
 
 Word search puts the right memory on the page but not always first. On the frozen dev split the
 served 9B, asked yes or no per atom, lifted recall@10 from 0.901 to 0.916 over a 40-atom window
-(`bench/reports/RANK.md`) and to 0.913 over the 24-atom page alone. It reorders only the page it is
-handed, so a cursor still walks every memory exactly once. The model is served, not loaded here.
+(`bench/reports/RANK.md` at `e046136`) and to 0.913 over the 24-atom page alone (the same file now).
+It reorders only the page it is handed, so a cursor still walks every memory exactly once. The
+model is served, not loaded here.
 """
 
 from __future__ import annotations
