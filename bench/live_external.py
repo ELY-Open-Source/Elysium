@@ -1,6 +1,6 @@
 """Real Mem0 on the shared pool, with the local 9B as its LLM.
 
-Runs in `.venv-external` (mem0ai, fastembed, spaCy; Qdrant in Docker); it never imports elysium. Every
+Runs in `.venv-external` (mem0ai, fastembed, spaCy; Qdrant in Docker); it never imports elysian. Every
 item of `pool.json` goes in through Mem0's own `add()`, without and with LLM inference. Items of one
 source go in one after another; sources run side by side, since one PDF holder alone holds 835 items.
 Token cost is read from vLLM's counters around each phase, so nothing else may use that server while

@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-import elysium.ingestion_media as media_module
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.ingestion import IngestionService
-from elysium.migrations import SCHEMA_VERSION, apply
-from elysium.ocr import OcrResult
-from elysium.storage import token_equivalent, visual_token_equivalent
+import elysian.ingestion_media as media_module
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.ingestion import IngestionService
+from elysian.migrations import SCHEMA_VERSION, apply
+from elysian.ocr import OcrResult
+from elysian.storage import token_equivalent, visual_token_equivalent
 
 FRAME = (1280, 720)
 

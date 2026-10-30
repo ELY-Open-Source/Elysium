@@ -118,7 +118,7 @@ def fake_source_map() -> dict[str, str]:
 
 def test_load_atoms_returns_every_row_in_a_stable_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("bench.systems.source_map", fake_source_map)
-    db = tmp_path / "elysium.sqlite"
+    db = tmp_path / "elysian.sqlite"
     make_database(db)
     loaded = load_atoms(db)
     assert [atom.atom_id for atom in loaded] == ["a1", "a2", "a3"]
@@ -128,7 +128,7 @@ def test_load_atoms_returns_every_row_in_a_stable_order(tmp_path: Path, monkeypa
 
 
 def test_load_atoms_refuses_an_atom_it_cannot_trace_to_a_corpus_file(tmp_path: Path) -> None:
-    db = tmp_path / "elysium.sqlite"
+    db = tmp_path / "elysian.sqlite"
     make_database(db)
     with pytest.raises(SystemExit, match="atom paths are not corpus files"):
         load_atoms(db)

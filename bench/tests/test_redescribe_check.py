@@ -4,11 +4,11 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.describe import with_description
-from elysium.memory import MemoryService
-from elysium.schemas import EvidenceAtom, MemoryOrigin, Modality
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.describe import with_description
+from elysian.memory import MemoryService
+from elysian.schemas import EvidenceAtom, MemoryOrigin, Modality
 
 from bench import redescribe_check
 
@@ -56,7 +56,7 @@ def test_the_undescribed_store_is_read_without_being_migrated(tmp_path: Path) ->
     _, plain = _store(tmp_path / "before", Modality.image)
     after, _ = _store(tmp_path / "after", Modality.image)
     after.upsert_atoms([with_description(plain, "a bar chart, blue bars rising")])
-    source = tmp_path / "before" / "data" / "elysium.sqlite"
+    source = tmp_path / "before" / "data" / "elysian.sqlite"
     with sqlite3.connect(source) as connection:
         connection.execute("PRAGMA user_version = 12")
 

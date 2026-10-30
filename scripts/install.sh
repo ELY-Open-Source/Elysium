@@ -11,4 +11,4 @@ fi
 .venv/bin/python -m pip install --upgrade --no-cache-dir transformers==5.9.0 datasets==4.8.5 dill==0.4.1 multiprocess==0.70.19 fsspec==2026.2.0 safetensors==0.8.0rc0
 (cd frontend && npm install)
 [ -f .env ] || cp .env.example .env
-.venv/bin/elysium status
+.venv/bin/elysian status

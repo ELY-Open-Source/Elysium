@@ -16,14 +16,14 @@ import httpx
 import pytest
 from PIL import Image
 
-import elysium.describe as describe_module
-import elysium.ingestion_media as media_module
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.describe import DEFERRED, VisionDescriber, describe_pictures
-from elysium.ingestion import IngestionService
-from elysium.ocr import OcrResult
-from elysium.senses import sense_facts
+import elysian.describe as describe_module
+import elysian.ingestion_media as media_module
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.describe import DEFERRED, VisionDescriber, describe_pictures
+from elysian.ingestion import IngestionService
+from elysian.ocr import OcrResult
+from elysian.senses import sense_facts
 
 CAPTION = "一个购物车图标停在结算按钮旁边"
 
@@ -64,7 +64,7 @@ def _ingest(
 def test_a_wordless_picture_ingested_with_a_model_carries_the_description(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from elysium.storage import token_equivalent, visual_token_equivalent
+    from elysian.storage import token_equivalent, visual_token_equivalent
 
     _, database = _ingest(tmp_path, FakeDescriber(), monkeypatch)
 
@@ -111,7 +111,7 @@ def test_no_served_model_is_named_as_a_setup_step(tmp_path: Path) -> None:
     describer = VisionDescriber(Settings(home=tmp_path / "home"))
 
     assert not describer.available()
-    with pytest.raises(SystemExit, match="ELYSIUM_VLM_BASE_URL"):
+    with pytest.raises(SystemExit, match="ELYSIAN_VLM_BASE_URL"):
         describer.describe(_picture(tmp_path))
 
 
@@ -257,7 +257,7 @@ def test_a_described_picture_carrying_an_instruction_is_quarantined(
 def test_a_vector_left_on_the_old_words_is_reencoded_on_resume(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_embeddings: Callable[[], Any]
 ) -> None:
-    from elysium.vector_index import VectorIndex
+    from elysian.vector_index import VectorIndex
 
     settings, database = _ingest(tmp_path, FakeDescriber(answer=None), monkeypatch, ocr_text="Checkout")
     dense = settings.model_copy(update={"vlm_base_url": "http://127.0.0.1:8001/v1", "dense_embeddings_enabled": True})
@@ -291,9 +291,9 @@ def test_describing_with_nothing_served_stops_before_it_starts(tmp_path: Path) -
 def test_the_retired_snapshot_variable_names_its_replacement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ELYSIUM_VLM_MODEL_DIR", "/models/qwen")
+    monkeypatch.setenv("ELYSIAN_VLM_MODEL_DIR", "/models/qwen")
 
-    with pytest.raises(SystemExit, match="ELYSIUM_VLM_BASE_URL"):
+    with pytest.raises(SystemExit, match="ELYSIAN_VLM_BASE_URL"):
         Settings(home=tmp_path / "home")
 
 

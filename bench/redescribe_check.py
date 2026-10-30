@@ -7,7 +7,7 @@ on the copy at the shipped budget, and ranks every split as shipped and, given a
 reranked. Video frames keep their 192-token words: at 512 tokens 60 of 60 sampled frames finished,
 median 149. The "before" rows are `bench/reports/rank.json`, the same store before this rewrite.
 
-Run: ELYSIUM_VLM_BASE_URL=http://127.0.0.1:8001/v1 python -m bench.redescribe_check [--rerank-url ...]
+Run: ELYSIAN_VLM_BASE_URL=http://127.0.0.1:8001/v1 python -m bench.redescribe_check [--rerank-url ...]
 Writes: bench/reports/REDESCRIBE.md, bench/reports/redescribe.json
 """
 
@@ -56,9 +56,9 @@ BUDGET = 512
 
 def undescribe(home: Path, undescribed: Path) -> int:
     """Each rewritten modality's atoms take back the words, trust and metadata they had before any description."""
-    from elysium.config import Settings
-    from elysium.db import Database
-    from elysium.row_codec import row_to_atom
+    from elysian.config import Settings
+    from elysian.db import Database
+    from elysian.row_codec import row_to_atom
 
     database = Database(Settings(home=home))
     with database.connect() as connection:
@@ -70,7 +70,7 @@ def undescribe(home: Path, undescribed: Path) -> int:
             )
         ]
     # Read-only: opening the source as a Database would migrate it in place.
-    with sqlite3.connect(f"file:{undescribed / 'data' / 'elysium.sqlite'}?mode=ro", uri=True) as source:
+    with sqlite3.connect(f"file:{undescribed / 'data' / 'elysian.sqlite'}?mode=ro", uri=True) as source:
         source.row_factory = sqlite3.Row
         rows = source.execute("SELECT * FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (json.dumps(ids),)).fetchall()
     old = {atom.atom_id: atom for atom in map(row_to_atom, rows)}
@@ -85,7 +85,7 @@ def undescribe(home: Path, undescribed: Path) -> int:
 
 
 def measure(home: Path, scratch: Path, workers: int, rerank_url: str | None) -> dict[str, Any]:
-    from elysium.config import Settings
+    from elysian.config import Settings
 
     if Settings().vlm_max_new_tokens != BUDGET:
         raise SystemExit(f"the product describes at {Settings().vlm_max_new_tokens} tokens but this report is labelled {BUDGET}")
@@ -93,7 +93,7 @@ def measure(home: Path, scratch: Path, workers: int, rerank_url: str | None) -> 
     copy_home, _ = copy_store(home, scratch)
     link_objects(copy_home, DEFAULT_OBJECTS)
     cleared = undescribe(copy_home, UNDESCRIBED)
-    restamped = stamp(copy_home / "data" / "elysium.sqlite")
+    restamped = stamp(copy_home / "data" / "elysian.sqlite")
     require_owned(copy_home, "shipped")
     describe = describe_copy(copy_home, workers)
     if describe["described"] != cleared:

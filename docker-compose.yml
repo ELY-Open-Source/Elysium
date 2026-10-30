@@ -1,14 +1,14 @@
 services:
-  elysium:
+  elysian:
     build: .
     ports:
       - "8765:8765"
     volumes:
-      - ./.elysium:/data/elysium
+      - ./.elysian:/data/elysian
     environment:
-      ELYSIUM_HOME: /data/elysium
-      ELYSIUM_RUNTIME_BACKEND: sglang
-      ELYSIUM_SGLANG_BASE_URL: http://host.docker.internal:8000/v1
+      ELYSIAN_HOME: /data/elysian
+      ELYSIAN_RUNTIME_BACKEND: sglang
+      ELYSIAN_SGLANG_BASE_URL: http://host.docker.internal:8000/v1
     deploy:
       resources:
         reservations:

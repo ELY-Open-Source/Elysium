@@ -3,15 +3,15 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(process.cwd(), '..');
-const outputDir = process.env.ELYSIUM_UI_SMOKE_DIR ?? path.join(root, '.elysium', 'proofs');
+const outputDir = process.env.ELYSIAN_UI_SMOKE_DIR ?? path.join(root, '.elysian', 'proofs');
 await mkdir(outputDir, { recursive: true });
 
-const apiBase = process.env.ELYSIUM_API ?? 'http://127.0.0.1:8765';
-const uiUrl = process.env.ELYSIUM_UI_URL ?? 'http://127.0.0.1:5173/';
+const apiBase = process.env.ELYSIAN_API ?? 'http://127.0.0.1:8765';
+const uiUrl = process.env.ELYSIAN_UI_URL ?? 'http://127.0.0.1:5173/';
 // Writes need the operator token since the server checks one; without it every seed is refused.
-const token = process.env.ELYSIUM_AUTH_TOKEN;
+const token = process.env.ELYSIAN_AUTH_TOKEN;
 if (!token) {
-  throw new Error('ELYSIUM_AUTH_TOKEN is not set: the server refuses every write without one, so nothing could be seeded');
+  throw new Error('ELYSIAN_AUTH_TOKEN is not set: the server refuses every write without one, so nothing could be seeded');
 }
 const authorization = { Authorization: `Bearer ${token}` };
 // Mirrors PAGE_SIZE in frontend/src/components/MemoryPanel.tsx; the pager is only provable against a known page size.
@@ -67,8 +67,8 @@ const pictureModality = await seed();
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
-// The console keeps the token in localStorage under elysium_token (frontend/src/api.ts), never in the bundle.
-await page.addInitScript((value) => window.localStorage.setItem('elysium_token', value), token);
+// The console keeps the token in localStorage under elysian_token (frontend/src/api.ts), never in the bundle.
+await page.addInitScript((value) => window.localStorage.setItem('elysian_token', value), token);
 const consoleErrors = [];
 const failedRequests = [];
 page.on('pageerror', (error) => consoleErrors.push(`uncaught: ${error.message}`));
@@ -261,7 +261,7 @@ for (const [state, reason] of states) {
 }
 observed.adapters = `${states.length} kinds: ${states.map(([state]) => state).join(', ')}`;
 
-await page.screenshot({ path: path.join(outputDir, 'elysium-dashboard.png'), fullPage: true });
+await page.screenshot({ path: path.join(outputDir, 'elysian-dashboard.png'), fullPage: true });
 const status = await page.locator('.kpi-grid').innerText();
 await browser.close();
 
@@ -277,7 +277,7 @@ if (unexpected.length > 0 || consoleErrors.length > 0) {
 console.log(
   JSON.stringify(
     {
-      screenshot: path.join(outputDir, 'elysium-dashboard.png'),
+      screenshot: path.join(outputDir, 'elysian-dashboard.png'),
       mount: observed.mount,
       adapters: observed.adapters,
       expected_failures: expectedFailures.filter((line) => failedRequests.includes(line)),

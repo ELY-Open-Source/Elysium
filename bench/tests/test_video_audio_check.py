@@ -89,7 +89,7 @@ def test_a_store_without_video_sources_refuses(tmp_path: Path) -> None:
         video_audio_check.guard_videos(tmp_path / "nowhere", tmp_path)
     store = tmp_path / "store"
     (store / "data").mkdir(parents=True)
-    connection = sqlite3.connect(store / "data" / "elysium.sqlite")
+    connection = sqlite3.connect(store / "data" / "elysian.sqlite")
     connection.execute("CREATE TABLE sources (source_id text, kind text)")
     connection.commit()
     connection.close()
@@ -110,7 +110,7 @@ def _store(home: Path, videos: list[str], speech: int) -> Path:
     import sqlite3
 
     (home / "data").mkdir(parents=True)
-    with sqlite3.connect(home / "data" / "elysium.sqlite") as connection:
+    with sqlite3.connect(home / "data" / "elysian.sqlite") as connection:
         connection.execute("CREATE TABLE sources (source_id TEXT, kind TEXT)")
         connection.execute("CREATE TABLE atoms (modality TEXT, text TEXT, holder_id TEXT DEFAULT 'wife')")
         connection.executemany("INSERT INTO sources VALUES (?, 'video')", [(name,) for name in videos])
@@ -157,7 +157,7 @@ def test_a_store_with_atoms_nobody_holds_is_not_ranked(tmp_path: Path) -> None:
 
     store = _store(tmp_path / "speech", ["a"], speech=2)
     video_audio_check.require_owned(store, "after")
-    with sqlite3.connect(store / "data" / "elysium.sqlite") as connection:
+    with sqlite3.connect(store / "data" / "elysian.sqlite") as connection:
         connection.execute("UPDATE atoms SET holder_id = '' WHERE rowid = 1")
 
     with pytest.raises(SystemExit, match="1 atoms in .* have no holder"):

@@ -2,8 +2,8 @@ $ErrorActionPreference = "Stop"
 
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-if (-not $env:ELYSIUM_GGUF_MODEL) {
-  throw "Set ELYSIUM_GGUF_MODEL to the absolute GGUF model path."
+if (-not $env:ELYSIAN_GGUF_MODEL) {
+  throw "Set ELYSIAN_GGUF_MODEL to the absolute GGUF model path."
 }
 
 $server = $env:LLAMA_CPP_SERVER
@@ -26,7 +26,7 @@ if (-not (Get-Command $server -ErrorAction SilentlyContinue)) {
 }
 
 & $server `
-  --model $env:ELYSIUM_GGUF_MODEL `
+  --model $env:ELYSIAN_GGUF_MODEL `
   --host 127.0.0.1 `
   --port 8003 `
   --ctx-size 262144 `

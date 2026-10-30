@@ -13,9 +13,9 @@ from typing import Any
 import httpx
 import pytest
 
-import elysium.runtime as runtime_module
-from elysium.config import Settings
-from elysium.runtime import QwenRuntime, RuntimeUnavailableError
+import elysian.runtime as runtime_module
+from elysian.config import Settings
+from elysian.runtime import QwenRuntime, RuntimeUnavailableError
 
 
 def _serve(monkeypatch: pytest.MonkeyPatch, reply: dict[str, Any], sent: list[dict[str, Any]]) -> None:

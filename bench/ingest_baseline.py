@@ -24,7 +24,7 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 
-from elysium.storage import (  # the product's own source-id rule
+from elysian.storage import (  # the product's own source-id rule
     safe_source_id,
     sha256_bytes,
 )
@@ -155,7 +155,7 @@ def _cap_worker_memory() -> None:
 
 
 def ingest_shard(job: tuple[int, list[Path]]) -> dict:
-    """Worker: ingest this shard's files into its own ELYSIUM_HOME, skipping finished ones."""
+    """Worker: ingest this shard's files into its own ELYSIAN_HOME, skipping finished ones."""
     index, paths = job
     _single_threaded()
     started = time.monotonic()
@@ -172,8 +172,8 @@ def ingest_shard(job: tuple[int, list[Path]]) -> dict:
             except (json.JSONDecodeError, KeyError) as error:
                 raise SystemExit(f"{ledger}:{number}: unreadable resume ledger: {error}") from error
 
-    from elysium.config import Settings
-    from elysium.ingestion import IngestionService
+    from elysian.config import Settings
+    from elysian.ingestion import IngestionService
 
     service = IngestionService(settings=Settings(home=home))
     ingested = 0
@@ -210,7 +210,7 @@ def ingest_shard(job: tuple[int, list[Path]]) -> dict:
 
 
 def database_path(home: Path) -> Path:
-    from elysium.config import Settings
+    from elysian.config import Settings
 
     return Settings(home=home).db_path
 
@@ -264,8 +264,8 @@ def merge() -> dict:
     """Copy every shard's rows and content-addressed objects into the merged database."""
     main_db = database_path(RUNS)
     main_db.parent.mkdir(parents=True, exist_ok=True)
-    from elysium.config import Settings
-    from elysium.db import Database
+    from elysian.config import Settings
+    from elysian.db import Database
 
     Database(Settings(home=RUNS)).init()
     connection = sqlite3.connect(main_db)

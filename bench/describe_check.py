@@ -6,7 +6,7 @@ copies the speech store, re-stamps its holders from the frozen corpus index, ran
 answerable query, runs the product's `describe_pictures` on the copy, and ranks again. Rows are
 split dev / test / whole: anything tuned is tuned on dev, and the bar is read on test.
 
-Run: ELYSIUM_VLM_BASE_URL=http://127.0.0.1:8001/v1 python -m bench.describe_check
+Run: ELYSIAN_VLM_BASE_URL=http://127.0.0.1:8001/v1 python -m bench.describe_check
 Writes: bench/reports/DESCRIBE.md, bench/reports/describe.json
 """
 
@@ -72,7 +72,7 @@ def described_facts(store: Path) -> dict[str, int]:
     """How many pictures carry a model's description, read without opening the store for write."""
     import sqlite3
 
-    with sqlite3.connect(f"file:{store / 'data' / 'elysium.sqlite'}?mode=ro", uri=True) as connection:
+    with sqlite3.connect(f"file:{store / 'data' / 'elysian.sqlite'}?mode=ro", uri=True) as connection:
         pictures, described = connection.execute(
             "SELECT count(*), coalesce(sum(json_extract(metadata_json, '$.caption') = 'vlm'), 0) FROM atoms "
             "WHERE modality IN ('image', 'ui_screenshot', 'video_frame') AND image_ref IS NOT NULL AND image_ref != ''"
@@ -82,13 +82,13 @@ def described_facts(store: Path) -> dict[str, int]:
 
 def describe_copy(home: Path, workers: int) -> dict[str, Any]:
     """Run the product's backfill on the copy, timed; a served model is required, not assumed."""
-    from elysium.config import Settings
-    from elysium.db import Database
-    from elysium.describe import describe_pictures
+    from elysian.config import Settings
+    from elysian.db import Database
+    from elysian.describe import describe_pictures
 
     settings = Settings(home=home)
     if settings.vlm_base_url is None:
-        raise SystemExit("ELYSIUM_VLM_BASE_URL is not set; start scripts/launch-vllm-live.sh and point it at /v1")
+        raise SystemExit("ELYSIAN_VLM_BASE_URL is not set; start scripts/launch-vllm-live.sh and point it at /v1")
     began = time.perf_counter()
     counts = describe_pictures(settings, Database(settings), workers)
     return {**counts, "seconds": time.perf_counter() - began, "vlm_base_url": settings.vlm_base_url, "model_id": settings.model_id}
@@ -122,7 +122,7 @@ def measure(home: Path, scratch: Path, workers: int, described_home: Path | None
     """Score dev, test and the whole suite before and after the pictures are described."""
     groups = suites()
     before_home, _ = copy_store(home, scratch / "before")
-    restamped = stamp(before_home / "data" / "elysium.sqlite")
+    restamped = stamp(before_home / "data" / "elysian.sqlite")
     require_owned(before_home, "before")
     if described_facts(before_home)["described"]:
         raise SystemExit(f"{home} already carries described pictures; the before row would not be a before")
@@ -131,7 +131,7 @@ def measure(home: Path, scratch: Path, workers: int, described_home: Path | None
     source = home if described_home is None else described_home
     after_home, _ = copy_store(source, scratch / "after")
     link_objects(after_home, objects)
-    stamp(after_home / "data" / "elysium.sqlite")
+    stamp(after_home / "data" / "elysian.sqlite")
     require_owned(after_home, "after")
     describe = describe_copy(after_home, workers) if described_home is None else {"reused": str(described_home)}
     facts = described_facts(after_home)

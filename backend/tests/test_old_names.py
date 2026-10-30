@@ -1,4 +1,4 @@
-"""The project was renamed from Ely-Eye to Elysium; every old name must stop the process.
+"""The project was renamed from Ely-Eye to Elysium, then Elysian; every old name must stop the process.
 
 A variable under the old prefix is otherwise ignored, so ELY_EYE_AUTH_TOKEN would start a server
 with no token; an old home or database would be passed over and a fresh, empty store created
@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from elysium.config import Settings, refuse_old_names
+from elysian.config import Settings, refuse_old_names
 
 
 def test_an_old_variable_names_its_new_spelling(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ELY_EYE_AUTH_TOKEN", "secret")
 
-    with pytest.raises(SystemExit, match="ELY_EYE_AUTH_TOKEN is set, but .* reads ELYSIUM_AUTH_TOKEN"):
+    with pytest.raises(SystemExit, match="ELY_EYE_AUTH_TOKEN is set, but .* reads ELYSIAN_AUTH_TOKEN"):
         Settings(home=tmp_path)
 
 
@@ -39,12 +39,12 @@ def test_an_exported_old_variable_in_the_dotenv_file_is_refused(tmp_path: Path, 
 
 
 def test_a_relative_home_beside_the_old_one_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """.env.example ships ELYSIUM_HOME=.elysium; a relative home must not slip past the absolute comparison."""
+    """.env.example ships ELYSIAN_HOME=.elysian; a relative home must not slip past the absolute comparison."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".ely_eye" / "data").mkdir(parents=True)
 
     with pytest.raises(SystemExit, match=r"\.ely_eye is the data home from before the rename"):
-        Settings(home=Path(".elysium"))
+        Settings(home=Path(".elysian"))
 
 
 def test_the_old_default_home_is_not_passed_over(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -63,10 +63,32 @@ def test_an_old_database_is_not_replaced_by_an_empty_one(tmp_path: Path) -> None
         Settings(home=tmp_path)
 
 
+@pytest.mark.parametrize("old", ["ELY_EYE_AUTH_TOKEN", "ELYSIUM_AUTH_TOKEN"])
+def test_each_old_prefix_names_its_new_spelling(tmp_path: Path, old: str) -> None:
+    with pytest.raises(SystemExit, match=f"{old} is set, but .* reads ELYSIAN_AUTH_TOKEN"):
+        refuse_old_names(Settings(home=tmp_path / "fresh"), {old: "secret"}, tmp_path)
+
+
+def test_the_elysium_home_is_not_passed_over(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".elysium" / "data").mkdir(parents=True)
+
+    with pytest.raises(SystemExit, match=r"\.elysium is the data home from before the rename"):
+        Settings()
+
+
+def test_an_elysium_database_is_not_replaced_by_an_empty_one(tmp_path: Path) -> None:
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "elysium.sqlite").write_bytes(b"store")
+
+    with pytest.raises(SystemExit, match=r"elysium\.sqlite is a store from before the rename; move it to"):
+        Settings(home=tmp_path)
+
+
 def test_a_moved_store_opens_and_a_new_home_is_untouched(tmp_path: Path) -> None:
     moved = tmp_path / "moved"
     (moved / "data").mkdir(parents=True)
-    (moved / "data" / "elysium.sqlite").write_bytes(b"store")
+    (moved / "data" / "elysian.sqlite").write_bytes(b"store")
 
     refuse_old_names(Settings(home=moved), {}, tmp_path)
-    refuse_old_names(Settings(home=tmp_path / "fresh"), {"ELYSIUM_HOME": "x"}, tmp_path)
+    refuse_old_names(Settings(home=tmp_path / "fresh"), {"ELYSIAN_HOME": "x"}, tmp_path)

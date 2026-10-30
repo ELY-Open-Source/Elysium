@@ -12,8 +12,8 @@ LEFT, RIGHT, TOP, BOTTOM = 76, 40, 112, 84
 PAPER, BAND, GRID, INK, MUTED = "#F6F0E4", "#ECE2CF", "#E2D7C2", "#2A2E29", "#6B675C"
 COLORS = {"Elysian": "#C4532F", "Mem0": "#3B6EA8"}
 LABELS = {
-    "elysium": "Elysian",
-    "elysium + 9B judge": "Elysian + 9B judge",
+    "elysian": "Elysian",
+    "elysian + 9B judge": "Elysian + 9B judge",
     "mem0 raw": "Mem0, raw text",
     "mem0": "Mem0, LLM extraction",
     "mem0 + LLM rerank": "+ its LLM rerank",

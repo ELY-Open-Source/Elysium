@@ -9,10 +9,10 @@ max_length="${MAX_LENGTH:-8192}"
 gradient_accumulation_steps="${GRADIENT_ACCUMULATION_STEPS:-4}"
 cartridge_id="${CARTRIDGE_ID:-}"
 
-dataset=.elysium/training/hme_prd_sft.jsonl
-adapter=.elysium/adapters/hme_core_lora_qwen35_9b
+dataset=.elysian/training/hme_prd_sft.jsonl
+adapter=.elysian/adapters/hme_core_lora_qwen35_9b
 
-.venv/bin/elysium build-prd-training-data \
+.venv/bin/elysian build-prd-training-data \
   --prd-path ./PRD.md \
   --output-path "$dataset" \
   --max-sections 48
@@ -29,7 +29,7 @@ if [ -n "$cartridge_id" ]; then
   args+=(--cartridge-id "$cartridge_id")
 fi
 
-.venv/bin/elysium "${args[@]}"
+.venv/bin/elysian "${args[@]}"
 
 echo "Adapter ready: $adapter"
-echo "Use with: ELYSIUM_ADAPTER_DIR=$adapter"
+echo "Use with: ELYSIAN_ADAPTER_DIR=$adapter"

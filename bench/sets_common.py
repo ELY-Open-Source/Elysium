@@ -15,7 +15,7 @@ CORPUS = ROOT / "corpus"
 SETS = ROOT / "sets"
 # Derived media (parquet images, video frames, crops) lives outside the repository: tens of thousands of new files inside it swamps repo tooling.
 # The frozen stores record 50,155 source paths under this old-named directory, so it keeps its name.
-DATA_ROOT = Path(os.environ.get("ELYSIUM_BENCH_DATA", str(Path.home() / "ely_eye_bench_data")))
+DATA_ROOT = Path(os.environ.get("ELYSIAN_BENCH_DATA", str(Path.home() / "ely_eye_bench_data")))
 CORPUS_ROOTS = {"corpus": CORPUS, "derived": DATA_ROOT}
 MODALITIES = ("pdf", "image", "ui_screenshot", "video", "code", "conversation")
 REQUIRED_QUERY_FIELDS = (

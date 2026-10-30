@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.retrieval import RetrievalService
-from elysium.schemas import MemoryOrigin, SearchFilters
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.retrieval import RetrievalService
+from elysian.schemas import MemoryOrigin, SearchFilters
 
 QUESTION = "will get the axis mode for the current series"
 ANSWER = "plot axis series graph"

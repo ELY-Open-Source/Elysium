@@ -1,12 +1,12 @@
 # Agent notes for this repository
 
-The project is **Elysium** (往世乐土), renamed from Ely-Eye: the package is `elysium`, the CLI
-`elysium`, the Go server `elysium-mcp`, variables `ELYSIUM_*`, the store `.elysium/data/elysium.sqlite`.
-Any old name stops the process (`config.refuse_old_names`, `elysium-mcp/internal/config`), because an
-ignored `ELY_EYE_AUTH_TOKEN` would start a server with no token. The repository is
-`github.com/ELY-Open-Source/Elysium` and the Go module is `github.com/ELY-Open-Source/Elysium/elysium-mcp`.
+The project is **Elysian** (往世乐土), renamed from Ely-Eye, then from Elysium on 2026-10-30: the package is `elysian`, the CLI
+`elysian`, the Go server `elysian-mcp`, variables `ELYSIAN_*`, the store `.elysian/data/elysian.sqlite`.
+Any old name stops the process (`config.refuse_old_names`, `elysian-mcp/internal/config`), because an
+ignored `ELY_EYE_AUTH_TOKEN` or `ELYSIUM_AUTH_TOKEN` would start a server with no token. The repository is
+`github.com/ELY-Open-Source/Elysian` and the Go module is `github.com/ELY-Open-Source/Elysian/elysian-mcp`.
 The bench data root stays `~/ely_eye_bench_data` because the frozen stores record 50,155 source paths
-under it.
+under it. Frozen reports keep the arm names they were measured under (`elysium`); the harness reads them as Elysian.
 
 Read `CHECKLIST.md` (phases 0–3) and `CHECKLIST_P4.md` (phase 4) for the ordered work list and `Gaps.md` for the audit the
 work started from. Measured results live in `bench/reports/`. If a sentence in
@@ -19,12 +19,12 @@ Run the gates, and compare against the recorded baseline rather than "it built":
 
 ```bash
 pytest -q                                       # both launch styles must work
-ruff check backend/src/elysium backend/tests bench
+ruff check backend/src/elysian backend/tests bench
 .venv/bin/python -m bench.filesize_check         # fails on any tracked file > 500 lines
 .venv/bin/python -m bench.audit --product        # the harness must not justify the product
-.venv/bin/python -m mypy backend/src/elysium backend/tests   # cold cache; baseline is 17 errors in 5 files
+.venv/bin/python -m mypy backend/src/elysian backend/tests   # cold cache; baseline is 17 errors in 5 files
 ./node_modules/.bin/pyright <the files you touched>          # must be 0 errors on touched files
-cd elysium-mcp && go build ./... && go vet ./... && go test ./... && gofmt -l .
+cd elysian-mcp && go build ./... && go vet ./... && go test ./... && gofmt -l .
 cd frontend && npm run build && npx eslint src --max-warnings 0
 bash scripts/mcp_write_smoke.sh                  # two processes, one store
 ```
@@ -64,7 +64,7 @@ the commit you branched from, do not assume it.
   `bench/query_set.py:scale_probes` is modality-stratified for that reason, and a
   test pins that every modality appears.
 - A harness works on a copy of the frozen store (`bench/scratch.py:copy_store`).
-  Never migrate `bench/runs/baseline/data/elysium.sqlite` in place.
+  Never migrate `bench/runs/baseline/data/elysian.sqlite` in place.
 - When two correct engines disagree, suspect the metric before the engine:
   byte-identical atoms produce tied scores, so id-level recall can read 0.83 for
   no real reason. `bench/reports/QUANT.md` scores a hit as "any returned atom
@@ -103,6 +103,6 @@ may show an older round.
 
 ## Cross-language contract
 
-`backend/src/elysium/schemas.py` is the source of truth. `elysium-mcp/internal/domain/types.go`
+`backend/src/elysian/schemas.py` is the source of truth. `elysian-mcp/internal/domain/types.go`
 and `frontend/src/types.ts` mirror it; when a field changes there, it changes in
 all three, and the smoke script is what proves the Go path agrees.

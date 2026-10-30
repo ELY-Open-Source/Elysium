@@ -3,17 +3,17 @@ set -euo pipefail
 
 # The console is proven by driving it: a fresh home, the built interface served by the
 # API itself, and a browser that searches, pages, forgets, mounts and reads adapter states.
-# ELYSIUM_UI_SMOKE_KEEP=1 leaves the temporary home in place and prints it.
+# ELYSIAN_UI_SMOKE_KEEP=1 leaves the temporary home in place and prints it.
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 python="${PYTHON:-$repo/.venv/bin/python}"
-server_bin="$(dirname "$python")/elysium"
+server_bin="$(dirname "$python")/elysian"
 if [[ ! -x "$server_bin" ]]; then
   echo "$server_bin is not installed; run scripts/install.sh first" >&2
   exit 1
 fi
-port="${ELYSIUM_UI_SMOKE_PORT:-8791}"
+port="${ELYSIAN_UI_SMOKE_PORT:-8791}"
 api="http://127.0.0.1:${port}"
-home="$(mktemp -d "${TMPDIR:-/tmp}/elysium-ui-smoke.XXXXXX")"
+home="$(mktemp -d "${TMPDIR:-/tmp}/elysian-ui-smoke.XXXXXX")"
 server=""
 
 cleanup() {
@@ -21,7 +21,7 @@ cleanup() {
     kill "$server" 2>/dev/null || true
     wait "$server" 2>/dev/null || true
   fi
-  if [[ "${ELYSIUM_UI_SMOKE_KEEP:-}" == "1" ]]; then
+  if [[ "${ELYSIAN_UI_SMOKE_KEEP:-}" == "1" ]]; then
     echo "kept: $home"
   else
     rm -rf "$home"
@@ -33,10 +33,10 @@ if [[ ! -f "$repo/frontend/dist/index.html" ]]; then
   (cd "$repo/frontend" && npm run build)
 fi
 
-export ELYSIUM_HOME="$home"
-export ELYSIUM_DEFAULT_HOLDER=wife
-export ELYSIUM_AUTH_TOKEN="ui-smoke-operator"
-export ELYSIUM_UI_DIR="$repo/frontend/dist"
+export ELYSIAN_HOME="$home"
+export ELYSIAN_DEFAULT_HOLDER=wife
+export ELYSIAN_AUTH_TOKEN="ui-smoke-operator"
+export ELYSIAN_UI_DIR="$repo/frontend/dist"
 
 "$server_bin" serve --host 127.0.0.1 --port "$port" >"$home/serve.log" 2>&1 &
 server=$!
@@ -67,6 +67,6 @@ if ! curl -sf "$api/" >/dev/null 2>&1; then
   exit 1
 fi
 
-(cd "$repo/frontend" && ELYSIUM_API="$api" ELYSIUM_UI_URL="$api/" ELYSIUM_UI_SMOKE_DIR="$home" node scripts/verify-ui.mjs)
+(cd "$repo/frontend" && ELYSIAN_API="$api" ELYSIAN_UI_URL="$api/" ELYSIAN_UI_SMOKE_DIR="$home" node scripts/verify-ui.mjs)
 
 echo "PASS: the console searches, pages, forgets, mounts and reports adapter states"

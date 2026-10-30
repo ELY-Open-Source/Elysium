@@ -61,7 +61,7 @@ export function App() {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Elysium · 往世乐土 v4.0</p>
+          <p className="eyebrow">Elysian · 往世乐土 v4.0</p>
           <h1>Local VLM Context OS</h1>
         </div>
         <div className="topbar-actions">
@@ -71,7 +71,7 @@ export function App() {
             value={token}
             placeholder="写入令牌"
             aria-label="写入令牌"
-            title="服务器设置了 ELYSIUM_AUTH_TOKEN 时，写入需要它"
+            title="服务器设置了 ELYSIAN_AUTH_TOKEN 时，写入需要它"
             onChange={(event) => {
               setToken(event.target.value);
               writeToken(event.target.value);

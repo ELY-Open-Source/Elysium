@@ -25,22 +25,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.ocr import read_text_from_image
-from elysium.retrieval import RetrievalService
-from elysium.schemas import (
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.ocr import read_text_from_image
+from elysian.retrieval import RetrievalService
+from elysian.schemas import (
     EvidenceAtom,
     Modality,
     SourceRecord,
     TrustScores,
 )
-from elysium.storage import (
+from elysian.storage import (
     ObjectStore,
     token_equivalent,
     visual_token_equivalent,
 )
-from elysium.visual_index import VisualIndex
+from elysian.visual_index import VisualIndex
 
 from bench.metrics import aggregate, chance_recall_at_k, score_query
 from bench.systems import machine_facts

@@ -1,6 +1,6 @@
 """Mem0- and Zep-style memory counterparts, so the baseline table has an external reference point.
 
-Both counterparts read the same ingested corpus and the same embeddings as the elysium arms;
+Both counterparts read the same ingested corpus and the same embeddings as the elysian arms;
 only the memory management differs, which is the thing being compared.
 
 * Mem0-style: one flat store, every item scoped by holder, sha256 dedup, no invalidation —

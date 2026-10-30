@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.migrations import SCHEMA_VERSION
-from elysium.schemas import (
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.migrations import SCHEMA_VERSION
+from elysian.schemas import (
     EvidenceAtom,
     MemoryOrigin,
     Modality,
@@ -20,7 +20,7 @@ from elysium.schemas import (
     TrustScores,
     Visibility,
 )
-from elysium.store_search import search_fts
+from elysian.store_search import search_fts
 
 NOW = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
 
@@ -126,7 +126,7 @@ def test_an_atom_round_trips_every_memory_dimension(tmp_path: Path) -> None:
 
 
 def test_a_first_version_database_upgrades_in_place_and_keeps_its_rows(tmp_path: Path) -> None:
-    path = tmp_path / "data" / "elysium.sqlite"
+    path = tmp_path / "data" / "elysian.sqlite"
     path.parent.mkdir(parents=True)
     connection = sqlite3.connect(path)
     connection.executescript(

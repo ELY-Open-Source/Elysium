@@ -3,9 +3,9 @@
 Real Mem0 writes through an LLM, and one PDF or video holder carries 10,000+ atoms, so no holder
 can be given to it whole. Per modality this draws holders, then test questions inside them,
 seeded; each drawn holder keeps the gold of its drawn questions plus seeded distractors from its own
-sources, up to SPEC's pool size. The Elysium store is a copy of the undescribed speech store cut down
+sources, up to SPEC's pool size. The Elysian store is a copy of the undescribed speech store cut down
 to the pool and described by the product, so every system reads the same words, and the token cost of
-those descriptions is Elysium's ingest cost. Chance is a random ranking of each holder's pool.
+those descriptions is Elysian's ingest cost. Chance is a random ranking of each holder's pool.
 """
 
 from __future__ import annotations
@@ -69,8 +69,8 @@ def chance(probes: list[Query], pools: dict[str, list[str]]) -> float:
 
 def build_store(scratch: Path, pools: dict[str, list[str]], vllm: str, workers: int) -> dict[str, Any]:
     """The undescribed store cut to the pool through the product's own delete, stamped, then described."""
-    from elysium.config import Settings
-    from elysium.db import Database
+    from elysian.config import Settings
+    from elysian.db import Database
 
     home, _ = copy_store(UNDESCRIBED, scratch)
     # Linked before the store is opened, which would make an objects directory of its own.
@@ -80,7 +80,7 @@ def build_store(scratch: Path, pools: dict[str, list[str]], vllm: str, workers: 
     with database.connect() as connection:
         rows = connection.execute("SELECT a.atom_id, s.path FROM atoms a JOIN sources s ON s.source_id = a.source_id").fetchall()
     database.delete_atoms([str(atom_id) for atom_id, path in rows if str(path) not in keep])
-    stamped = stamp(home / "data" / "elysium.sqlite")
+    stamped = stamp(home / "data" / "elysian.sqlite")
     before = counters(vllm)
     described = describe_copy(home, workers)
     return {"home": str(home), "stamped": stamped, "described": described, "tokens": spent(before, counters(vllm))}
@@ -90,7 +90,7 @@ def items(home: Path, pools: dict[str, list[str]]) -> list[dict[str, Any]]:
     """Each pool source's atoms in order, joined and cut at CHUNK_CHARS: what Mem0 is given."""
     corpus_id = source_map()
     index = load_source_index()
-    with sqlite3.connect(f"file:{home / 'data' / 'elysium.sqlite'}?mode=ro", uri=True) as connection:
+    with sqlite3.connect(f"file:{home / 'data' / 'elysian.sqlite'}?mode=ro", uri=True) as connection:
         rows = connection.execute(
             "SELECT s.path, a.text FROM atoms a JOIN sources s ON s.source_id = a.source_id ORDER BY s.path, a.rowid"
         ).fetchall()
@@ -116,9 +116,9 @@ def items(home: Path, pools: dict[str, list[str]]) -> list[dict[str, Any]]:
 
 
 def build(scratch: Path, vllm: str, workers: int) -> dict[str, Any]:
-    """Draw the pool, build and describe Elysium's store, and write what the other two are given."""
+    """Draw the pool, build and describe Elysian's store, and write what the other two are given."""
     probes, pools = draw(load_queries(), load_source_index())
-    store = build_store(scratch / "elysium", pools, vllm, workers)
+    store = build_store(scratch / "elysian", pools, vllm, workers)
     given = items(Path(store["home"]), pools)
     empty = sorted({s for pool in pools.values() for s in pool} - {item["source_id"] for item in given})
     pool = {
@@ -129,7 +129,7 @@ def build(scratch: Path, vllm: str, workers: int) -> dict[str, Any]:
         "pools": pools,
         "sources_without_text": empty,
         "chance_recall_at_10": chance(probes, pools),
-        "elysium_store": store,
+        "elysian_store": store,
         "items": given,
     }
     (scratch / "pool.json").write_text(json.dumps(pool, ensure_ascii=False), encoding="utf-8")

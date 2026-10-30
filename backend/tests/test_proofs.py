@@ -8,23 +8,23 @@ from typing import Literal
 import pytest
 from PIL import Image
 
-from elysium.cartridge import CartridgeService
-from elysium.config import Settings
-from elysium.memory import MemoryService
-from elysium.proofs import PRDProofSuite
-from elysium.proofs.arena import (
+from elysian.cartridge import CartridgeService
+from elysian.config import Settings
+from elysian.memory import MemoryService
+from elysian.proofs import PRDProofSuite
+from elysian.proofs.arena import (
     _slot_boxes,
     render_visual_hash,
     render_visual_hash_arena,
 )
-from elysium.proofs.checks_common import _deferred_without_model
-from elysium.proofs.contradictions import (
+from elysian.proofs.checks_common import _deferred_without_model
+from elysian.proofs.contradictions import (
     PACKAGED_CORPUS,
     build_contradiction_scenarios,
     load_corpus,
 )
-from elysium.proofs.table import render_table
-from elysium.schemas import MemoryOrigin
+from elysian.proofs.table import render_table
+from elysian.schemas import MemoryOrigin
 
 # The replay question is fixed inside the suite, so the fixture memory must answer it in words the ranker can match.
 PRD_MEMORY = "PRD requirements prove long context memory, HashHop proof, and adapter training."
@@ -117,24 +117,24 @@ def test_a_check_defers_loudly_when_the_model_it_needs_is_missing(
         tmp_path / "a" / "artifact.json",
         "Runtime Adapter Binding",
         "PRD 18 requires the trained adapter to run.",
-        "elysium proof runtime with model_dir set",
+        "elysian proof runtime with model_dir set",
     )
     with_model = _deferred_without_model(
         Settings(home=tmp_path / "b", model_dir=model_dir),
         tmp_path / "b" / "artifact.json",
         "Runtime Adapter Binding",
         "PRD 18 requires the trained adapter to run.",
-        "elysium proof runtime with model_dir set",
+        "elysian proof runtime with model_dir set",
     )
 
     assert without is not None and without.status == "deferred"
-    assert without.rerun == "elysium proof runtime with model_dir set"
+    assert without.rerun == "elysian proof runtime with model_dir set"
     assert (tmp_path / "a" / "artifact.json").exists()
     assert with_model is None
 
 
 def test_the_table_shows_the_verdict_counts_and_the_reason_for_each_claim() -> None:
-    from elysium.evaluation_schemas import ProofCheck, ProofSuiteReport
+    from elysian.evaluation_schemas import ProofCheck, ProofSuiteReport
 
     report = ProofSuiteReport(
         proof_id="proof-1",
@@ -150,7 +150,7 @@ def test_the_table_shows_the_verdict_counts_and_the_reason_for_each_claim() -> N
                 evidence=[],
                 detail="nothing ran",
                 reason="no model weights",
-                rerun="elysium proof suite",
+                rerun="elysian proof suite",
             ),
         ],
     )
@@ -159,7 +159,7 @@ def test_the_table_shows_the_verdict_counts_and_the_reason_for_each_claim() -> N
 
     assert "counts: failed 0, passed 1, deferred 1, removed 0" in table
     assert "why: no model weights" in table
-    assert "rerun: elysium proof suite" in table
+    assert "rerun: elysian proof suite" in table
     assert table.index("[passed ") < table.index("[deferred")
     assert "[failed" not in table and "[removed" not in table
 
@@ -171,8 +171,8 @@ def test_the_latest_command_prints_the_table_and_exits_by_verdict(
 
     from typer.testing import CliRunner
 
-    from elysium import cli as cli_module
-    from elysium.evaluation_schemas import ProofCheck, ProofSuiteReport
+    from elysian import cli as cli_module
+    from elysian.evaluation_schemas import ProofCheck, ProofSuiteReport
 
     settings = Settings(home=tmp_path / "home")
     monkeypatch.setattr(cli_module, "get_settings", lambda: settings)
@@ -236,7 +236,7 @@ def test_the_packaged_corpus_matches_the_scenarios_it_was_written_from() -> None
 def test_the_contradiction_check_defers_when_no_corpus_exists_and_names_the_file(
     harness: Harness, monkeypatch
 ) -> None:
-    from elysium.proofs import checks_visual as visual_module
+    from elysian.proofs import checks_visual as visual_module
 
     monkeypatch.setattr(visual_module, "corpus_path", lambda data_dir: None)
 

@@ -1,4 +1,4 @@
-name: elysium-mcp release
+name: elysian-mcp release
 
 on:
   push:
@@ -25,9 +25,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-          cache-dependency-path: elysium-mcp/go.sum
+          cache-dependency-path: elysian-mcp/go.sum
       - name: Build and archive
-        working-directory: elysium-mcp
+        working-directory: elysian-mcp
         env:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
@@ -35,12 +35,12 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#mcp-}"
-          binary="elysium-mcp"
-          if [ "$GOOS" = "windows" ]; then binary="elysium-mcp.exe"; fi
-          ldflags="-s -w -X github.com/ELY-Open-Source/Elysium/elysium-mcp/internal/cli.version=${version}"
+          binary="elysian-mcp"
+          if [ "$GOOS" = "windows" ]; then binary="elysian-mcp.exe"; fi
+          ldflags="-s -w -X github.com/ELY-Open-Source/Elysian/elysian-mcp/internal/cli.version=${version}"
           mkdir -p dist
-          go build -trimpath -ldflags "$ldflags" -o "dist/${binary}" ./cmd/elysium-mcp
-          base="elysium-mcp_${GOOS}_${GOARCH}"
+          go build -trimpath -ldflags "$ldflags" -o "dist/${binary}" ./cmd/elysian-mcp
+          base="elysian-mcp_${GOOS}_${GOARCH}"
           cd dist
           if [ "$GOOS" = "windows" ]; then
             zip "${base}.zip" "$binary"
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: elysium-mcp/dist/*
+          path: elysian-mcp/dist/*
           if-no-files-found: error
 
   release:
@@ -66,9 +66,9 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          # Match only the per-target archives (elysium-mcp_<os>_<arch>.*); the
+          # Match only the per-target archives (elysian-mcp_<os>_<arch>.*); the
           # single-underscore SHA256SUMS file is excluded so it never hashes itself.
-          sha256sum elysium-mcp_*_* > elysium-mcp_SHA256SUMS.txt
+          sha256sum elysian-mcp_*_* > elysian-mcp_SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

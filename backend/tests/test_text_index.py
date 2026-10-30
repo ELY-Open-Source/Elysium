@@ -11,12 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.schemas import MemoryOrigin
-from elysium.store_search import search_atoms
-from elysium.text_index import (
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.schemas import MemoryOrigin
+from elysian.store_search import search_atoms
+from elysian.text_index import (
     RAREST_KEEP,
     fts_all_expression,
     fts_expression,
@@ -76,7 +76,7 @@ def test_a_long_question_reaches_the_answer_that_covers_most_of_its_words() -> N
             "Unrelated notes about the weather.",
         ]
     )
-    question = "Which Elysium PRD requirements prove long context memory, HashHop, and adapters?"
+    question = "Which Elysian PRD requirements prove long context memory, HashHop, and adapters?"
     hits = [
         row[0]
         for row in connection.execute(

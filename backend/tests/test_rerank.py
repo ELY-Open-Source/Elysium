@@ -9,12 +9,12 @@ from pathlib import Path
 import httpx
 import pytest
 
-from elysium import rerank
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.retrieval import RetrievalService
-from elysium.schemas import MemoryOrigin, SearchFilters
+from elysian import rerank
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.retrieval import RetrievalService
+from elysian.schemas import MemoryOrigin, SearchFilters
 
 URL = "http://judge/v1"
 

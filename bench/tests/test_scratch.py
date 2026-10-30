@@ -37,7 +37,7 @@ def test_copy_store_claims_the_copy_it_makes(tmp_path: Path) -> None:
         pytest.skip("liveness is read from /proc")
     source = tmp_path / "source"
     (source / "data").mkdir(parents=True)
-    (source / "data" / "elysium.sqlite").write_text("store", encoding="utf-8")
+    (source / "data" / "elysian.sqlite").write_text("store", encoding="utf-8")
     busy = tmp_path / "scratch"
     busy.mkdir()
     (busy / scratch.HELD).write_text("1", encoding="utf-8")

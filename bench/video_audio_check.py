@@ -58,7 +58,7 @@ def video_sources(store: Path) -> set[str]:
     """The video sources a store holds, read without opening it for write."""
     import sqlite3
 
-    with sqlite3.connect(f"file:{store / 'data' / 'elysium.sqlite'}?mode=ro", uri=True) as connection:
+    with sqlite3.connect(f"file:{store / 'data' / 'elysian.sqlite'}?mode=ro", uri=True) as connection:
         return {row[0] for row in connection.execute("SELECT source_id FROM sources WHERE kind = 'video'")}
 
 
@@ -67,7 +67,7 @@ def guard_videos(videos: Path, store: Path) -> list[Path]:
     if not videos.is_dir():
         raise SystemExit(
             f"{videos}: the Video-MME files are not here; they are staged from the corpus zips at "
-            "the data root (set ELYSIUM_BENCH_DATA to wherever they live)"
+            "the data root (set ELYSIAN_BENCH_DATA to wherever they live)"
         )
     files = sorted(videos.glob("*.mp4"))
     if not files:
@@ -81,7 +81,7 @@ def speech_facts(store: Path) -> dict[str, Any]:
     """How much speech the store carries, and how many words of it."""
     import sqlite3
 
-    with sqlite3.connect(f"file:{store / 'data' / 'elysium.sqlite'}?mode=ro", uri=True) as connection:
+    with sqlite3.connect(f"file:{store / 'data' / 'elysian.sqlite'}?mode=ro", uri=True) as connection:
         atoms, characters = connection.execute(
             "SELECT count(*), coalesce(sum(length(text)), 0) FROM atoms WHERE modality = 'audio'"
         ).fetchone()
@@ -92,7 +92,7 @@ def unowned(store: Path) -> int:
     """Atoms nobody holds answer every caller, so one left over turns a scoped suite into a whole-corpus one."""
     import sqlite3
 
-    with sqlite3.connect(f"file:{store / 'data' / 'elysium.sqlite'}?mode=ro", uri=True) as connection:
+    with sqlite3.connect(f"file:{store / 'data' / 'elysian.sqlite'}?mode=ro", uri=True) as connection:
         return int(connection.execute("SELECT count(*) FROM atoms WHERE holder_id = ''").fetchone()[0])
 
 
@@ -108,9 +108,9 @@ def require_owned(store: Path, label: str) -> None:
 
 def rank_arm(home: Path, probes: list[Any], top_k: int, rerank_url: str | None = None) -> dict[str, Any] | None:
     """Rank the probes through the shipped words-only path, reranked when a judge is served; None skips the arm."""
-    from elysium.config import Settings
-    from elysium.db import Database
-    from elysium.retrieval import RetrievalService
+    from elysian.config import Settings
+    from elysian.db import Database
+    from elysian.retrieval import RetrievalService
 
     if not probes:
         return None
@@ -152,8 +152,8 @@ def rank_arm(home: Path, probes: list[Any], top_k: int, rerank_url: str | None =
 
 def add_speech(home: Path, files: list[Path], asr: Path, limit: int) -> dict[str, Any]:
     """Re-ingest the same files with the speech snapshot, and time the whole pass."""
-    from elysium.config import Settings
-    from elysium.ingestion import IngestionService
+    from elysian.config import Settings
+    from elysian.ingestion import IngestionService
 
     if not (asr / "model.bin").exists():
         raise SystemExit(
@@ -192,7 +192,7 @@ def reuse_speech(home: Path, speech_home: Path, scratch: Path) -> dict[str, Any]
             f"--speech-home {speech_home} is the scratch this run copies into; the copy would "
             "overwrite the very store it was asked to reuse"
         )
-    if not (speech_home / "data" / "elysium.sqlite").exists():
+    if not (speech_home / "data" / "elysian.sqlite").exists():
         raise SystemExit(f"{speech_home}: no store to reuse; drop --speech-home to re-ingest")
     facts = speech_facts(speech_home)
     if not facts["atoms"]:
@@ -208,7 +208,7 @@ def measure(
     home: Path, scratch: Path, videos: Path, asr: Path, limit: int, speech_home: Path | None
 ) -> dict[str, Any]:
     """Score the video questions and the whole answerable suite before and after the speech pass."""
-    if not (home / "data" / "elysium.sqlite").exists():
+    if not (home / "data" / "elysian.sqlite").exists():
         raise SystemExit(f"{home}: no store to copy; run `python -m bench.dense_scale` first")
     reused = None if speech_home is None else reuse_speech(home, speech_home, scratch)
     files = guard_videos(videos, home) if reused is None else []
@@ -238,7 +238,7 @@ def measure(
         after_home, copied = copy_store(Path(reused["reused"]), scratch / "after")
         print(f"copied the speech store in {copied:.1f}s to {after_home}", flush=True)
         # A store re-ingested before ingest kept provenance lost its holders; these are the corpus facts it would have kept.
-        ingest["restamped"] = stamp(after_home / "data" / "elysium.sqlite")
+        ingest["restamped"] = stamp(after_home / "data" / "elysian.sqlite")
     require_owned(after_home, "after")
     after_speech = speech_facts(after_home)
     if after_speech["atoms"] == before_speech["atoms"]:

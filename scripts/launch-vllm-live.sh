@@ -10,7 +10,7 @@ source .venv-linux-vllm/bin/activate
 export VLLM_USE_FLASHINFER_SAMPLER=0
 # Thinking off unless a request asks: Mem0 and Zep cannot pass chat_template_kwargs, and the product always passes it.
 exec python -m vllm.entrypoints.openai.api_server \
-  --model "${ELYSIUM_MODEL_DIR:-Qwen/Qwen3.5-9B}" \
+  --model "${ELYSIAN_MODEL_DIR:-Qwen/Qwen3.5-9B}" \
   --served-model-name Qwen/Qwen3.5-9B \
   --host 127.0.0.1 \
   --port 8001 \

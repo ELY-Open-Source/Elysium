@@ -5,7 +5,7 @@ nobody owns. The frozen corpus index names the owner, the setting and the moment
 the same facts the counterpart and the gold scopes are written from — so the store can be brought
 in line without re-running ingestion.
 
-Run: python -m bench.stamp_holders [--store bench/runs/baseline/data/elysium.sqlite]
+Run: python -m bench.stamp_holders [--store bench/runs/baseline/data/elysian.sqlite]
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 from bench.sets_common import MODALITIES, SETS, read_jsonl, record_path
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_STORE = REPO / "bench" / "runs" / "baseline" / "data" / "elysium.sqlite"
+DEFAULT_STORE = REPO / "bench" / "runs" / "baseline" / "data" / "elysian.sqlite"
 
 
 def corpus_facts() -> dict[str, tuple[str, str, str]]:

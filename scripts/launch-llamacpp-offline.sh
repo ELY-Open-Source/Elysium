@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [ -z "${ELYSIUM_GGUF_MODEL:-}" ]; then
-  echo "Set ELYSIUM_GGUF_MODEL to the absolute GGUF model path." >&2
+if [ -z "${ELYSIAN_GGUF_MODEL:-}" ]; then
+  echo "Set ELYSIAN_GGUF_MODEL to the absolute GGUF model path." >&2
   exit 1
 fi
 server="${LLAMA_CPP_SERVER:-llama-server}"
@@ -11,7 +11,7 @@ if ! command -v "$server" >/dev/null 2>&1; then
   exit 1
 fi
 exec "$server" \
-  --model "$ELYSIUM_GGUF_MODEL" \
+  --model "$ELYSIAN_GGUF_MODEL" \
   --host 127.0.0.1 \
   --port 8003 \
   --ctx-size 262144 \

@@ -16,12 +16,12 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-import elysium.api as api_module
-from elysium import lifecycle_store
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.schemas import MemoryOrigin, SearchFilters, TimePrecision
+import elysian.api as api_module
+from elysian import lifecycle_store
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.schemas import MemoryOrigin, SearchFilters, TimePrecision
 
 DRAWER = "钥匙放在玄关抽屉里"
 CAR = "钥匙现在在车里"
@@ -128,8 +128,8 @@ def test_the_dense_leg_reads_the_same_window_as_the_words_leg(
     The dense leg is enabled here with a stand-in model: with the default off, this test would
     pass while the vector side of `as_of` had no coverage at all.
     """
-    from elysium.retrieval import RetrievalService
-    from elysium.vector_index import VectorIndex, expected_vectors
+    from elysian.retrieval import RetrievalService
+    from elysian.vector_index import VectorIndex, expected_vectors
 
     settings = Settings(home=tmp_path, default_holder="wife", dense_embeddings_enabled=True)
     database = Database(settings)

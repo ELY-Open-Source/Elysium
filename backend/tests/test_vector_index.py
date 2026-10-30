@@ -13,12 +13,12 @@ from typing import Any
 
 import pytest
 
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.retrieval import RetrievalService
-from elysium.schemas import MemoryOrigin, SearchFilters
-from elysium.vector_index import VectorIndex, expected_vectors
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.retrieval import RetrievalService
+from elysian.schemas import MemoryOrigin, SearchFilters
+from elysian.vector_index import VectorIndex, expected_vectors
 
 KEYS = "我们的钥匙放在玄关抽屉里"
 PASSPORT = "护照在书房第二个抽屉"
@@ -111,7 +111,7 @@ def test_somebody_elses_memory_is_not_mine_to_find(tmp_path: Path, fake_embeddin
 
 
 def test_a_shared_memory_is_findable_by_both(tmp_path: Path, fake_embeddings: Callable[[], Any]) -> None:
-    from elysium.schemas import Visibility
+    from elysian.schemas import Visibility
 
     settings, database = _settings(tmp_path), Database(_settings(tmp_path))
     index = _index(settings, database, fake_embeddings)
@@ -129,7 +129,7 @@ def test_a_shared_memory_is_findable_by_both(tmp_path: Path, fake_embeddings: Ca
 def test_a_cartridge_scope_cannot_be_walked_around(tmp_path: Path, fake_embeddings: Callable[[], Any]) -> None:
     from datetime import UTC, datetime
 
-    from elysium import cartridge_store
+    from elysian import cartridge_store
 
     settings, database = _settings(tmp_path), Database(_settings(tmp_path))
     index = _index(settings, database, fake_embeddings)
@@ -172,7 +172,7 @@ def test_a_different_model_rebuilds_instead_of_mixing_vectors(tmp_path: Path, fa
 def test_a_picture_with_no_words_is_the_other_indexs_job(tmp_path: Path, fake_embeddings: Callable[[], Any]) -> None:
     from datetime import UTC, datetime
 
-    from elysium.schemas import EvidenceAtom, Modality, SourceRecord, TrustScores
+    from elysian.schemas import EvidenceAtom, Modality, SourceRecord, TrustScores
 
     settings, database = _settings(tmp_path), Database(_settings(tmp_path))
     index = _index(settings, database, fake_embeddings)

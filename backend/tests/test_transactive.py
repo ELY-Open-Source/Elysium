@@ -11,18 +11,18 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
-import elysium.api as api_module
-import elysium.cli as cli_module
-from elysium.cli import app
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.holder_store import HolderStore
-from elysium.ingestion import IngestionService
-from elysium.memory import MemoryService
-from elysium.migrations import SCHEMA_VERSION
-from elysium.schemas import MemoryOrigin, Visibility, utc_now
-from elysium.transactive import LIBRARY, NO_HOLDER_KNOWS, TransactiveService
-from elysium.transactive_schemas import Holder
+import elysian.api as api_module
+import elysian.cli as cli_module
+from elysian.cli import app
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.holder_store import HolderStore
+from elysian.ingestion import IngestionService
+from elysian.memory import MemoryService
+from elysian.migrations import SCHEMA_VERSION
+from elysian.schemas import MemoryOrigin, Visibility, utc_now
+from elysian.transactive import LIBRARY, NO_HOLDER_KNOWS, TransactiveService
+from elysian.transactive_schemas import Holder
 
 HOME_KEYS = "我们的钥匙放在玄关抽屉里"
 WORK_KEYS = "备用钥匙在办公室第二个抽屉里"

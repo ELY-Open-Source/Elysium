@@ -42,7 +42,7 @@ PAYLOAD = Path("bench/reports/rank.json")
 def measure(home: Path, scratch: Path, rerank_url: str | None) -> dict[str, Any]:
     groups = suites()
     copy_home, _ = copy_store(home, scratch)
-    restamped = stamp(copy_home / "data" / "elysium.sqlite")
+    restamped = stamp(copy_home / "data" / "elysian.sqlite")
     require_owned(copy_home, "shipped")
     facts = described_facts(copy_home)
     if facts["described"] != facts["pictures"]:

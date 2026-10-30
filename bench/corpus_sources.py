@@ -1,4 +1,4 @@
-"""Pinned corpus sources for the elysium benchmark."""
+"""Pinned corpus sources for the elysian benchmark."""
 
 from typing import Any
 

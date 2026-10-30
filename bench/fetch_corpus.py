@@ -23,7 +23,7 @@ from bench.sets_common import parse_json_line
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "bench" / "corpus"
 MANIFEST = CORPUS / "manifest.jsonl"
-UA = {"User-Agent": "elysium-bench"}
+UA = {"User-Agent": "elysian-bench"}
 OPENER = urllib.request.build_opener(urllib.request.HTTPSHandler())
 
 

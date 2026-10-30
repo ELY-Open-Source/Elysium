@@ -12,17 +12,17 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from elysium import cli as cli_module
-from elysium import maintenance
-from elysium.cartridge_store import set_mounts
-from elysium.cli import app
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.migrations import SCHEMA_VERSION
-from elysium.schemas import EvidenceAtom, MemoryOrigin, Modality, SourceRecord, TrustScores, utc_now
-from elysium.storage import ObjectStore
-from elysium.vector_index import VectorIndex
+from elysian import cli as cli_module
+from elysian import maintenance
+from elysian.cartridge_store import set_mounts
+from elysian.cli import app
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.migrations import SCHEMA_VERSION
+from elysian.schemas import EvidenceAtom, MemoryOrigin, Modality, SourceRecord, TrustScores, utc_now
+from elysian.storage import ObjectStore
+from elysian.vector_index import VectorIndex
 
 KEYS = "the keys are on the shelf by the door"
 PASSPORT = "the passport is in the blue box"

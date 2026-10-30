@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-import elysium.api as api_module
-from elysium.config import Settings
+import elysian.api as api_module
+from elysian.config import Settings
 
 KEYS = "我们的钥匙放在玄关抽屉里"
 TOKEN = "a-token-worth-having"
@@ -31,7 +31,7 @@ def test_a_write_against_a_server_with_no_token_is_refused_and_says_why(
 ) -> None:
     response = _client(tmp_path, monkeypatch).post("/api/memory", json={"text": KEYS})
     assert response.status_code == 403
-    assert "ELYSIUM_AUTH_TOKEN" in response.json()["detail"], "the refusal must name the fix"
+    assert "ELYSIAN_AUTH_TOKEN" in response.json()["detail"], "the refusal must name the fix"
 
 
 def test_a_write_with_the_wrong_token_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -79,7 +79,7 @@ def test_an_allowed_origin_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 def test_the_console_this_server_serves_writes_from_its_own_origin(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ELYSIUM_UI_DIR serves the console from the API's own address, which no allowlist names."""
+    """ELYSIAN_UI_DIR serves the console from the API's own address, which no allowlist names."""
     client = _client(tmp_path, monkeypatch, auth_token=TOKEN)
     own = {"Authorization": f"Bearer {TOKEN}", "Origin": str(client.base_url)}
     assert client.post("/api/memory", json={"text": KEYS}, headers=own).status_code == 200

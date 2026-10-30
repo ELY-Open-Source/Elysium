@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 Set-Location (Split-Path -Parent $PSScriptRoot)
-$distro = if ($env:ELYSIUM_WSL_DISTRO) { $env:ELYSIUM_WSL_DISTRO } else { "Ubuntu" }
+$distro = if ($env:ELYSIAN_WSL_DISTRO) { $env:ELYSIAN_WSL_DISTRO } else { "Ubuntu" }
 
 if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
   throw "WSL is required for the SGLang Linux runtime."

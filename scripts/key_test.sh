@@ -6,10 +6,10 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 home="$(mktemp -d)"
 port="${PORT:-8801}"
-export ELYSIUM_HOME="$home"
-export ELYSIUM_API="http://127.0.0.1:${port}"
-export ELYSIUM_AUTH_TOKEN="keytest-operator"
-export ELYSIUM_DEFAULT_HOLDER="wife"
+export ELYSIAN_HOME="$home"
+export ELYSIAN_API="http://127.0.0.1:${port}"
+export ELYSIAN_AUTH_TOKEN="keytest-operator"
+export ELYSIAN_DEFAULT_HOLDER="wife"
 
 python_bin="$root/.venv/bin/python"
 [ -x "$python_bin" ] || python_bin="python3"
@@ -28,7 +28,7 @@ JSON
   printf '{"metadata": {}, "weight_map": {"model-00001.safetensors": "0"}}' > "$model_dir/model.safetensors.index.json"
 }
 write_snapshot 4.0
-export ELYSIUM_MODEL_DIR="$model_dir"
+export ELYSIAN_MODEL_DIR="$model_dir"
 
 api=""
 cleanup() {
@@ -43,13 +43,13 @@ if curl -sf "http://127.0.0.1:${port}/api/status" >/dev/null 2>&1; then
   exit 1
 fi
 
-"$python_bin" -m elysium.cli serve --port "$port" >"$home/api.log" 2>&1 &
+"$python_bin" -m elysian.cli serve --port "$port" >"$home/api.log" 2>&1 &
 api=$!
 
 ready=0
 for _ in $(seq 1 80); do
   if ! kill -0 "$api" 2>/dev/null; then
-    echo "FAIL: the Elysium API process exited before it was ready"
+    echo "FAIL: the Elysian API process exited before it was ready"
     cat "$home/api.log"
     exit 1
   fi
@@ -57,12 +57,12 @@ for _ in $(seq 1 80); do
   sleep 0.5
 done
 if [ "$ready" -ne 1 ]; then
-  echo "FAIL: the Elysium API did not start"
+  echo "FAIL: the Elysian API did not start"
   cat "$home/api.log"
   exit 1
 fi
 
-status="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${ELYSIUM_AUTH_TOKEN}" \
+status="$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${ELYSIAN_AUTH_TOKEN}" \
   "http://127.0.0.1:${port}/api/memory/working?holder=fingerprint&session=probe")"
 if [ "$status" != "200" ]; then
   echo "FAIL: port ${port} answers /api/status but returns HTTP $status for /api/memory/working;"
@@ -73,7 +73,7 @@ fi
 results="$home/results.tsv"
 : > "$results"
 
-cli() { (cd "$root" && "$python_bin" -m elysium.cli "$@"); }
+cli() { (cd "$root" && "$python_bin" -m elysian.cli "$@"); }
 
 # Scenarios 1, 3, 4 and 5 go through the live HTTP API and the Python writer.
 KEYTEST_RESULTS="$results" "$python_bin" - <<'PY'
@@ -84,8 +84,8 @@ import pathlib
 import urllib.error
 import urllib.request
 
-API = os.environ["ELYSIUM_API"]
-TOKEN = os.environ["ELYSIUM_AUTH_TOKEN"]
+API = os.environ["ELYSIAN_API"]
+TOKEN = os.environ["ELYSIAN_AUTH_TOKEN"]
 RESULTS = pathlib.Path(os.environ["KEYTEST_RESULTS"])
 NOW = datetime.datetime.now(datetime.timezone.utc)
 
@@ -216,9 +216,9 @@ older_then = texts(search("恒温器", as_holder="wife", as_of=(NOW - datetime.t
 if "恒温器放在书房，设定 22 度" not in older_then:
     raise SystemExit(f"FAIL: the older reading is unreachable for the time it was true: {older_then}")
 # Settling is the holder's call: until it happens retrieval shows the newer side, and once it happens both sides answer.
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
 
 keeper = MemoryService(Settings(), Database(Settings()))
 settled = keeper.resolve_conflicts([item["conflict_id"] for item in conflicts])
@@ -237,10 +237,10 @@ record(
 )
 
 # 5. 抗污染: a third-party sentence cannot make itself a trusted fact.
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.schemas import MemoryOrigin
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.schemas import MemoryOrigin
 
 settings = Settings()
 service = MemoryService(settings, Database(settings))
@@ -270,14 +270,14 @@ record(
 PY
 
 # 2. 找老婆: the asker's own memory is empty, so the answer is a pointer — proved through MCP.
-(cd "$root/elysium-mcp" && go build -o "$home/elysium-mcp" ./cmd/elysium-mcp)
+(cd "$root/elysian-mcp" && go build -o "$home/elysian-mcp" ./cmd/elysian-mcp)
 KEYTEST_RESULTS="$results" "$python_bin" - <<'PY'
 import json
 import os
 import pathlib
 import subprocess
 
-binary = os.path.join(os.environ["ELYSIUM_HOME"], "elysium-mcp")
+binary = os.path.join(os.environ["ELYSIAN_HOME"], "elysian-mcp")
 results = pathlib.Path(os.environ["KEYTEST_RESULTS"])
 proc = subprocess.Popen([binary, "server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                         stderr=subprocess.DEVNULL, text=True)
@@ -310,7 +310,7 @@ def tool(name, arguments):
 
 send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
     "protocolVersion": "2025-06-18", "capabilities": {},
-    "clientInfo": {"name": "elysium-key-test", "version": "0"}}})
+    "clientInfo": {"name": "elysian-key-test", "version": "0"}}})
 send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
 directory = tool("who_knows", {"query": "护照", "as_holder": "local"})["report"]
@@ -381,11 +381,11 @@ if [ -z "$moved" ]; then
   exit 1
 fi
 write_snapshot 4.0
-printf '6\tPASS\telysium ingest --cartridge-name 甲/乙 + finalize-cartridge + switch: mounted 甲 → 月岩灰=%s 花岗岩=%s; switch 乙 → 月岩灰=%s 花岗岩=%s; unmount → 月岩灰=%s; rewriting the model snapshot to rope factor 2.0 makes `mount 甲` refuse: %s\n' \
+printf '6\tPASS\telysian ingest --cartridge-name 甲/乙 + finalize-cartridge + switch: mounted 甲 → 月岩灰=%s 花岗岩=%s; switch 乙 → 月岩灰=%s 花岗岩=%s; unmount → 月岩灰=%s; rewriting the model snapshot to rope factor 2.0 makes `mount 甲` refuse: %s\n' \
   "$a_only" "$b_hidden" "$a_gone" "$b_found" "$whole_a" "$moved" >> "$results"
 
 # 7. 卡带省算力: the same pack twice; given a served model, its time to first token cold and warm.
-generator="${ELYSIUM_KEY_TEST_GENERATOR_URL:-}"
+generator="${ELYSIAN_KEY_TEST_GENERATOR_URL:-}"
 # vLLM reuses a prefix in whole blocks (528 tokens for Qwen3.5); a one-line pack fits in none.
 "$python_bin" - "$home/scenes/garage_log.md" <<'PY'
 import sys
@@ -402,11 +402,11 @@ import sys
 import time
 
 import httpx
-from elysium.compiler import ContextCompiler
-from elysium.config import get_settings
-from elysium.db import Database
-from elysium.runtime import QwenRuntime
-from elysium.schemas import RuntimeProfile
+from elysian.compiler import ContextCompiler
+from elysian.config import get_settings
+from elysian.db import Database
+from elysian.runtime import QwenRuntime
+from elysian.schemas import RuntimeProfile
 
 
 def prefix_hits(url: str) -> float:
@@ -461,7 +461,7 @@ if [ "$cache_same" != "True" ] || [ "$cache_atoms" -lt 1 ] || [ "$cache_hit" -lt
   exit 1
 fi
 if [ -z "$generator" ]; then
-  printf '7\tPARTLY MEASURED\tthe same question compiled twice hands back the same pack (cache_trace_id equal=%s over %s atoms), the second from the semantic cache (hit=%s miss=%s). The saving is time to first token, and no served model was given: rerun with ELYSIUM_KEY_TEST_GENERATOR_URL=<a vLLM /v1 URL>\n' \
+  printf '7\tPARTLY MEASURED\tthe same question compiled twice hands back the same pack (cache_trace_id equal=%s over %s atoms), the second from the semantic cache (hit=%s miss=%s). The saving is time to first token, and no served model was given: rerun with ELYSIAN_KEY_TEST_GENERATOR_URL=<a vLLM /v1 URL>\n' \
     "$cache_same" "$cache_atoms" "$cache_hit" "$cache_miss" >> "$results"
 else
   printf '%s' "$cache_stats" | "$python_bin" -c '

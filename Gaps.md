@@ -1,4 +1,4 @@
-# Gaps.md — Elysium（往世乐土，原名 Ely-Eye）现状与目标之间的差距
+# Gaps.md — Elysian（往世乐土，原名 Ely-Eye）现状与目标之间的差距
 
 > 审查方式：全仓库通读（86 文件 / 17,146 行）+ 14 个并行审计 lane（6 个代码审计 + 8 个外部调研），
 > 每条结论都带 `file:line` 或一手来源。审查日期对应 HEAD `18e70f7`。
@@ -8,7 +8,7 @@
 
 ## 0. 结论先行
 
-**现在的 elysium 是一个「带证明外壳的语料库检索器」，还不是一个「记忆系统」，更不是「转忆（transactive memory）系统」。**
+**现在的 elysian 是一个「带证明外壳的语料库检索器」，还不是一个「记忆系统」，更不是「转忆（transactive memory）系统」。**
 
 三句话概括：
 
@@ -32,7 +32,7 @@
 | 3.4 卡带是导出包不是卡带 | **作用域闭合，算力部分实测** | `mount/switch/unmount/append` 让挂载真的改变检索域，指纹不符拒绝挂载（`f788945`）。同一题编译出同一份正文，送 vLLM（`--enable-prefix-caching`）后第二次首字 0.054–0.095 s，对冷的 0.39–0.49 s（钥匙测试 7，p4-4）；复用的是服务端前缀缓存，卡带自己不存 KV、换进程即失效 |
 | 3.5 没有 holder，就没有「找老婆」 | **闭合** | `who_knows` / `ask` / 目录 / 「没人知道」终态（`51279e2`）；p2-4 用 token 把「只给指针」变成真边界：无 token 搜不到私钥，MCP 进程不带 token 重启一遍仍守规则（`dcacba5`、`bash scripts/mcp_write_smoke.sh` 两行 PASS） |
 | 3.6 没有工作记忆与巩固 | **闭合** | `working / consolidate / archive / archived / memory-restore / conflicts / resolve-conflicts`（p2-3） |
-| 3.7 无文字图像结构性不可见 | **部分闭合** | CLIP 图文互查（`a9c6eba`）与语音+词级时间戳（`46060c1`）已实现。语音进视频后（129 个视频 28,363 段转写，`bench/reports/VIDEO_AUDIO.md`）video **0.493 → 0.651**（holder 内随机排序的 chance 是 0.504：只有帧与 OCR 时视频题处于随机水平，语音让它高出 chance 0.148）；p4 用本地 Qwen3.5-9B 给每张图、截图与视频帧写描述（`ELYSIUM_VLM_BASE_URL`，p4-2/p4-3b）后，全库 recall@10（9B 重排）为 ui_screenshot **0.800** / video **0.842** / image **0.863**（code 0.977、pdf 0.898、conversation 0.945；不重排 0.753 / 0.842 / 0.844，`bench/reports/REDESCRIBE.md`）。剩下的：描述没写到的图标仍找不到；视频帧描述仍是 192 token；UI widget tree 本仓库没有 |
+| 3.7 无文字图像结构性不可见 | **部分闭合** | CLIP 图文互查（`a9c6eba`）与语音+词级时间戳（`46060c1`）已实现。语音进视频后（129 个视频 28,363 段转写，`bench/reports/VIDEO_AUDIO.md`）video **0.493 → 0.651**（holder 内随机排序的 chance 是 0.504：只有帧与 OCR 时视频题处于随机水平，语音让它高出 chance 0.148）；p4 用本地 Qwen3.5-9B 给每张图、截图与视频帧写描述（`ELYSIAN_VLM_BASE_URL`，p4-2/p4-3b）后，全库 recall@10（9B 重排）为 ui_screenshot **0.800** / video **0.842** / image **0.863**（code 0.977、pdf 0.898、conversation 0.945；不重排 0.753 / 0.842 / 0.844，`bench/reports/REDESCRIBE.md`）。剩下的：描述没写到的图标仍找不到；视频帧描述仍是 192 token；UI widget tree 本仓库没有 |
 | 3.8 6 个 adapter 只有 1 个真被加载 | **加载闭合，效果未测** | `adapters.py` 统一加载/校验/缓存（p1-3）。基座 9B 经 vLLM 生成已实测（p4-4：按证据答出 6 / 6 个 adapter 名、引用准确率 1.00）；本机没有训练出的 adapter，带 adapter 的生成、HashHop、标准基准**没跑过**，所以 README 与 `TRAINING_ARTIFACTS.md` 不引用任何未跑分数 |
 | 3.9 证明外壳比能力跑得远 | **闭合** | `evals.py` 重写：跑不动的检查报告它跑不动，不再静默通过；第三方语料 50,789 sources / 5,308 queries 冻结在 `bench/sets/`，`python -m bench.validate_sets` 校验；`python -m bench.audit --product` 专抓「harness 自证」 |
 | 3.10 工程与可复现性 | **闭合** | 15 个 `.sh` 双胞胎 + Docker + Linux CI + `backup/restore/doctor`（p1-4）；每个 tracked 源文件 ≤500 行、死代码清零、注释单行（p1-6，`bench/filesize_check`） |
@@ -41,7 +41,7 @@
 
 四个根因现在的状态：**「命名即实现」**被 `bench.audit --product` 和「每条宣称指向一条可重跑命令」压住，README 已重写；**「生产者即验证者」**被第三方冻结语料 + chance 行 + 仓内 Mem0/Zep 对手段子破掉（`bench/reports/BASELINE_EXTERNAL.md`：同一 ranker 同一批条目，holder 作用域 0.866 对全库 0.412，**相差 0.455**（原值相减 0.4549）——该报告只给两行与「这段差值是 holder 边界的价值、不是更好排序器的价值」这句话，差值是这里减出来的）；**「语料库而非记忆」**随 3.1/3.5/3.6 闭合不再成立；**「单用户·单轮·只读」**随 3.2/3.5/3.11/3.12 闭合不再成立。
 
-**还剩什么**：验收线 0.92 未达（9B 重排后全库 0.916、test 0.913）；按题数加权，还漏的 0.084 里 pdf 占 0.027、截图 0.022、视频 0.012、图 0.011、code 0.010、对话 0.003。卡带自己不存 KV，省算力靠服务端前缀缓存；带 adapter 的生成在本机测不了（没有 adapter 权重）。§6 的钥匙测试给了服务的 9B 时 7 条全 PASS（`ELYSIUM_KEY_TEST_GENERATOR_URL`），不给时第 7 条 PARTLY MEASURED。
+**还剩什么**：验收线 0.92 未达（9B 重排后全库 0.916、test 0.913）；按题数加权，还漏的 0.084 里 pdf 占 0.027、截图 0.022、视频 0.012、图 0.011、code 0.010、对话 0.003。卡带自己不存 KV，省算力靠服务端前缀缓存；带 adapter 的生成在本机测不了（没有 adapter 权重）。§6 的钥匙测试给了服务的 9B 时 7 条全 PASS（`ELYSIAN_KEY_TEST_GENERATOR_URL`），不给时第 7 条 PARTLY MEASURED。
 
 ---
 
@@ -76,7 +76,7 @@ frontend (React, 8 panels, 只读为主)
 
 真实存在的能力：本地单文件 SQLite + FTS5、PDF 页/区块 atom、视频抽帧 + RapidOCR、git 仓库结构 atom、LoRA 训练与产物哈希、只读 MCP server、跨平台 Go 发布工程。
 
-**仓库里没有任何测试文件**（Python 与 Go 都是 0），唯一 CI 是 Go 的 tag 触发交叉编译。`.elysium/` 运行时状态未提交，`PRD.md`（所有训练与证明的语料来源）被 `.gitignore` 排除 —— 也就是说**外人 clone 之后无法复现任何一条宣称**，`docker build` 甚至直接失败（`Dockerfile:16 COPY README.md PRD.md ./`）。
+**仓库里没有任何测试文件**（Python 与 Go 都是 0），唯一 CI 是 Go 的 tag 触发交叉编译。`.elysian/` 运行时状态未提交，`PRD.md`（所有训练与证明的语料来源）被 `.gitignore` 排除 —— 也就是说**外人 clone 之后无法复现任何一条宣称**，`docker build` 甚至直接失败（`Dockerfile:16 COPY README.md PRD.md ./`）。
 
 ---
 
@@ -142,9 +142,9 @@ frontend (React, 8 panels, 只读为主)
 - **没有 origin 类型**：`trust.model` 是一个连续值而不是来源类型 → 模型自己生成的内容被重新摄取后，与「我亲眼看到的」无法区分（认知科学里的 source-monitoring error；训练侧对应 model collapse）。
 - **没有转述回路的防环设计**：需要 visited-set + 深度上限 + 终态 `NO_HOLDER_KNOWS`，否则 A 问 B、B 问 A。
 - **没有 ACL / 可见性 / 冲突记录**：两个 holder 说法不一致时，今天会被检索分数**静默平均**掉，而不是把分歧呈现出来。
-- **污染已被量化**：Sleeper Memory Poisoning（arXiv 2605.15338）写入成功率 99.8%/95%，成功检索里 60–89% 被攻击者左右动作；InjecMEM（arXiv 2608.23471）同类。elysium 目前**摄取即信任**，无 quarantine。
+- **污染已被量化**：Sleeper Memory Poisoning（arXiv 2605.15338）写入成功率 99.8%/95%，成功检索里 60–89% 被攻击者左右动作；InjecMEM（arXiv 2608.23471）同类。elysian 目前**摄取即信任**，无 quarantine。
 - **隐私/删除**：GDPR Art.5/16/17/25 与 CJEU C-136/21 意味着「删除」必须是**级联**：atom + 派生 atom + 卡带 + 向量 + 元记忆 + 缓存。今天连软删除都没有。
-- **反向能力卡缺失**：别人要能把问题路由**到** elysium，需要一张 capability/authority card；现在没有对外声明「我知道什么」。
+- **反向能力卡缺失**：别人要能把问题路由**到** elysian，需要一张 capability/authority card；现在没有对外声明「我知道什么」。
 
 ### 3.6 短期/长期分层：没有工作记忆，也没有巩固 — **P0/P1**
 
@@ -181,7 +181,7 @@ frontend (React, 8 panels, 只读为主)
 
 ### 3.10 工程与可复现性 — **P1**
 
-- **0 个测试文件**（Python + Go），9,637 行后端无测试；唯一 CI 是 Go 交叉编译。`scripts/verify.ps1` = `compileall` + `elysium status`（atom_count=0 也退出 0）+ `npm build`。
+- **0 个测试文件**（Python + Go），9,637 行后端无测试；唯一 CI 是 Go 交叉编译。`scripts/verify.ps1` = `compileall` + `elysian status`（atom_count=0 也退出 0）+ `npm build`。
 - **`PRD.md` 被 gitignore**（`.gitignore:23/24`）但 `Dockerfile:16` 要 COPY 它 → 任何人的 `docker build` 都失败；同时它是全部训练数据的来源 → 宣称不可复现。
 - **硬件写死**：`evals.py:1672,1683,1780-1784` 断言 `"RTX 4090" in device_name` → 在 4080/5090/A6000 上证明直接失效（而 README 说目标是 4080 级 16GB）；`:1793-1798` 要求 unsloth/triton/xformers 版本串，而 unsloth 从未被 import。
 - **平台锁死**：`profiles.py` 一路 shell 到 `wsl.exe -d Ubuntu`（发行版名写死），16 个脚本里 15 个是 `.ps1`；`_runtime_profile_check` 因此只在 Windows+WSL+CUDA 下可能通过。
@@ -260,7 +260,7 @@ frontend (React, 8 panels, 只读为主)
 | 4 分歧共存 | PASS | 两条都在库；未裁决时一页只给新边；冲突清单记下双值；`as_of` 拿回旧值；`resolve-conflicts` 之后两条都给 |
 | 5 抗污染 | PASS | 第三方说法可被本人搜到但 `quarantined=True`，编译器把它挡在正文外；换个 holder 完全答不出 |
 | 6 卡带即作用域 | PASS | 挂载后只命中卡带内容、切换随之变、卸载恢复；把快照 RoPE 改成 2.0 后拒绝挂载并点名 `factor: cartridge 4.0 vs local 2.0` |
-| 7 卡带省算力 | PASS（给了服务的 9B 时） | 同题编译两次同一份正文（`cache_trace_id` 相同，约 2,000 token），第二次落在语义缓存（hit=1 miss=1）；两份各送本地 vLLM 的 Qwen3.5-9B 生成 1 个 token：冷 0.39–0.49 s、0 个 token 来自前缀缓存，热 0.058–0.095 s、1,584 个来自前缀缓存（5 次跑的范围，随负载变；`ELYSIUM_KEY_TEST_GENERATOR_URL`）。不给服务时这条仍是 PARTLY MEASURED |
+| 7 卡带省算力 | PASS（给了服务的 9B 时） | 同题编译两次同一份正文（`cache_trace_id` 相同，约 2,000 token），第二次落在语义缓存（hit=1 miss=1）；两份各送本地 vLLM 的 Qwen3.5-9B 生成 1 个 token：冷 0.39–0.49 s、0 个 token 来自前缀缓存，热 0.058–0.095 s、1,584 个来自前缀缓存（5 次跑的范围，随负载变；`ELYSIAN_KEY_TEST_GENERATOR_URL`）。不给服务时这条仍是 PARTLY MEASURED |
 
 ---
 
@@ -355,18 +355,18 @@ FTS5：改 external-content 表 + CJK 分词 + 标识符切分（去掉 `db.py:1
 
 ```
 MCP（写必须经 Python 单写者；Go 保持 mode=ro + query_only）
-  elysium_remember / elysium_forget / elysium_supersede
-  elysium_search        （与后端同一排序；filters: since/until/source/scenario/holder/modality/trust/limit/cursor）
-  elysium_who_knows     （返回排序后的持有者 + basis + confidence；终态 NO_HOLDER_KNOWS）
-  elysium_mount / elysium_unmount
+  elysian_remember / elysian_forget / elysian_supersede
+  elysian_search        （与后端同一排序；filters: since/until/source/scenario/holder/modality/trust/limit/cursor）
+  elysian_who_knows     （返回排序后的持有者 + basis + confidence；终态 NO_HOLDER_KNOWS）
+  elysian_mount / elysian_unmount
   全部加 readOnlyHint/destructiveHint/idempotentHint + outputSchema
 HTTP
   POST /api/search   POST /api/memory   POST /api/memory/{id}/forget   POST /api/memory/{id}/supersede
   GET  /api/holders  GET /api/holders/{id}/knows   POST /api/cartridges/{id}/mount
   /api/session/*     token 鉴权 + Origin 校验（默认 localhost）
 CLI
-  elysium search "q" --since --until --source --scenario --holder --modality --limit --cursor
-  elysium remember|forget|supersede|mount|who-knows|backup|restore|doctor
+  elysian search "q" --since --until --source --scenario --holder --modality --limit --cursor
+  elysian remember|forget|supersede|mount|who-knows|backup|restore|doctor
 前端
   补 search-without-answer、记忆浏览/编辑/遗忘、溯源下钻（time/source_id/trust/relations 已在响应里，types.ts 别丢）、
   图像渲染（App.tsx 目前无 <img>）、per-leg 分数可视化（把 45% 空权重暴露出来）

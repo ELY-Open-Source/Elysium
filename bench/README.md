@@ -33,7 +33,7 @@ database and reports its latency plus how far its top-10 differs from the fast B
 ## known environment artifact
 
 pi-lens' pyright reports `Import "bench.sets_common" could not be resolved` (and the same for
-`bench.metrics`, `bench.systems`, `elysium.*`, `cv2`, `onnxruntime`, `pypdf.errors`) even though
+`bench.metrics`, `bench.systems`, `elysian.*`, `cv2`, `onnxruntime`, `pypdf.errors`) even though
 every one of those imports works. It is not a repo defect:
 
 - `effective_config` on any bench file returns `0 config file(s)` with `resolvedCwd` at the repo
@@ -43,7 +43,7 @@ every one of those imports works. It is not a repo defect:
 
 ```bash
 .venv/bin/python -c "import bench.sets_common, bench.metrics, bench.systems, bench.run, bench.ingest_baseline, \
-bench.build_mmlongbench, elysium.config, elysium.db, cv2, onnxruntime, pypdf.errors; print('runtime proof OK')"
+bench.build_mmlongbench, elysian.config, elysian.db, cv2, onnxruntime, pypdf.errors; print('runtime proof OK')"
 ```
 
 Treat that command as the check of record for import health; treat pyright's *type* findings

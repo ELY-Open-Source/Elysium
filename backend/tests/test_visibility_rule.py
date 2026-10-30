@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-SOURCE_DIR = Path(__file__).resolve().parents[1] / "src" / "elysium"
+SOURCE_DIR = Path(__file__).resolve().parents[1] / "src" / "elysian"
 FILES = ("browse.py", "store_search.py", "vector_index.py")
 CLAUSE = re.compile(r"\(\? IS NULL[^()]*?holder_id = ''.*?WHERE value = \?[^)]*\)\)\)\)", re.DOTALL)
 EXPECTED_COPIES = 5

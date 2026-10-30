@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from elysium import profiles
-from elysium.config import Settings
-from elysium.proofs.training_trace import cuda_bf16_training
-from elysium.training_metrics import require_cuda_bf16
+from elysian import profiles
+from elysian.config import Settings
+from elysian.proofs.training_trace import cuda_bf16_training
+from elysian.training_metrics import require_cuda_bf16
 
 
 def _stub_nvidia_smi(tmp_path: Path, monkeypatch, output: str, exit_code: int = 0) -> None:

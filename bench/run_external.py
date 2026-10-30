@@ -2,7 +2,7 @@
 
 The point of this runner is an external reference point measured on our own corpus: a flat
 memory store with holder scoping and no invalidation (Mem0-style), and the same items with
-time-bounded validity (Zep-style). Whatever elysium scores, it must beat these two on the
+time-bounded validity (Zep-style). Whatever elysian scores, it must beat these two on the
 same queries, or the memory story is not real.
 
 Run: python -m bench.run_external            # after bench.ingest_baseline has merged the corpus

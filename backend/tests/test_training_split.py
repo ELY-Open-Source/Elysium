@@ -10,26 +10,26 @@ from typing import Any
 
 import pytest
 
-from elysium import training_datasets, training_lora, training_retrieval
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.schemas import (
+from elysian import training_datasets, training_lora, training_retrieval
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.schemas import (
     EvidenceAtom,
     Modality,
     SourceRecord,
     TrainingAdapterKind,
     TrustScores,
 )
-from elysium.training import TrainingService
-from elysium.training_common import sha256_bytes
-from elysium.training_datasets import (
+from elysian.training import TrainingService
+from elysian.training_common import sha256_bytes
+from elysian.training_datasets import (
     atom_id_for_path,
     atoms_for_path,
     latest_cartridge_id,
     model_for_kind,
     validate_dataset,
 )
-from elysium.training_lora import write_lora_config
+from elysian.training_lora import write_lora_config
 
 
 def _settings(root: Path) -> Settings:

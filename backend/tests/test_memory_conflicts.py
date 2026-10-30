@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from elysium.config import Settings
-from elysium.db import Database
-from elysium.memory import MemoryService
-from elysium.retrieval import RetrievalService
-from elysium.schemas import MemoryOrigin, SearchFilters
+from elysian.config import Settings
+from elysian.db import Database
+from elysian.memory import MemoryService
+from elysian.retrieval import RetrievalService
+from elysian.schemas import MemoryOrigin, SearchFilters
 
 NOW = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
 OLD = "恒温器放在书房，设定 22 度"

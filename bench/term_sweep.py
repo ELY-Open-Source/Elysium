@@ -32,7 +32,7 @@ DEFAULT_SCRATCH = Path("bench/runs/term_sweep")
 
 def measure(home: Path, scratch: Path, probes: int) -> dict[str, Any]:
     """Score the shipped search path at each bound, on a copy of the frozen store."""
-    from elysium import text_index
+    from elysian import text_index
 
     copy_home, copy_seconds = copy_store(home, scratch)
     chosen = scale_probes(load_queries(), probes)
@@ -76,7 +76,7 @@ def measure(home: Path, scratch: Path, probes: int) -> dict[str, Any]:
     peak = max(arms, key=lambda arm: arm["recall_at_10"])
     return {
         "commit": git_commit(),
-        "store": str(copy_home / "data" / "elysium.sqlite"),
+        "store": str(copy_home / "data" / "elysian.sqlite"),
         "copy_seconds": copy_seconds,
         "probes": len(chosen),
         "shipped_fraction": shipped,

@@ -3,7 +3,7 @@
 node_modules/
 dist/
 build/
-.elysium/
+.elysian/
 *.pyc
 __pycache__/
 .pytest_cache/
@@ -13,7 +13,7 @@ __pycache__/
 .env.local
 frontend/.vite/
 frontend/dist/
-backend/src/elysium.egg-info/
+backend/src/elysian.egg-info/
 *.log
 *.tsbuildinfo
 frontend/vite.config.d.ts
@@ -25,7 +25,7 @@ PRD.md
 CLAUDE.md
 designreference.html
 # Local landing site — deployed to Cloudflare, not part of this repo
-/elysium-web/
+/elysian-web/
 
 bench/corpus/*
 !bench/corpus/manifest.jsonl
