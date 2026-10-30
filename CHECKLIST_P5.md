@@ -6,7 +6,8 @@
 
 ## A. 安装
 
-- [ ] **p5-0** 改名 Elysian：仓库 `ELY-Open-Source/Elysian`，Go 模块 `github.com/ELY-Open-Source/Elysian/elysian-mcp`，包与命令 `elysian`，变量 `ELYSIAN_*`，库 `elysian.sqlite`；旧的 `ELYSIUM_*` 变量、`.elysium` 库与 `elysium.sqlite` 和 `ELY_EYE_*` 一样报错退出，不静默忽略。冻结报告里的历史 arm 名不改。
+- [x] **p5-0** 改名 Elysian：仓库 `ELY-Open-Source/Elysian`，Go 模块 `github.com/ELY-Open-Source/Elysian/elysian-mcp`，包与命令 `elysian`，变量 `ELYSIAN_*`，库 `elysian.sqlite`；旧的 `ELYSIUM_*` 变量、`.elysium` 库与 `elysium.sqlite` 和 `ELY_EYE_*` 一样报错退出，不静默忽略。冻结报告里的历史 arm 名不改。
+  - 评审第 1 轮 FAIL，D1–D3：D1 Go 向上找库时跳过旧目录与旧库名，加 `refuseOldStores`，每一层都查；D2 Python 旧目录守卫看的是新目录是否存在，安装器先建 `.elysian/bin` 就绕过了，改看新数据库；D3 冻结的 `live.json` 仍用 `elysium` arm 名，画图读不了，`live_chart.label` 读作 elysian 并加测试。第 2 轮 PASS（`8ce0127`）。
 
 - [ ] **p5-1** 拆依赖：`pip install ./backend` 只装核心（存、取、检索、API、CLI、MCP 需要的后端）；torch、transformers、sentence-transformers、peft、bitsandbytes、accelerate、datasets、qwen-vl-utils 进 `elysian[models]`。一个干净 venv 只装核心，`elysian remember / search / serve` 能跑，`torch` 不在环境里；一个测试钉住核心模块导入时不加载 torch。`scripts/install.sh` 与 `.ps1` 跟着改。
 - [ ] **p5-2** 全局库：后端和 Go MCP 用同一条规则找库：`ELYSIAN_HOME`，没有就是 `~/.elysian`。当前目录有旧的 `.elysian` 库而 `ELYSIAN_HOME` 没指向它时，报错并给出命令，不静默开一个空库。
