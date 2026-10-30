@@ -19,30 +19,26 @@ command that re-measures it, or it is marked as not measured.
 
 | question | answer | report |
 | --- | --- | --- |
-| can it find the memory that answers a question? | recall@10 **0.857**, MRR 0.697, over all 2,928 answerable queries from six third-party corpora, each asked as the holder that corpus assigns it, with speech ingested; **0.848** on the frozen stores, which hold no speech | `bench/reports/VIDEO_AUDIO.md`, `bench/reports/LEGS.md` |
-| is that any good? | a Mem0-style counterpart on the same corpus scores **0.866** inside one holder's memory and **0.412** across all of them; chance is 0.0002 whole-corpus and 0.369 inside one holder | `bench/reports/BASELINE_EXTERNAL.md` |
+| can it find the memory that answers a question? | recall@10 **0.901**, MRR 0.728, over all 2,928 answerable queries from six third-party corpora, each asked as the holder that corpus assigns it, with speech ingested and every picture described by a local Qwen3.5-9B (figures and screenshots at 512 tokens, video frames at 192); **0.916**, MRR 0.806, when the same 9B judges each returned page (`ELYSIUM_RERANK_BASE_URL`). Chance inside the asker's holder is 0.510 | `bench/reports/REDESCRIBE.md`, `bench/reports/RANK.md` |
+| is that any good? | a Mem0-style counterpart on the same queries scores **0.866** inside one holder's memory and **0.412** across all of them; it was given the frozen stores' words, without descriptions or speech, and its own floor is 0.0002 whole-corpus and 0.369 inside one holder | `bench/reports/BASELINE_EXTERNAL.md` |
 | does the holder boundary matter? | **+0.454 recall@10** with an identical ranker and identical items — the gain is scoping, not ranking | same report |
-| how fast at corpus size? | p50 **0.072 s**, p95 0.218 s over 165,973 atoms; the search this replaced took 20.16 s on the same corpus | `bench/reports/SCALE.md` |
+| how fast at corpus size? | p50 **0.072 s**, p95 0.218 s over 165,973 atoms; the search this replaced took 20.16 s on the same corpus. On today's 194,336-atom store the shipped search reads p50 0.14–0.16 s, p95 1.49–1.56 s (the holder-scope refill scans common words); with the judge p50 0.86–0.92 s, p95 2.05–2.48 s | `bench/reports/SCALE.md`, `bench/reports/redescribe.json` |
 | how much does it hold? | 165,973 atoms and 153,857 vectors in one SQLite file; the vector build runs 106 memories/s. One million is an extrapolation, not a measurement | `bench/reports/DENSE.md` |
 | can a wordless picture be found? | yes for icon crops, weakly for whole screenshots — the report shows every arm, including the ones that hurt | `bench/reports/VISUAL.md` |
 | what does speech cost? | WER **0.242** over 533 reference words; 258.18 s of audio transcribed in 3.12 s (68.4–111.2× realtime per video, CPU int8), byte-identical across two passes | `bench/reports/ASR.md` |
 | what is speech worth? | video recall@10 **0.493 → 0.651** over all 215 video questions, against a chance floor of 0.504 inside the asker's holder: frames and OCR alone ranked at chance, speech puts video 0.148 above it; the whole suite 0.848 → 0.857 against a holder-scoped floor of 0.510 | `bench/reports/VIDEO_AUDIO.md` |
-| is the acceptance bar met? | **no.** The bar is recall@10 ≥ 0.90; measured is 0.857, short by 0.043 | `bench/reports/VIDEO_AUDIO.md` |
+| what did describing pictures give? | 0.857 → 0.877 with 192-token descriptions, 0.893 once a holder's search refills from every word when the rare ones run dry, 0.901 at 512 tokens; the judge adds 0.015 | `bench/reports/DESCRIBE.md`, `RANK.md`, `REDESCRIBE.md` |
+| is the acceptance bar met? | **not at 0.92.** With the judge: whole suite 0.916 (hit@10 Wilson 95% lower 0.907), held-out test split 0.913, short by 0.004 and 0.007. Without it the older 0.90 bar holds on the whole suite (0.901) and misses on test (0.898) | `bench/reports/REDESCRIBE.md` |
 
-Where the deficit lives, by modality (recall@10, every answerable query, speech
-ingested), each beside the chance floor of a random ranking inside the asker's
-holder: code 0.941 (0.696), conversation 0.907 (0.210), pdf 0.876 (0.577),
-image 0.781 (0.011), video 0.651 (0.504), ui_screenshot 0.659 (0.147). Weighted
-by how many questions each holds, the 0.043 short of the bar is mostly
-screenshots (0.659 → 0.95 would add 0.032) and video (0.651 → 0.90 would add
-0.018); code, PDF and conversation have little left to
-give. Both are content problems, not ranking ones: a screenshot question often
-names an icon that has no text, and CLIP cannot point at an icon inside a whole
-screen (crops were tried and lost to on-screen text, `CHECKLIST.md` p2-6.2); a
-video question often asks what was shown, not said, and frames carry only OCR.
-The two capabilities that would close it — a vision model describing regions,
-and a UI widget tree — are not in this repository; the 8B vision model was not
-downloaded for this round. Nothing here rounds those numbers up.
+Where the deficit lives, by modality (recall@10 with the judge, every answerable
+query), each beside the chance floor of a random ranking inside the asker's
+holder: code 0.977 (0.696), conversation 0.945 (0.210), pdf 0.898 (0.577),
+image 0.863 (0.011), video 0.842 (0.504), ui_screenshot 0.800 (0.147). Of the
+0.084 recall still missed, PDF holds 0.027, screenshots 0.022, video 0.012,
+images 0.011, code 0.010 and conversation 0.003, weighted by how many questions
+each holds. A described screenshot still misses an icon the description did not
+name, and a video frame keeps its 192-token description; no UI widget tree is in
+this repository. Nothing here rounds those numbers up.
 
 Re-measure any of them:
 
@@ -53,6 +49,8 @@ python -m bench.video_audio_check --speech-home bench/runs/video_audio_speech \
   --report /tmp/VIDEO_AUDIO.md --payload /tmp/video_audio.json   # speech; drop --speech-home to re-ingest (~5 h)
 python -m bench.run_external                       # the counterparts and the chance floor
 python -m bench.dense_scale                        # the vector leg at corpus size
+ELYSIUM_VLM_BASE_URL=http://127.0.0.1:8001/v1 python -m bench.redescribe_check \
+  --rerank-url http://127.0.0.1:8001/v1           # descriptions at 512 tokens, shipped and judged
 ```
 
 ## What is not measured here
@@ -139,6 +137,12 @@ It buys the memory questions (multi-session 0.857 → 0.920, preference 0.800 �
 0.960) and costs the picture ones (image 0.781 → 0.773), which is why it is
 opt-in rather than the default. The picture leg runs only
 when the words page comes back thin and `ELYSIUM_CLIP_MODEL_DIR` is set.
+A picture is searched by its words: with `ELYSIUM_VLM_BASE_URL` set, ingest asks the served
+vision model to describe it (up to 512 tokens), printed text first;
+`elysium describe-pictures` backfills a store written without one. With
+`ELYSIUM_RERANK_BASE_URL` set, the served model judges each atom of the returned page
+yes or no and the page is reordered by that judgement; the page keeps the same
+memories, and a failed judge fails the search. Off by default.
 Vectors live in the database beside the atoms, written in the same transaction
 as the memory itself, so a memory is findable the moment it is stored and there
 is no index to rebuild.
