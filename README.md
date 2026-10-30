@@ -21,7 +21,7 @@ command that re-measures it, or it is marked as not measured.
 | --- | --- | --- |
 | can it find the memory that answers a question? | recall@10 **0.901**, MRR 0.728, over all 2,928 answerable queries from six third-party corpora, each asked as the holder that corpus assigns it, with speech ingested and every picture described by a local Qwen3.5-9B (figures and screenshots at 512 tokens, video frames at 192); **0.916**, MRR 0.806, when the same 9B judges each returned page (`ELYSIUM_RERANK_BASE_URL`). Chance inside the asker's holder is 0.510 | `bench/reports/REDESCRIBE.md`, `bench/reports/RANK.md` |
 | is that any good? | a Mem0-style counterpart on the same queries scores **0.866** inside one holder's memory and **0.412** across all of them; it was given the frozen stores' words, without descriptions or speech, and its own floor is 0.0002 whole-corpus and 0.369 inside one holder | `bench/reports/BASELINE_EXTERNAL.md` |
-| does the holder boundary matter? | **+0.454 recall@10** with an identical ranker and identical items — the gain is scoping, not ranking | same report |
+| does the holder boundary matter? | **+0.455 recall@10** with an identical ranker and identical items — the gain is scoping, not ranking | same report |
 | how fast at corpus size? | p50 **0.072 s**, p95 0.218 s over 165,973 atoms; the search this replaced took 20.16 s on the same corpus. On today's 194,336-atom store the shipped search reads p50 0.14–0.16 s, p95 1.49–1.56 s (the holder-scope refill scans common words); with the judge p50 0.86–0.92 s, p95 2.05–2.48 s | `bench/reports/SCALE.md`, `bench/reports/redescribe.json` |
 | how much does it hold? | 165,973 atoms and 153,857 vectors in one SQLite file; the vector build runs 106 memories/s. One million is an extrapolation, not a measurement | `bench/reports/DENSE.md` |
 | can a wordless picture be found? | yes for icon crops, weakly for whole screenshots — the report shows every arm, including the ones that hurt | `bench/reports/VISUAL.md` |
@@ -50,7 +50,8 @@ python -m bench.video_audio_check --speech-home bench/runs/video_audio_speech \
 python -m bench.run_external                       # the counterparts and the chance floor
 python -m bench.dense_scale                        # the vector leg at corpus size
 ELYSIUM_VLM_BASE_URL=http://127.0.0.1:8001/v1 python -m bench.redescribe_check \
-  --rerank-url http://127.0.0.1:8001/v1           # descriptions at 512 tokens, shipped and judged
+  --rerank-url http://127.0.0.1:8001/v1 \
+  --report /tmp/REDESCRIBE.md --payload /tmp/redescribe.json   # descriptions at 512 tokens, shipped and judged
 ```
 
 ## What is not measured here

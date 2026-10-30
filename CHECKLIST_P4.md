@@ -71,4 +71,5 @@
   - 外部对手（`bench/reports/BASELINE_EXTERNAL.md`，Mem0 / Zep 式、词法抽取）：holder 作用域 0.866，全库 0.412 / 0.429；它拿到的是冻结库的字，没有描述与语音，chance 按它自己的库算（holder 内 0.369）。真 Mem0、真 Zep 在 p4-6。
   - 判定：0.92 未达。0.90 线：重排后全库与 test 都过；不重排 test 不过。
   - 同步：README「What is measured」改为上表的数并加上「描述给了多少」一行、缺口段按重排后各模态重写（还漏的 0.084：pdf 0.027、截图 0.022、视频 0.012、图 0.011、code 0.010、对话 0.003）、Retrieval 段写明描述与重排两个开关；Gaps §0.5 的 3.1 / 3.3 / 3.4 / 3.7 / 3.8 行与「还剩什么」；`CHECKLIST.md` final-accept 加复跑记录并打勾（7 PASS，0.90 线在重排配置下过）。
+  - 评审（codex）第 1 轮 FAIL，D1–D3：D1 README 新加的重测命令写冻结报告，原样跑被拒；补上 `--report /tmp/REDESCRIBE.md --payload /tmp/redescribe.json`。D2 Gaps 里外部对手 holder 作用域 0.866 配了全库 chance 0.0002；改为 holder 内 0.369。D3 holder 边界收益按三位小数相减写 0.454，原值相减 0.4549；README 与 Gaps 改为 0.455。
 - [ ] **p4-6** 与真 Mem0、真 Zep 对跑并出图（用户要求，2026-10-29）：同一批冻结语料与题目，三家各跑几档配置（Elysium 的 top_k 与腿；Mem0 / Zep 的检索条数与它们的 LLM 写入），纵轴 recall@10（附 holder 内 chance），横轴每题成本（对数刻度：查询耗时与写入时的 LLM token，本地 9B 承担两家的 LLM 调用），画成「每个系统一条线、点是配置档」的图，提交图与生成它的脚本。Mem0 / Zep 的 `add()` 要 LLM 抽取，量级与耗时如实写进报告；跑不全的部分照实标出，不外推。
