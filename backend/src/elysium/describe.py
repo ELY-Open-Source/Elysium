@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import base64
 import io
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 import httpx
@@ -146,12 +146,19 @@ def describe_pictures(settings: Settings, database: Database, workers: int) -> d
     objects = ObjectStore(settings)
     vectors = VectorIndex(settings, database)
     pending = [atom for atom in _pictures(database) if atom.metadata.get("caption") != DESCRIBED]
+    batches = [pending[start : start + BATCH] for start in range(0, len(pending), BATCH)]
     described = 0
     with ThreadPoolExecutor(workers) as pool:
-        for start in range(0, len(pending), BATCH):
-            batch = pending[start : start + BATCH]
-            paths = [objects.resolve(str(atom.image_ref)) for atom in batch]
-            texts = list(pool.map(describer.describe, paths))
+
+        def submit(index: int) -> list[Future[str]]:
+            batch = batches[index] if index < len(batches) else []
+            return [pool.submit(describer.describe, objects.resolve(str(atom.image_ref))) for atom in batch]
+
+        ahead = submit(0)
+        for index, batch in enumerate(batches):
+            # The next batch is asked for before this one is read, so its slowest picture never idles the model.
+            current, ahead = ahead, submit(index + 1)
+            texts = [future.result() for future in current]
             described_batch = [with_description(atom, text) for atom, text in zip(batch, texts, strict=True)]
             for atom in described_batch:
                 trust.stamp([atom], origin=atom.origin)

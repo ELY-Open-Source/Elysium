@@ -7,6 +7,7 @@ letters on the picture, from a model's sentences, or from nothing at all.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
@@ -211,6 +212,33 @@ def test_a_store_described_later_matches_what_ingest_writes_and_resumes(
     atom = database.list_atoms()[0]
     assert atom.text == f"Checkout\n{CAPTION}"
     assert atom.metadata["caption"] == "vlm"
+
+
+def test_the_next_batch_is_asked_for_while_this_one_finishes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Batch by batch, each batch waited for its slowest picture while the model sat idle."""
+    settings, database = _ingest(tmp_path, FakeDescriber(answer=None), monkeypatch, ocr_text="Checkout")
+    (first,) = database.list_atoms()
+    database.upsert_atoms([first.model_copy(update={"atom_id": f"{first.atom_id}-second"})])
+    monkeypatch.setattr(describe_module, "BATCH", 1)
+    second_asked = threading.Event()
+    asked = 0
+    lock = threading.Lock()
+
+    def describe(self: VisionDescriber, path: Path) -> str:
+        nonlocal asked
+        with lock:
+            asked += 1
+            mine = asked
+        if mine == 1 and not second_asked.wait(5):
+            raise AssertionError("the second batch was not asked for while the first was still out")
+        second_asked.set()
+        return CAPTION
+
+    monkeypatch.setattr(VisionDescriber, "describe", describe)
+
+    result = describe_pictures(settings.model_copy(update={"vlm_base_url": "http://127.0.0.1:8001/v1"}), database, workers=2)
+
+    assert result == {"pending": 2, "described": 2}
 
 
 def test_a_described_picture_carrying_an_instruction_is_quarantined(
