@@ -107,6 +107,10 @@ bash scripts/serve-backend.sh          # API on http://127.0.0.1:8765
 bash scripts/serve-frontend.sh         # dashboard on http://127.0.0.1:5173
 ```
 
+`scripts/install.sh` is the developer setup with every local model. The memory itself needs none:
+`pip install ./backend` installs the store, search, API, CLI and the backend MCP talks to, without
+torch; `pip install "./backend[models]"` adds the local embedding, CLIP, speech and training stack.
+
 Windows: the same names as `.ps1`. There is also a container image
 (`docker build -t elysian .`), and CI runs the whole suite on Linux.
 

@@ -18,7 +18,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       # pytest and ruff come from the dev extra, so CI matches a fresh clone.
-      - run: pip install -e "./backend[dev]"
+      - run: pip install -e "./backend[dev,models]"
       - run: python -m pytest -q
       - run: ruff check backend/src bench
 
