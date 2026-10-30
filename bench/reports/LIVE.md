@@ -1,6 +1,6 @@
 # Elysium and Mem0 on one pool
 
-- commit: `b3cadbf0d785d78d78df213ad297545210ca88fc`; machine: 32 cpus, load [0.64, 0.92, 0.96]
+- commit: `d066d71e397c28810e08551fb62e28ed0106d3c8`; machine: 32 cpus, load [0.88, 0.81, 1.28]
 - 110 test questions (code 20, conversation 10, image 20, pdf 20, ui_screenshot 20, video 20), 619 sources, 1963 items of at most 8000 characters given to Mem0
 - chance (a random ranking of the asker's pool): recall@10 0.5911
 - LLM for every system: the same local Qwen3.5-9B on vLLM, thinking off; embedder for Mem0: local MiniLM

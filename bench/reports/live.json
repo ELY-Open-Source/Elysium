@@ -11,16 +11,16 @@
       "video": 20
     }
   },
-  "commit": "b3cadbf0d785d78d78df213ad297545210ca88fc",
+  "commit": "d066d71e397c28810e08551fb62e28ed0106d3c8",
   "machine": {
     "system": "Linux",
     "release": "6.18.54.1-microsoft-standard-WSL2",
     "cpus": 32,
     "threads_per_query": 4,
     "load_average_1_5_15": [
-      0.64,
-      0.92,
-      0.96
+      0.88,
+      0.81,
+      1.28
     ]
   },
   "questions": 110,
@@ -96,7 +96,7 @@
   "arms": [
     {
       "arm": "elysium",
-      "system": "Elysium",
+      "system": "Elysian",
       "items_written": null,
       "write_seconds": 0.0,
       "write_tokens": {
@@ -139,7 +139,7 @@
     },
     {
       "arm": "elysium + 9B judge",
-      "system": "Elysium",
+      "system": "Elysian",
       "items_written": null,
       "write_seconds": 0.0,
       "write_tokens": {
