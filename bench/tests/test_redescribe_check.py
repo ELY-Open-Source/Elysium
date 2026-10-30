@@ -1,5 +1,6 @@
 """A figure goes back to the words it had before any description, and only from the store it came from."""
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -49,3 +50,16 @@ def test_an_undescribed_store_that_lacks_the_figure_is_refused(tmp_path: Path) -
 
     with pytest.raises(SystemExit, match="not the store DESCRIBE started from"):
         redescribe_check.undescribe(tmp_path / "after", tmp_path / "other")
+
+
+def test_the_undescribed_store_is_read_without_being_migrated(tmp_path: Path) -> None:
+    _, plain = _store(tmp_path / "before", Modality.image)
+    after, _ = _store(tmp_path / "after", Modality.image)
+    after.upsert_atoms([with_description(plain, "a bar chart, blue bars rising")])
+    source = tmp_path / "before" / "data" / "elysium.sqlite"
+    with sqlite3.connect(source) as connection:
+        connection.execute("PRAGMA user_version = 12")
+
+    assert redescribe_check.undescribe(tmp_path / "after", tmp_path / "before") == 1
+    with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 12, "the source store must not be migrated in place"

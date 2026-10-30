@@ -367,6 +367,19 @@ def test_every_index_row_sits_on_its_atoms_rowid_through_rewrites_and_deletes(tm
     assert [atom_id for atom_id, _ in search_fts(database, "spare", 5)] == ["second"]
 
 
+def test_a_batch_naming_one_atom_twice_keeps_one_index_row(tmp_path: Path) -> None:
+    """Two files with the same bytes give one atom_id; the second index insert must not hit the first's rowid."""
+    database = _database(tmp_path)
+    _seed_source(database)
+    database.upsert_atoms([_atom("key", text="the key is in the drawer"), _atom("key", text="the key is by the door")])
+
+    assert _unlinked_index_rows(database) == 0
+    with database.connect() as connection:
+        assert int(connection.execute("SELECT count(*) FROM atom_fts").fetchone()[0]) == 1
+    assert database.get_atoms(["key"])[0].text == "the key is by the door"
+    assert [atom_id for atom_id, _ in search_fts(database, "door", 5)] == ["key"]
+
+
 def test_a_twelfth_version_database_moves_its_index_rows_onto_the_atoms_rowids(tmp_path: Path) -> None:
     database = _database(tmp_path)
     _seed_source(database)

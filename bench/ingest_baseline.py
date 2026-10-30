@@ -309,7 +309,7 @@ def merge() -> dict:
     # A file processed twice lands in two shards: atoms dedupe on atom_id but fts5 has no key and kept every copy (288,266 rows for 165,973 atoms).
     connection.execute("DELETE FROM atom_fts")
     connection.execute(
-        "INSERT INTO atom_fts (atom_id, source, text) SELECT atom_id, source, text FROM atoms"
+        "INSERT INTO atom_fts (rowid, atom_id, source, text) SELECT rowid, atom_id, source, text FROM atoms"
     )
     connection.commit()
 

@@ -73,6 +73,8 @@ class Database:
             )
 
     def upsert_atoms(self, atoms: list[EvidenceAtom]) -> None:
+        # One index row per atom: a batch naming an atom twice keeps its last copy, as the upsert does.
+        atoms = list({atom.atom_id: atom for atom in atoms}.values())
         with self.connect() as connection:
             connection.executemany(
                 """

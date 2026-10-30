@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,7 @@ def undescribe(home: Path, undescribed: Path) -> int:
     """Each rewritten modality's atoms take back the words, trust and metadata they had before any description."""
     from elysium.config import Settings
     from elysium.db import Database
+    from elysium.row_codec import row_to_atom
 
     database = Database(Settings(home=home))
     with database.connect() as connection:
@@ -67,7 +69,11 @@ def undescribe(home: Path, undescribed: Path) -> int:
                 (json.dumps(REWRITTEN),),
             )
         ]
-    old = {atom.atom_id: atom for atom in Database(Settings(home=undescribed)).get_atoms(ids)}
+    # Read-only: opening the source as a Database would migrate it in place.
+    with sqlite3.connect(f"file:{undescribed / 'data' / 'elysium.sqlite'}?mode=ro", uri=True) as source:
+        source.row_factory = sqlite3.Row
+        rows = source.execute("SELECT * FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (json.dumps(ids),)).fetchall()
+    old = {atom.atom_id: atom for atom in map(row_to_atom, rows)}
     missing = [atom_id for atom_id in ids if atom_id not in old]
     if missing:
         raise SystemExit(f"{len(missing)} pictures in {home} are not in {undescribed}, e.g. {missing[0]}; it is not the store DESCRIBE started from")

@@ -43,7 +43,7 @@
   - 顺带修的崩溃：写测试时 `remember()` 在「plot axis series of the graph」之后再记「… 0」抛 `KeyError`（`trust.quantity_conflict` 读了旧记忆里不存在的主语数值）。改成两边都有才比；`test_memory_conflicts.py` 加 1 条。
   - 评审（codex）第 1 轮 FAIL，D1–D3：D1 判官同一答案的各写法互相覆盖（`f5c47d9` 改为相加，重跑后判官由 0.606 变为涨）；D2「少 2 题」应为 1；D3「中位 149」未注明是 60 张探针。第 2 轮 PASS（`1d066b6`）。
 - [~] **p4-3b** 描述写长（p4-3 dev 上查出来的，2026-10-29 加）：192 token 的预算把描述截在半句（按句末标点估：图 82%、截图 86%、视频帧 37%），屏幕下半截的按钮没写进去。dev 截图 111 题、只重写 730 张截图：512 token 0.712 → 0.748；改成「至多 150 词」的短提示反而 0.685——对 BM25，字多比句子完整更要紧。把文档图与截图（约 21,400 张）按 512 token 重写，视频帧不动（按 atom_id 顺序各抽 60 张、按 512 token 重写的探针里，视频帧 60 张全写完、中位 149 token；文档图 44 / 60、截图 35 / 60）；dev 量，test 与全库出报告。
-  - 产品：`vlm_max_new_tokens` 默认 192 → 512（`658ac0c`）。harness `bench/redescribe_check.py`：复制 DESCRIBE 库，把 `image` 与 `ui_screenshot` 的 21,362 个 atom 的字、信任、metadata 换回描述前（`bench/runs/describe/before`），再用产品的 `describe_pictures` 按 512 重写；视频帧留 192 的字。`bench/tests/test_redescribe_check.py` 3 条。
+  - 产品：`vlm_max_new_tokens` 默认 192 → 512（`658ac0c`）。harness `bench/redescribe_check.py`：复制 DESCRIBE 库，把 `image` 与 `ui_screenshot` 的 21,362 个 atom 的字、信任、metadata 换回描述前（`bench/runs/describe/before`），再用产品的 `describe_pictures` 按 512 重写；视频帧留 192 的字。`bench/tests/test_redescribe_check.py` 4 条。
   - 跑的时候抓到的写入病（`7326fe8`）：`upsert_atoms` 按 `atom_id` 删索引行，而 `atom_id` 是 FTS5 的 UNINDEXED 列，每删一行扫全索引（194,336 行，单次 0.10 s）；换回 21,362 个 atom 跑了 20 分钟没完。修法：索引行与 atom 同 rowid，写、删都按 rowid；schema 12 → 13，升级时整表重建一次（这个库 24 s）。1,000 个 atom 重写 0.29 s。`test_memory_schema.py` 加 2 条，去掉各自的修复各红 1 条。重建换了同分 atom 的扫描顺序：在新副本上重排三档，recall@10 与 `rank.json` 逐位一样、分模态一样，test MRR 0.7203 → 0.7204；所以 `rank.json` 仍是这条的 before。
   - 第二处（`describe.py`）：补描述一批 64 张，整批等最慢那张写完才发下一批；vLLM 日志里每批约 2 分钟，后半段 KV 从 80% 掉到 5%，GPU 空转。改成读这一批之前先把下一批发出去。`test_describe.py` 加 1 条，退回旧循环红。另：这台的 vLLM 没有 FlashInfer（缺 nvcc），图像编码器不走 CUDA graph，引擎单核 CPU 占满——文档图约 0.5 张/秒，是速度的主因，不在本仓能修的范围。
   - 速度：同一个 180 张探针（`budget_finish.py 512`）这次只有 0.40 张/秒，前一晚是 2.51。vLLM 空闲时 GPU 仍 68%、114 W，`Get-Counter` 指到 Windows 上的 DesktopMate 占 3D 引擎 64%；用户关掉后功耗 306 W，补描述 3.3–4.1 张/秒。21,362 张用了 5,997 s（64 并发）。
@@ -53,7 +53,8 @@
     - 全库分模态（重排）：ui_screenshot 0.772 → 0.800，pdf 0.888 → 0.898，video 0.819 → 0.842，image 0.863 不变，conversation 0.948 → 0.945，code 0.977 不变。
     - 视频帧没重写，video 和 conversation 也动了：词的常用度按全库计（`term_df`），图的描述变长后改了别的题的稀有词。dev 上逐题比两库的 `rare_terms`：video 56 题里 19 题、conversation 57 题里 33 题的稀有词集合变了。
     - 代价：p50 不重排 0.14–0.16 s，重排 0.86–0.92 s；p95 不重排 1.49–1.56 s，重排 2.05–2.48 s（`redescribe.json` 三档，单次跑，随负载变；跑时机器 load 一度到 13.8）。
-    - 离 0.92：dev 到线，test 差 0.007，全库差 0.004。
+    - 离 0.92（按 JSON 原值，不按三位小数）：dev 0.91995，差 0.00005，没到线；test 0.91329，差 0.0067；全库 0.91623，差 0.0038。
+  - 评审（codex）第 1 轮 FAIL，D1–D4。D1 同一批写入同一 atom_id 两次（两个目录里内容相同的文件），第二次插索引撞上第一次的 rowid，整批回滚；修法：`upsert_atoms` 先按 atom_id 去重、留最后一份，与 upsert 本身的结果一致。D2 harness 把描述前的库当 `Database` 打开，顺手把它从 12 迁到 13；改为只读读取。D3 `ingest_baseline` 合并后重建索引没带 rowid，靠 SELECT 的顺序对齐；改为显式带 rowid。D4「dev 到线」是三位小数的 0.920，原值 0.91995，已改。三处修复不动计分：重写的 21,362 个 id 各不相同；描述前的库只重建了索引，atoms 表未变；冻结库的索引在副本迁移时整表重建。`test_memory_schema.py`、`test_redescribe_check.py` 各加 1 条，去掉修复各红 1 条；评审的合并探针在 `reverse_unordered_selects` 下 0 行错位。
 - [ ] **p4-4** 生成侧实测：`elysium runtime-generation-proof` 与钥匙测试场景 7 的首字时间（同题两次，第二次走缓存），把 PARTLY MEASURED 变成实数。
 - [ ] **p4-5** 验收重算：test 与全库 recall@10 对 0.92，并排 chance 与外部对手；README / Gaps / CHECKLIST 同步。
 - [ ] **p4-6** 与真 Mem0、真 Zep 对跑并出图（用户要求，2026-10-29）：同一批冻结语料与题目，三家各跑几档配置（Elysium 的 top_k 与腿；Mem0 / Zep 的检索条数与它们的 LLM 写入），纵轴 recall@10（附 holder 内 chance），横轴每题成本（对数刻度：查询耗时与写入时的 LLM token，本地 9B 承担两家的 LLM 调用），画成「每个系统一条线、点是配置档」的图，提交图与生成它的脚本。Mem0 / Zep 的 `add()` 要 LLM 抽取，量级与耗时如实写进报告；跑不全的部分照实标出，不外推。
