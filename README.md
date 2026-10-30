@@ -170,10 +170,12 @@ See `elysian-mcp/README.md` for the full tool list.
 
 ## Data layout
 
-Runtime state lives under `.elysian/` (git-ignored):
+One person keeps one store, in `~/.elysian/` unless `ELYSIAN_HOME` names another home. A
+store left in a project directory from the old per-project layout stops the process with the
+command that keeps it, instead of an empty store opening beside it.
 
 ```text
-.elysian/
+~/.elysian/
 ├─ data/         the SQLite store: atoms, FTS, vectors (vec0), edges, mounts
 ├─ objects/      ingested source files
 ├─ cache/        compiled-context cache and the picture index

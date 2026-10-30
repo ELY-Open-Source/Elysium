@@ -17,7 +17,7 @@ SERVER_NAME="elysian"
 METHOD="auto"
 VERSION=""
 PROJECT_ROOT=""
-ELYSIAN_HOME=""
+ELYSIAN_HOME="${ELYSIAN_HOME:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -49,7 +49,7 @@ if [[ -z "$PROJECT_ROOT" ]]; then
   fi
 fi
 PROJECT_ROOT="$(cd -- "$PROJECT_ROOT" && pwd)"
-[[ -z "$ELYSIAN_HOME" ]] && ELYSIAN_HOME="$PROJECT_ROOT/.elysian"
+[[ -z "$ELYSIAN_HOME" ]] && ELYSIAN_HOME="$HOME/.elysian"
 mkdir -p "$ELYSIAN_HOME/bin"
 BINARY="$ELYSIAN_HOME/bin/elysian-mcp"
 

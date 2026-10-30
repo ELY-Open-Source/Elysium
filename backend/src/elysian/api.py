@@ -463,5 +463,3 @@ def count_training_steps(path: Path) -> int:
             return 0
     return steps
 
-
-app = create_app()

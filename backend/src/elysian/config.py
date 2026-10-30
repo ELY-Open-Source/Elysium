@@ -18,7 +18,7 @@ OLD_DATABASE_NAMES = ("ely_eye.sqlite", "elysium.sqlite")
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ELYSIAN_", env_file=".env", extra="ignore")
 
-    home: Path = Field(default_factory=lambda: Path.cwd() / ".elysian")
+    home: Path = Field(default_factory=lambda: Path.home() / ".elysian")
     default_holder: str = "local"
     auth_token: str | None = None
     allowed_origins: list[str] = Field(
@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _refuse_old_names(self) -> Settings:
         refuse_old_names(self, dict(os.environ), Path.cwd())
+        if "home" not in self.model_fields_set:
+            refuse_project_store(self.home, Path.cwd())
         return self
 
     def ensure_dirs(self) -> None:
@@ -98,6 +100,17 @@ class Settings(BaseSettings):
             self.adapters_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
+
+
+def refuse_project_store(home: Path, cwd: Path) -> None:
+    """A store in the working directory is the per-project layout from before the global home; opening an empty one beside it would hide it."""
+    for name in (".elysian", *OLD_HOME_NAMES):
+        store = cwd / name
+        if (store / "data").is_dir() and store.resolve() != home.resolve():
+            raise SystemExit(
+                f"{store} holds a project store, and Elysian now keeps memory in {home}; "
+                f"set ELYSIAN_HOME={store} to keep using it, or move it to {home}"
+            )
 
 
 def refuse_old_names(settings: Settings, environment: dict[str, str], cwd: Path) -> None:

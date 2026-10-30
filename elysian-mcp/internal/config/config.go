@@ -22,16 +22,14 @@ type Config struct {
 	APIBaseURL  string `json:"api_base_url"`
 }
 
-// Resolve locates the Elysian data home and its SQLite database. Reads mirror
-// any local .elysian store directly, so identity is anchored on the database
-// itself rather than on Elysian repository layout. This lets the MCP server be
-// deployed for any project that owns an .elysian/data/elysian.sqlite. Writes go
-// through the Elysian API, which owns the memory rules.
+// Resolve locates the Elysian data home and its SQLite database by the backend's rule:
+// --elysian-home, else ELYSIAN_HOME, else ~/.elysian. Reads mirror the store directly;
+// writes go through the Elysian API, which owns the memory rules.
 func Resolve(projectRoot string, elysianHome string, binary string) (Config, error) {
 	if err := refuseOldNames(os.Environ()); err != nil {
 		return Config{}, err
 	}
-	home, err := resolveHome(projectRoot, elysianHome)
+	home, err := resolveHome(elysianHome)
 	if err != nil {
 		return Config{}, err
 	}
@@ -73,7 +71,7 @@ func apiBaseURL() string {
 	return "http://127.0.0.1:8765"
 }
 
-func resolveHome(projectRoot string, elysianHome string) (string, error) {
+func resolveHome(elysianHome string) (string, error) {
 	if elysianHome == "" {
 		elysianHome = os.Getenv("ELYSIAN_HOME")
 	}
@@ -84,15 +82,31 @@ func resolveHome(projectRoot string, elysianHome string) (string, error) {
 		}
 		return home, refuseOldStores(home)
 	}
-	if projectRoot != "" {
-		abs, err := filepath.Abs(projectRoot)
-		if err != nil {
-			return "", err
-		}
-		home := filepath.Join(abs, ".elysian")
-		return home, refuseOldStores(home)
+	user, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
 	}
-	return discoverHome()
+	home := filepath.Join(user, ".elysian")
+	if err := refuseOldStores(home); err != nil {
+		return "", err
+	}
+	return home, refuseProjectStore(home)
+}
+
+// refuseProjectStore mirrors the backend's refuse_project_store: a per-project store must not be passed over.
+func refuseProjectStore(home string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	for _, name := range append([]string{".elysian"}, oldHomeNames...) {
+		store := filepath.Join(cwd, name)
+		if exists(filepath.Join(store, "data")) && store != home {
+			return errors.New(store + " holds a project store, and Elysian now keeps memory in " + home +
+				"; set ELYSIAN_HOME=" + store + " to keep using it, or move it to " + home)
+		}
+	}
+	return nil
 }
 
 // refuseOldStores mirrors the backend's refuse_old_names: an old store must not be passed over.
@@ -120,27 +134,6 @@ func refuseOldStores(home string) error {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
-}
-
-func discoverHome() (string, error) {
-	current, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		home := filepath.Join(current, ".elysian")
-		if err := refuseOldStores(home); err != nil {
-			return "", err
-		}
-		if exists(filepath.Join(home, "data", "elysian.sqlite")) {
-			return home, nil
-		}
-		next := filepath.Dir(current)
-		if next == current {
-			return "", errors.New("cannot find an Elysian data home; pass --elysian-home or set ELYSIAN_HOME")
-		}
-		current = next
-	}
 }
 
 // refuseOldNames stops on any old-prefix variable: ignoring ELYSIUM_AUTH_TOKEN would

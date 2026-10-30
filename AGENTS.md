@@ -1,7 +1,8 @@
 # Agent notes for this repository
 
 The project is **Elysian** (往世乐土), renamed from Ely-Eye, then from Elysium on 2026-10-30: the package is `elysian`, the CLI
-`elysian`, the Go server `elysian-mcp`, variables `ELYSIAN_*`, the store `.elysian/data/elysian.sqlite`.
+`elysian`, the Go server `elysian-mcp`, variables `ELYSIAN_*`, the store `~/.elysian/data/elysian.sqlite`
+(`ELYSIAN_HOME` names another home; backend and Go share the rule and refuse a per-project store left in the working directory).
 Any old name stops the process (`config.refuse_old_names`, `elysian-mcp/internal/config`), because an
 ignored `ELY_EYE_AUTH_TOKEN` or `ELYSIUM_AUTH_TOKEN` would start a server with no token. The repository is
 `github.com/ELY-Open-Source/Elysian` and the Go module is `github.com/ELY-Open-Source/Elysian/elysian-mcp`.

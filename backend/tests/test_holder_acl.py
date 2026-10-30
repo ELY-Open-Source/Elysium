@@ -42,7 +42,7 @@ def _settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
 
 
 @pytest.fixture
-def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def client(settings: Settings) -> TestClient:
     return TestClient(api_module.create_app())
 
 

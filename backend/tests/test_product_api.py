@@ -190,11 +190,11 @@ def test_status_names_pictures_whose_bytes_are_gone(client: TestClient, settings
     assert senses["picture_bytes_missing"] == 1
 
 
-def test_the_http_surface_is_exactly_what_someone_uses() -> None:
+def test_the_http_surface_is_exactly_what_someone_uses(settings: Settings) -> None:
     """A route nobody calls is a contract nobody keeps: adding one has to be a deliberate act."""
     served = {
         route.path
-        for route in api_module.app.routes
+        for route in api_module.create_app().routes
         if isinstance(route, APIRoute) and route.path.startswith("/api")
     }
     assert served == HTTP_SURFACE

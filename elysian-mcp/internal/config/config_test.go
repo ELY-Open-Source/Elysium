@@ -32,28 +32,54 @@ func store(t *testing.T, path string) {
 	}
 }
 
-func TestAnOldStoreIsNotPassedOverForOneHigherUp(t *testing.T) {
-	for _, old := range []string{".elysium/data/elysium.sqlite", ".elysian/data/elysium.sqlite", ".ely_eye/data/ely_eye.sqlite"} {
-		root := t.TempDir()
-		store(t, filepath.Join(root, ".elysian", "data", "elysian.sqlite"))
-		child := filepath.Join(root, "project")
-		store(t, filepath.Join(child, old))
-		t.Chdir(child)
-		home, err := discoverHome()
-		if err == nil || !strings.Contains(err.Error(), "from before the rename") {
-			t.Fatalf("%s must stop the walk up, got home %q and error %v", old, home, err)
+func user(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Setenv("HOME", filepath.Join(root, "user"))
+	t.Setenv("ELYSIAN_HOME", "")
+	if err := os.MkdirAll(filepath.Join(root, "project"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Join(root, "project"))
+	return root
+}
+
+func TestTheDefaultHomeIsTheUsersWhateverTheDirectory(t *testing.T) {
+	root := user(t)
+	home, err := resolveHome("")
+	if err != nil || home != filepath.Join(root, "user", ".elysian") {
+		t.Fatalf("the default home must be ~/.elysian, got %q, %v", home, err)
+	}
+}
+
+func TestAProjectStoreIsNotPassedOverForTheGlobalOne(t *testing.T) {
+	for _, name := range []string{".elysian", ".elysium", ".ely_eye"} {
+		root := user(t)
+		store(t, filepath.Join(root, "project", name, "data", "elysian.sqlite"))
+		if _, err := resolveHome(""); err == nil || !strings.Contains(err.Error(), "holds a project store") {
+			t.Fatalf("a project store in %s must stop the server, got %v", name, err)
 		}
+	}
+}
+
+func TestNamingTheProjectStoreOpensIt(t *testing.T) {
+	root := user(t)
+	project := filepath.Join(root, "project", ".elysian")
+	store(t, filepath.Join(project, "data", "elysian.sqlite"))
+	t.Setenv("ELYSIAN_HOME", project)
+	if home, err := resolveHome(""); err != nil || home != project {
+		t.Fatalf("ELYSIAN_HOME must open the named store, got %q, %v", home, err)
 	}
 }
 
 func TestAnExplicitHomeWithAnOldDatabaseIsRefused(t *testing.T) {
 	home := filepath.Join(t.TempDir(), ".elysian")
 	store(t, filepath.Join(home, "data", "elysium.sqlite"))
-	if _, err := resolveHome("", home); err == nil || !strings.Contains(err.Error(), "elysium.sqlite is a store from before the rename") {
+	if _, err := resolveHome(home); err == nil || !strings.Contains(err.Error(), "elysium.sqlite is a store from before the rename") {
 		t.Fatalf("an old database in the given home must be refused, got %v", err)
 	}
 	store(t, filepath.Join(home, "data", "elysian.sqlite"))
-	if _, err := resolveHome("", home); err != nil {
+	if _, err := resolveHome(home); err != nil {
 		t.Fatalf("a moved store must open, got %v", err)
 	}
 }

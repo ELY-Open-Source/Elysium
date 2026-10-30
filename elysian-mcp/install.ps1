@@ -34,7 +34,8 @@ if (-not $ProjectRoot) {
   }
 }
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
-if (-not $ElysianHome) { $ElysianHome = Join-Path $ProjectRoot ".elysian" }
+if (-not $ElysianHome) { $ElysianHome = $env:ELYSIAN_HOME }
+if (-not $ElysianHome) { $ElysianHome = Join-Path $HOME ".elysian" }
 $BinDir = Join-Path $ElysianHome "bin"
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 $Binary = Join-Path $BinDir "elysian-mcp.exe"

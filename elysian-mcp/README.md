@@ -2,9 +2,9 @@
 
 Elysian MCP exposes a local Context Cartridge memory store as a stdio Model Context Protocol server for coding agents such as Codex and Claude Code.
 
-The server is local-first and read-only against `<elysian-home>/data/elysian.sqlite`. It reads Evidence Atoms, cartridge manifests, Memory DNA, proof-suite artifacts, HashHop proofs, and compiled evidence packs. The production database is never modified.
+The server is local-first. Reads open `<elysian-home>/data/elysian.sqlite` read-only; writes go through the Elysian API, which owns the memory rules.
 
-It can be deployed for any `.elysian` store. Identity is anchored on the database file, not on the Elysian repository layout, so the server walks up from the working directory to find `.elysian/data/elysian.sqlite`, or takes an explicit `--elysian-home`.
+The home follows the backend's rule: `--elysian-home`, else `ELYSIAN_HOME`, else `~/.elysian`. A per-project store left in the working directory stops the server with the command that keeps it.
 
 ## One-command setup
 
@@ -32,13 +32,13 @@ Codex registration uses `codex mcp add`. Claude Code project registration writes
 
 ## Manual run
 
-From inside a project that owns an `.elysian` store:
+Against `~/.elysian`:
 
 ```bash
 go run ./cmd/elysian-mcp server
 ```
 
-Or point at an explicit store:
+Or point at another store:
 
 ```bash
 go run ./cmd/elysian-mcp server --elysian-home /path/to/.elysian
