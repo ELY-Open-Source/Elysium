@@ -1,0 +1,313 @@
+{
+  "meta": {
+    "queries": 110,
+    "answerable": 110,
+    "limit_per_modality": {
+      "code": 20,
+      "conversation": 10,
+      "image": 20,
+      "pdf": 20,
+      "ui_screenshot": 20,
+      "video": 20
+    }
+  },
+  "commit": "b3cadbf0d785d78d78df213ad297545210ca88fc",
+  "machine": {
+    "system": "Linux",
+    "release": "6.18.54.1-microsoft-standard-WSL2",
+    "cpus": 32,
+    "threads_per_query": 4,
+    "load_average_1_5_15": [
+      0.64,
+      0.92,
+      0.96
+    ]
+  },
+  "questions": 110,
+  "by_modality_questions": {
+    "code": 20,
+    "conversation": 10,
+    "image": 20,
+    "pdf": 20,
+    "ui_screenshot": 20,
+    "video": 20
+  },
+  "pool": {
+    "seed": 0,
+    "spec": {
+      "code": [
+        20,
+        20,
+        30
+      ],
+      "conversation": [
+        10,
+        10,
+        20
+      ],
+      "image": [
+        2,
+        20,
+        60
+      ],
+      "pdf": [
+        2,
+        20,
+        12
+      ],
+      "ui_screenshot": [
+        2,
+        20,
+        60
+      ],
+      "video": [
+        2,
+        20,
+        12
+      ]
+    },
+    "chunk_chars": 8000,
+    "sources_without_text": [
+      "lme:0edc2aef:sharegpt_86llQ0z_0",
+      "lme:19b5f2b3_abs:45c29267",
+      "lme:505af2f5:sharegpt_A3DTUI4_28",
+      "lme:505af2f5:sharegpt_i59HUGf_0",
+      "lme:54026fce:fab585c2_1",
+      "lme:8b9d4367:sharegpt_ZcfatzD_0",
+      "lme:cc06de0d:9863a1c8_3",
+      "lme:cf22b7bf:ultrachat_155963",
+      "visrag:mp-docvqa:xmww0217_p16.jpg"
+    ]
+  },
+  "pool_sources": 619,
+  "items_given": 1963,
+  "chance": {
+    "recall_at_10": 0.5911053172174116
+  },
+  "descriptions": {
+    "tokens": {
+      "prompt": 1937327,
+      "generated": 602240
+    },
+    "seconds": 637.2027844359836,
+    "pictures": 2051
+  },
+  "external_limit": 24,
+  "arms": [
+    {
+      "arm": "elysium",
+      "system": "Elysium",
+      "items_written": null,
+      "write_seconds": 0.0,
+      "write_tokens": {
+        "prompt": 0,
+        "generated": 0
+      },
+      "writes_failed": [],
+      "query_tokens": {
+        "prompt": 0,
+        "generated": 0
+      },
+      "tokens_per_question": 23086.97272727273,
+      "p50_seconds": 0.07009597300202586,
+      "p95_seconds": 0.25131165800848976,
+      "overall": {
+        "n_answerable": 110,
+        "n_unanswerable": 0,
+        "recall_at_1": 0.5363636363636364,
+        "recall_at_5": 0.8,
+        "recall_at_10": 0.8636363636363636,
+        "ndcg_at_10": 0.7050806254515467,
+        "mrr": 0.6562655141107827,
+        "hit_at_10": 0.8636363636363636,
+        "hit_at_10_wilson_lower": 0.7871432478694177,
+        "abstention_rate_answerable": 0.0,
+        "abstention_rate_unanswerable": 0.0,
+        "top_hit_from_holder_unanswerable": 0.0
+      },
+      "by_modality": {
+        "code": 0.95,
+        "conversation": 1.0,
+        "image": 0.85,
+        "pdf": 0.95,
+        "ui_screenshot": 0.65,
+        "video": 0.85
+      },
+      "recall_at_10": 0.8636363636363636,
+      "hit_at_10": 0.8636363636363636,
+      "hit_at_10_wilson_lower": 0.7871432478694177
+    },
+    {
+      "arm": "elysium + 9B judge",
+      "system": "Elysium",
+      "items_written": null,
+      "write_seconds": 0.0,
+      "write_tokens": {
+        "prompt": 0,
+        "generated": 0
+      },
+      "writes_failed": [],
+      "query_tokens": {
+        "prompt": 1018333,
+        "generated": 2233
+      },
+      "tokens_per_question": 32364.845454545455,
+      "p50_seconds": 0.7862268549797591,
+      "p95_seconds": 1.2115558380028233,
+      "overall": {
+        "n_answerable": 110,
+        "n_unanswerable": 0,
+        "recall_at_1": 0.6409090909090909,
+        "recall_at_5": 0.8545454545454545,
+        "recall_at_10": 0.9090909090909091,
+        "ndcg_at_10": 0.7779946706647565,
+        "mrr": 0.7378643578643579,
+        "hit_at_10": 0.9090909090909091,
+        "hit_at_10_wilson_lower": 0.8407034728180641,
+        "abstention_rate_answerable": 0.0,
+        "abstention_rate_unanswerable": 0.0,
+        "top_hit_from_holder_unanswerable": 0.0
+      },
+      "by_modality": {
+        "code": 0.95,
+        "conversation": 1.0,
+        "image": 0.95,
+        "pdf": 0.95,
+        "ui_screenshot": 0.8,
+        "video": 0.85
+      },
+      "recall_at_10": 0.9090909090909091,
+      "hit_at_10": 0.9090909090909091,
+      "hit_at_10_wilson_lower": 0.8407034728180641
+    },
+    {
+      "arm": "mem0 raw",
+      "system": "Mem0",
+      "items_written": 1963,
+      "write_seconds": 95.6540897040104,
+      "write_tokens": {
+        "prompt": 0,
+        "generated": 0
+      },
+      "writes_failed": [],
+      "query_tokens": {
+        "prompt": 0,
+        "generated": 0
+      },
+      "tokens_per_question": 23086.97272727273,
+      "p50_seconds": 0.03618053998798132,
+      "p95_seconds": 0.07280878600431606,
+      "overall": {
+        "n_answerable": 110,
+        "n_unanswerable": 0,
+        "recall_at_1": 0.5954545454545455,
+        "recall_at_5": 0.8636363636363636,
+        "recall_at_10": 0.8909090909090909,
+        "ndcg_at_10": 0.7575776677780834,
+        "mrr": 0.7173699028244482,
+        "hit_at_10": 0.8909090909090909,
+        "hit_at_10_wilson_lower": 0.8189511686524213,
+        "abstention_rate_answerable": 0.0,
+        "abstention_rate_unanswerable": 0.0,
+        "top_hit_from_holder_unanswerable": 0.0
+      },
+      "by_modality": {
+        "code": 0.95,
+        "conversation": 1.0,
+        "image": 0.95,
+        "pdf": 1.0,
+        "ui_screenshot": 0.6,
+        "video": 0.9
+      },
+      "recall_at_10": 0.8909090909090909,
+      "hit_at_10": 0.8909090909090909,
+      "hit_at_10_wilson_lower": 0.8189511686524213
+    },
+    {
+      "arm": "mem0",
+      "system": "Mem0",
+      "items_written": 1963,
+      "write_seconds": 19278.546429671027,
+      "write_tokens": {
+        "prompt": 21359739,
+        "generated": 1193475
+      },
+      "writes_failed": [],
+      "query_tokens": {
+        "prompt": 0,
+        "generated": 0
+      },
+      "tokens_per_question": 228116.19090909092,
+      "p50_seconds": 0.029149264009902254,
+      "p95_seconds": 0.05262015500920825,
+      "overall": {
+        "n_answerable": 110,
+        "n_unanswerable": 0,
+        "recall_at_1": 0.4954545454545455,
+        "recall_at_5": 0.7090909090909091,
+        "recall_at_10": 0.7181818181818181,
+        "ndcg_at_10": 0.6234844269263994,
+        "mrr": 0.5936627588098176,
+        "hit_at_10": 0.7181818181818181,
+        "hit_at_10_wilson_lower": 0.6278504468827402,
+        "abstention_rate_answerable": 0.02727272727272727,
+        "abstention_rate_unanswerable": 0.0,
+        "top_hit_from_holder_unanswerable": 0.0
+      },
+      "by_modality": {
+        "code": 0.3,
+        "conversation": 0.9,
+        "image": 0.85,
+        "pdf": 1.0,
+        "ui_screenshot": 0.45,
+        "video": 0.9
+      },
+      "recall_at_10": 0.7181818181818181,
+      "hit_at_10": 0.7181818181818181,
+      "hit_at_10_wilson_lower": 0.6278504468827402
+    },
+    {
+      "arm": "mem0 + LLM rerank",
+      "system": "Mem0",
+      "items_written": 1963,
+      "write_seconds": 19278.546429671027,
+      "write_tokens": {
+        "prompt": 21359739,
+        "generated": 1193475
+      },
+      "writes_failed": [],
+      "query_tokens": {
+        "prompt": 576197,
+        "generated": 9028
+      },
+      "tokens_per_question": 233436.41818181818,
+      "p50_seconds": 15.568692606000695,
+      "p95_seconds": 17.947546146984678,
+      "overall": {
+        "n_answerable": 110,
+        "n_unanswerable": 0,
+        "recall_at_1": 0.5590909090909091,
+        "recall_at_5": 0.6909090909090909,
+        "recall_at_10": 0.7181818181818181,
+        "ndcg_at_10": 0.6457370246523219,
+        "mrr": 0.6243310299326341,
+        "hit_at_10": 0.7181818181818181,
+        "hit_at_10_wilson_lower": 0.6278504468827402,
+        "abstention_rate_answerable": 0.02727272727272727,
+        "abstention_rate_unanswerable": 0.0,
+        "top_hit_from_holder_unanswerable": 0.0
+      },
+      "by_modality": {
+        "code": 0.3,
+        "conversation": 0.9,
+        "image": 0.85,
+        "pdf": 1.0,
+        "ui_screenshot": 0.45,
+        "video": 0.9
+      },
+      "recall_at_10": 0.7181818181818181,
+      "hit_at_10": 0.7181818181818181,
+      "hit_at_10_wilson_lower": 0.6278504468827402
+    }
+  ]
+}

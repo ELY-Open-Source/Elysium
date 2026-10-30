@@ -72,4 +72,9 @@
   - 判定：0.92 未达。0.90 线：重排后全库与 test 都过；不重排 test 不过。
   - 同步：README「What is measured」改为上表的数并加上「描述给了多少」一行、缺口段按重排后各模态重写（还漏的 0.084：pdf 0.027、截图 0.022、视频 0.012、图 0.011、code 0.010、对话 0.003）、Retrieval 段写明描述与重排两个开关；Gaps §0.5 的 3.1 / 3.3 / 3.4 / 3.7 / 3.8 行与「还剩什么」；`CHECKLIST.md` final-accept 加复跑记录并打勾（7 PASS，0.90 线在重排配置下过）。
   - 评审（codex）第 1 轮 FAIL，D1–D3：D1 README 新加的重测命令写冻结报告，原样跑被拒；补上 `--report /tmp/REDESCRIBE.md --payload /tmp/redescribe.json`。D2 Gaps 里外部对手 holder 作用域 0.866 配了全库 chance 0.0002；改为 holder 内 0.369。D3 holder 边界收益按三位小数相减写 0.454，原值相减 0.4549；README 与 Gaps 改为 0.455。第 2 轮 PASS（`10d0562`）。
-- [ ] **p4-6** 与真 Mem0、真 Zep 对跑并出图（用户要求，2026-10-29）：同一批冻结语料与题目，三家各跑几档配置（Elysium 的 top_k 与腿；Mem0 / Zep 的检索条数与它们的 LLM 写入），纵轴 recall@10（附 holder 内 chance），横轴每题成本（对数刻度：查询耗时与写入时的 LLM token，本地 9B 承担两家的 LLM 调用），画成「每个系统一条线、点是配置档」的图，提交图与生成它的脚本。Mem0 / Zep 的 `add()` 要 LLM 抽取，量级与耗时如实写进报告；跑不全的部分照实标出，不外推。
+- [x] **p4-6** 与真 Mem0、真 Zep 对跑并出图（用户要求，2026-10-29）：同一批冻结语料与题目，三家各跑几档配置（Elysium 的 top_k 与腿；Mem0 / Zep 的检索条数与它们的 LLM 写入），纵轴 recall@10（附 holder 内 chance），横轴每题成本（对数刻度：查询耗时与写入时的 LLM token，本地 9B 承担两家的 LLM 调用），画成「每个系统一条线、点是配置档」的图，提交图与生成它的脚本。Mem0 / Zep 的 `add()` 要 LLM 抽取，量级与耗时如实写进报告；跑不全的部分照实标出，不外推。
+  - 范围（用户 2026-10-30 定）：不比 Zep，只比 Elysium 与真 Mem0（mem0ai 2.2.1，Qdrant 服务，`llm_reranker`）；不加 `enable_vision`；跳过 codex 评审；Elysium 两档不重跑，`elysium.json` 的 `write` 置空，描述成本只按共享一份计。
+  - 池（`bench/live_pool.py`）：110 道 test 题，619 个源，1963 段（每段至多 8000 字）；holder 池内 chance 0.591。2051 张图的描述由 Elysium 写入时生成，1,937,327 + 602,240 token，两家共用。
+  - 结果（`bench/reports/LIVE.md`，图 `live_cost.svg`，stamp `b3cadbf`）：Elysium 0.864 / 23,087 token 每题；Elysium + 9B 重排 0.909 / 32,365；Mem0 原文（`infer=False`）0.891 / 23,087；Mem0 抽取 0.718 / 228,116；Mem0 抽取 + LLM 重排 0.718 / 233,436，p50 15.6 s。
+  - Mem0 抽取写入：21,359,739 + 1,193,475 token，19,279 s；`add()` 无一抛错，但日志里 13 次 "Error parsing extraction response"（9B 返回的 JSON 不合法，Mem0 吞掉）。抽取把 code 题打到 0.300。
+  - 判定：同一个 9B，Elysium 重排档 recall 最高，成本是 Mem0 抽取档的七分之一；Mem0 原文档比 Elysium 不重排档高 0.027，单次运行，差距在误差内。
