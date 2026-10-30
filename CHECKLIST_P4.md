@@ -59,7 +59,7 @@
   - 场景 7（`scripts/key_test.sh`）：给 `ELYSIUM_KEY_TEST_GENERATOR_URL`（vLLM 的 /v1）时，同一份正文两次各走产品的 `QwenRuntime.generate`，只要 1 个 token，往返即预填加首字；前后读 vLLM 的 `vllm:prefix_cache_hits_total` 记下命中的 token。第一版用卡带 甲 那一行（464 token），两次都 0 命中：vLLM 对 Qwen3.5 按 528 token 一块复用前缀，不满一块的正文复用不了；那次冷 0.51 s、热 0.088 s 的差来自客户端初始化，不是缓存。改为场景 7 自己摄入一份 24 节的刷漆记录（约 2,000 token），运行时在计时外建好。判定：热的那次命中数大于冷的那次。5 次跑：冷 0.39–0.49 s、0 / 约 2,000 命中；热 0.058–0.095 s、1,584 命中。不给服务时仍写 PARTLY MEASURED，并给出重跑命令。顺带修：清理时 `kill` 后不等进程退出，连跑第二次撞上「port 8801 already answers」；改为 `wait`。
   - `elysium runtime-generation-proof`（`ELYSIUM_RUNTIME_BACKEND=sglang` 指向同一个 vLLM）：空库 FAIL，`No PRD text evidence`——这台机器上没有 PRD 原文，也没有训练出的 HME-Core-LoRA（`.elysium/adapters` 为空，权重在训练机上）。摄入 `TRAINING_ARTIFACTS.md` 作证据再跑：9B 输入 1,683、输出 111 token（评审复跑 130，温度 0 也不逐位一样），答出 6 / 6 个 adapter 名，引用准确率 1.00，被引 atom 自己含 ≥3 个名字；仍判 FAIL，只因检查要求 transformers 后端并挂上 HME-Core-LoRA，adapter 为 null。所以「9B 能按证据带引用作答」已实测，「训练出的 adapter 被加载并用于生成」在本机测不了，留在 README 的未测清单。
   - 评审（codex）第 1 轮 PASS（`e9b964d`）；评审串行复跑 5 次：冷 0.419–0.486 s，热 0.054–0.058 s，命中 0 → 1,584。
-- [~] **p4-5** 验收重算：test 与全库 recall@10 对 0.92，并排 chance 与外部对手；README / Gaps / CHECKLIST 同步。
+- [x] **p4-5** 验收重算：test 与全库 recall@10 对 0.92，并排 chance 与外部对手；README / Gaps / CHECKLIST 同步。
   - 数（`bench/reports/redescribe.json`，stamp `79d1ea8`；按原值，不按三位小数）：
 
     | split | n | holder 内 chance | 不重排 | 9B 重排 | hit@10 Wilson 下界（重排） | 对 0.92 |
@@ -71,5 +71,5 @@
   - 外部对手（`bench/reports/BASELINE_EXTERNAL.md`，Mem0 / Zep 式、词法抽取）：holder 作用域 0.866，全库 0.412 / 0.429；它拿到的是冻结库的字，没有描述与语音，chance 按它自己的库算（holder 内 0.369）。真 Mem0、真 Zep 在 p4-6。
   - 判定：0.92 未达。0.90 线：重排后全库与 test 都过；不重排 test 不过。
   - 同步：README「What is measured」改为上表的数并加上「描述给了多少」一行、缺口段按重排后各模态重写（还漏的 0.084：pdf 0.027、截图 0.022、视频 0.012、图 0.011、code 0.010、对话 0.003）、Retrieval 段写明描述与重排两个开关；Gaps §0.5 的 3.1 / 3.3 / 3.4 / 3.7 / 3.8 行与「还剩什么」；`CHECKLIST.md` final-accept 加复跑记录并打勾（7 PASS，0.90 线在重排配置下过）。
-  - 评审（codex）第 1 轮 FAIL，D1–D3：D1 README 新加的重测命令写冻结报告，原样跑被拒；补上 `--report /tmp/REDESCRIBE.md --payload /tmp/redescribe.json`。D2 Gaps 里外部对手 holder 作用域 0.866 配了全库 chance 0.0002；改为 holder 内 0.369。D3 holder 边界收益按三位小数相减写 0.454，原值相减 0.4549；README 与 Gaps 改为 0.455。
+  - 评审（codex）第 1 轮 FAIL，D1–D3：D1 README 新加的重测命令写冻结报告，原样跑被拒；补上 `--report /tmp/REDESCRIBE.md --payload /tmp/redescribe.json`。D2 Gaps 里外部对手 holder 作用域 0.866 配了全库 chance 0.0002；改为 holder 内 0.369。D3 holder 边界收益按三位小数相减写 0.454，原值相减 0.4549；README 与 Gaps 改为 0.455。第 2 轮 PASS（`10d0562`）。
 - [ ] **p4-6** 与真 Mem0、真 Zep 对跑并出图（用户要求，2026-10-29）：同一批冻结语料与题目，三家各跑几档配置（Elysium 的 top_k 与腿；Mem0 / Zep 的检索条数与它们的 LLM 写入），纵轴 recall@10（附 holder 内 chance），横轴每题成本（对数刻度：查询耗时与写入时的 LLM token，本地 9B 承担两家的 LLM 调用），画成「每个系统一条线、点是配置档」的图，提交图与生成它的脚本。Mem0 / Zep 的 `add()` 要 LLM 抽取，量级与耗时如实写进报告；跑不全的部分照实标出，不外推。
