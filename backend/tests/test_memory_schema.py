@@ -342,3 +342,43 @@ def test_an_eleventh_version_database_learns_that_a_future_retirement_is_still_c
     assert visible == ["key"], (
         "the old view body survived, so a memory retiring next year would answer nothing today"
     )
+
+
+def _unlinked_index_rows(database: Database) -> int:
+    with database.connect() as connection:
+        return int(
+            connection.execute(
+                "SELECT count(*) FROM atom_fts AS f LEFT JOIN atoms AS a ON a.rowid = f.rowid AND a.atom_id = f.atom_id WHERE a.atom_id IS NULL"
+            ).fetchone()[0]
+        )
+
+
+def test_every_index_row_sits_on_its_atoms_rowid_through_rewrites_and_deletes(tmp_path: Path) -> None:
+    """A write finds its index row by rowid; matched by the unindexed atom_id, each write scanned the whole index."""
+    database = _database(tmp_path)
+    _seed_source(database)
+    database.upsert_atoms([_atom("first"), _atom("second"), _atom("third")])
+    database.upsert_atoms([_atom("second", text="the spare key hangs by the door")])
+    database.delete_atoms(["third"])
+
+    assert _unlinked_index_rows(database) == 0
+    with database.connect() as connection:
+        assert int(connection.execute("SELECT count(*) FROM atom_fts").fetchone()[0]) == 2
+    assert [atom_id for atom_id, _ in search_fts(database, "spare", 5)] == ["second"]
+
+
+def test_a_twelfth_version_database_moves_its_index_rows_onto_the_atoms_rowids(tmp_path: Path) -> None:
+    database = _database(tmp_path)
+    _seed_source(database)
+    database.upsert_atoms([_atom("key")])
+    with database.connect() as connection:
+        connection.execute("DELETE FROM atom_fts")
+        connection.execute("INSERT INTO atom_fts(rowid, atom_id, source, text) VALUES (999, 'key', 'notes/key.txt', '钥匙 放在 玄关')")
+        connection.execute("PRAGMA user_version = 12")
+    assert _unlinked_index_rows(database) == 1
+
+    upgraded = _database(tmp_path)
+    assert _unlinked_index_rows(upgraded) == 0
+    upgraded.upsert_atoms([_atom("key", text="the key moved to the drawer")])
+    with upgraded.connect() as connection:
+        assert int(connection.execute("SELECT count(*) FROM atom_fts").fetchone()[0]) == 1, "a rewrite must replace its row, not add a second"

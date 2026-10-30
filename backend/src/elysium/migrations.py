@@ -16,7 +16,7 @@ import sqlite3
 from .storage import token_equivalent, visual_token_equivalent
 from .text_index import index_text
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 ATOM_COLUMNS_V2 = """
     atom_id TEXT PRIMARY KEY,
@@ -313,7 +313,7 @@ def apply(connection: sqlite3.Connection) -> None:
             _upgrade_v1_to_v2(connection)
     else:
         _create_v2(connection)
-    if version < 3:
+    if version < 13:
         _rebuild_fts(connection)
     if version < 7:
         _recount_visual_tokens(connection)
@@ -337,12 +337,16 @@ def apply(connection: sqlite3.Connection) -> None:
 
 
 def _rebuild_fts(connection: sqlite3.Connection) -> None:
-    """Re-index every atom through text_index: rows indexed before it existed hold raw text, and
-    FTS5 cannot match 钥匙 inside a token that is a whole Chinese sentence."""
+    """Re-index every atom through text_index, each index row on its atom's rowid.
+
+    Rows indexed before text_index existed hold raw text, and FTS5 cannot match 钥匙 inside a token
+    that is a whole Chinese sentence. Rows indexed before v13 carry their own rowid, so a write could
+    find its row only by scanning the index for the unindexed atom_id.
+    """
     connection.execute("DROP TABLE IF EXISTS atom_fts")
     connection.executescript(_BASE_TABLES)
-    rows = connection.execute("SELECT atom_id, source, text FROM atoms ORDER BY atom_id").fetchall()
+    rows = connection.execute("SELECT rowid, atom_id, source, text FROM atoms ORDER BY atom_id").fetchall()
     connection.executemany(
-        "INSERT INTO atom_fts(atom_id, source, text) VALUES (?, ?, ?)",
-        [(row[0], index_text(row[1]), index_text(row[2])) for row in rows],
+        "INSERT INTO atom_fts(rowid, atom_id, source, text) VALUES (?, ?, ?, ?)",
+        [(row[0], row[1], index_text(row[2]), index_text(row[3])) for row in rows],
     )

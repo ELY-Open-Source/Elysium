@@ -50,8 +50,8 @@ COPY_STATEMENTS = (
     'INSERT OR IGNORE INTO "sources" SELECT * FROM shard."sources"',
     'INSERT OR IGNORE INTO "atoms" SELECT * FROM shard."atoms"',
     (
-        'INSERT OR IGNORE INTO "atom_fts" (atom_id, source, text) '
-        'SELECT DISTINCT atom_id, source, text FROM shard."atom_fts"'
+        'INSERT OR REPLACE INTO "atom_fts" (rowid, atom_id, source, text) '
+        'SELECT a.rowid, f.atom_id, f.source, f.text FROM shard."atom_fts" AS f JOIN "atoms" AS a ON a.atom_id = f.atom_id'
     ),
     'INSERT OR IGNORE INTO "cartridges" SELECT * FROM shard."cartridges"',
     'INSERT OR IGNORE INTO "cache_events" SELECT * FROM shard."cache_events"',

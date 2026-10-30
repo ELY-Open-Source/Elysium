@@ -117,10 +117,13 @@ class Database:
                 """,
                 [atom_params(atom) for atom in atoms],
             )
-            connection.executemany("DELETE FROM atom_fts WHERE atom_id = ?", [(atom.atom_id,) for atom in atoms])
+            # An index row shares its atom's rowid; found by atom_id, the unindexed column, each write scanned the whole index.
             connection.executemany(
-                "INSERT INTO atom_fts(atom_id, source, text) VALUES (?, ?, ?)",
-                [(atom.atom_id, index_text(atom.source), index_text(atom.text)) for atom in atoms],
+                "DELETE FROM atom_fts WHERE rowid = (SELECT rowid FROM atoms WHERE atom_id = ?)", [(atom.atom_id,) for atom in atoms]
+            )
+            connection.executemany(
+                "INSERT INTO atom_fts(rowid, atom_id, source, text) VALUES ((SELECT rowid FROM atoms WHERE atom_id = ?), ?, ?, ?)",
+                [(atom.atom_id, atom.atom_id, index_text(atom.source), index_text(atom.text)) for atom in atoms],
             )
             # New text changes which words are common, so every remembered count is void.
             connection.execute("DELETE FROM term_df")
@@ -237,7 +240,8 @@ class Database:
             return 0
         with self.connect() as connection:
             connection.execute(
-                "DELETE FROM atom_fts WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(atom_ids),)
+                "DELETE FROM atom_fts WHERE rowid IN (SELECT rowid FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?)))",
+                (to_json(atom_ids),),
             )
             cursor = connection.execute(
                 "DELETE FROM atoms WHERE atom_id IN (SELECT value FROM json_each(?))", (to_json(atom_ids),)
