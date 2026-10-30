@@ -10,6 +10,10 @@ import (
 // oldEnvPrefixes are the names before Elysian; a variable under one would be ignored.
 var oldEnvPrefixes = []string{"ELY_EYE_", "ELYSIUM_"}
 
+var oldHomeNames = []string{".ely_eye", ".elysium"}
+
+var oldDatabaseNames = []string{"ely_eye.sqlite", "elysium.sqlite"}
+
 type Config struct {
 	ProjectRoot string `json:"project_root"`
 	ElysianHome string `json:"elysian_home"`
@@ -74,16 +78,48 @@ func resolveHome(projectRoot string, elysianHome string) (string, error) {
 		elysianHome = os.Getenv("ELYSIAN_HOME")
 	}
 	if elysianHome != "" {
-		return filepath.Abs(elysianHome)
+		home, err := filepath.Abs(elysianHome)
+		if err != nil {
+			return "", err
+		}
+		return home, refuseOldStores(home)
 	}
 	if projectRoot != "" {
 		abs, err := filepath.Abs(projectRoot)
 		if err != nil {
 			return "", err
 		}
-		return filepath.Join(abs, ".elysian"), nil
+		home := filepath.Join(abs, ".elysian")
+		return home, refuseOldStores(home)
 	}
 	return discoverHome()
+}
+
+// refuseOldStores mirrors the backend's refuse_old_names: an old store must not be passed over.
+func refuseOldStores(home string) error {
+	database := filepath.Join(home, "data", "elysian.sqlite")
+	if exists(database) {
+		return nil
+	}
+	for _, name := range oldDatabaseNames {
+		if old := filepath.Join(home, "data", name); exists(old) {
+			return errors.New(old + " is a store from before the rename; move it to " + database)
+		}
+	}
+	if filepath.Base(home) != ".elysian" {
+		return nil
+	}
+	for _, name := range oldHomeNames {
+		if old := filepath.Join(filepath.Dir(home), name); exists(old) {
+			return errors.New(old + " is the data home from before the rename; move it to " + home)
+		}
+	}
+	return nil
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func discoverHome() (string, error) {
@@ -93,7 +129,10 @@ func discoverHome() (string, error) {
 	}
 	for {
 		home := filepath.Join(current, ".elysian")
-		if _, err := os.Stat(filepath.Join(home, "data", "elysian.sqlite")); err == nil {
+		if err := refuseOldStores(home); err != nil {
+			return "", err
+		}
+		if exists(filepath.Join(home, "data", "elysian.sqlite")) {
 			return home, nil
 		}
 		next := filepath.Dir(current)

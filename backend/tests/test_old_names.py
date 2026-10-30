@@ -77,6 +77,17 @@ def test_the_elysium_home_is_not_passed_over(tmp_path: Path, monkeypatch: pytest
         Settings()
 
 
+def test_a_new_home_without_a_store_does_not_hide_the_old_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An installer makes .elysian/bin first; the old store must still stop the process."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".elysian" / "bin").mkdir(parents=True)
+    (tmp_path / ".elysium" / "data").mkdir(parents=True)
+    (tmp_path / ".elysium" / "data" / "elysium.sqlite").write_bytes(b"store")
+
+    with pytest.raises(SystemExit, match=r"\.elysium is the data home from before the rename"):
+        Settings(home=Path(".elysian"))
+
+
 def test_an_elysium_database_is_not_replaced_by_an_empty_one(tmp_path: Path) -> None:
     (tmp_path / "data").mkdir()
     (tmp_path / "data" / "elysium.sqlite").write_bytes(b"store")

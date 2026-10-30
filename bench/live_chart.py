@@ -18,6 +18,8 @@ LABELS = {
     "mem0": "Mem0, LLM extraction",
     "mem0 + LLM rerank": "+ its LLM rerank",
 }
+# Frozen reports keep the arm names they were measured under.
+HISTORICAL = {"elysium": "elysian"}
 FONT = "Newsreader, 'Iowan Old Style', Georgia, serif"
 
 
@@ -27,6 +29,11 @@ def nice_ticks(low: float, high: float) -> list[float]:
     for power in range(math.floor(math.log10(low)), math.ceil(math.log10(high)) + 1):
         ticks += [step * 10**power for step in (1, 2, 5) if low <= step * 10**power <= high]
     return ticks
+
+
+def label(arm: str) -> str:
+    first, _, rest = arm.partition(" ")
+    return LABELS[" ".join(part for part in (HISTORICAL.get(first, first), rest) if part)]
 
 
 def compact(tokens: float) -> str:
@@ -93,7 +100,7 @@ def write_chart(payload: dict[str, Any], destination: Path) -> None:
         points = [(x(row["tokens_per_question"]), y(row["recall_at_10"])) for row in rows]
         parts.append(f'<polyline fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="{" ".join(f"{px:.1f},{py:.1f}" for px, py in points)}"/>')
         for (px, py), row in zip(points, rows, strict=True):
-            tip = f"{LABELS[row['arm']]}: recall@10 {row['recall_at_10']:.3f}, {row['tokens_per_question']:,.0f} tokens per question"
+            tip = f"{label(row['arm'])}: recall@10 {row['recall_at_10']:.3f}, {row['tokens_per_question']:,.0f} tokens per question"
             parts.append(f"<g><title>{escape(tip)}</title>{marker(system, px, py)}</g>")
     parts += point_labels(arms, x, y, best)
 
@@ -121,12 +128,12 @@ def point_labels(arms: list[dict[str, Any]], x: Any, y: Any, best: dict[str, Any
         crowded = any(0 < ox - px < 140 and abs(oy - py) < 40 for ox, oy, _ in spots)
         if len(group) > 1:
             slowest = max(spot[2]["p50_seconds"] for spot in group)
-            out.append(text(px, py + 28, " ".join(LABELS[spot[2]["arm"]] for spot in group), 13, INK, "middle"))
+            out.append(text(px, py + 28, " ".join(label(spot[2]["arm"]) for spot in group), 13, INK, "middle"))
             out.append(text(px, py + 46, f"{row['recall_at_10']:.3f} · the rerank takes {slowest:.1f} s a question", 13, INK, "middle"))
             continue
         if row is best:
-            out.append(text(px, py - 16, f"{LABELS[row['arm']]}  {row['recall_at_10']:.3f}", 14, INK, "middle", 600))
+            out.append(text(px, py - 16, f"{label(row['arm'])}  {row['recall_at_10']:.3f}", 14, INK, "middle", 600))
             continue
         side, anchor = (-14, "end") if crowded else (14, "start")
-        out.append(text(px + side, py + 4, f"{LABELS[row['arm']]}  {row['recall_at_10']:.3f}", 13, INK, anchor))
+        out.append(text(px + side, py + 4, f"{label(row['arm'])}  {row['recall_at_10']:.3f}", 13, INK, anchor))
     return out

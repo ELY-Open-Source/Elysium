@@ -121,10 +121,10 @@ def refuse_old_names(settings: Settings, environment: dict[str, str], cwd: Path)
             f"rename every {prefix}* variable (under the old name it would be ignored)"
         )
     home = (cwd / settings.home).resolve()
-    for legacy_home in (home.parent / name for name in OLD_HOME_NAMES):
-        if home.name == ".elysian" and legacy_home.is_dir() and not home.exists():
-            raise SystemExit(f"{legacy_home} is the data home from before the rename; move it to {home}")
     database = home / settings.db_path.relative_to(settings.home)
+    for legacy_home in (home.parent / name for name in OLD_HOME_NAMES):
+        if home.name == ".elysian" and legacy_home.is_dir() and not database.exists():
+            raise SystemExit(f"{legacy_home} is the data home from before the rename; move it to {home}")
     for legacy_database in (database.with_name(name) for name in OLD_DATABASE_NAMES):
         if legacy_database.is_file() and not database.exists():
             raise SystemExit(
