@@ -32,7 +32,8 @@ export ELYSIUM_MODEL_DIR="$model_dir"
 
 api=""
 cleanup() {
-  if [ -n "$api" ]; then kill "$api" 2>/dev/null || true; fi
+  # Waited for, or the next run finds the port still bound.
+  if [ -n "$api" ]; then kill "$api" 2>/dev/null || true; wait "$api" 2>/dev/null || true; fi
   rm -rf "$home"
 }
 trap cleanup EXIT
@@ -383,15 +384,48 @@ write_snapshot 4.0
 printf '6\tPASS\telysium ingest --cartridge-name 甲/乙 + finalize-cartridge + switch: mounted 甲 → 月岩灰=%s 花岗岩=%s; switch 乙 → 月岩灰=%s 花岗岩=%s; unmount → 月岩灰=%s; rewriting the model snapshot to rope factor 2.0 makes `mount 甲` refuse: %s\n' \
   "$a_only" "$b_hidden" "$a_gone" "$b_found" "$whole_a" "$moved" >> "$results"
 
-# 7. 卡带省算力: the cache-hit half is measurable here, the time-to-first-token half is not.
+# 7. 卡带省算力: the same pack twice; given a served model, its time to first token cold and warm.
+generator="${ELYSIUM_KEY_TEST_GENERATOR_URL:-}"
+# vLLM reuses a prefix in whole blocks (528 tokens for Qwen3.5); a one-line pack fits in none.
+"$python_bin" - "$home/scenes/garage_log.md" <<'PY'
+import sys
+from pathlib import Path
+
+entries = [f"## 第 {n} 次刷漆\n\n第 {n} 次给车库刷漆用的是月岩灰，色号 N-71，刷了 {n + 1} 遍，干透要 {n + 3} 小时，工具放回第 {n} 格架子。\n" for n in range(1, 25)]
+Path(sys.argv[1]).write_text("# 车库刷漆记录\n\n" + "\n".join(entries), encoding="utf-8")
+PY
+cli ingest "$home/scenes/garage_log.md" >/dev/null
 cache_stats="$(
-  "$python_bin" - "车库的漆是什么颜色" <<'PY'
+  "$python_bin" - "车库的漆是什么颜色" "$generator" <<'PY'
 import json
 import sys
+import time
+
+import httpx
 from elysium.compiler import ContextCompiler
 from elysium.config import get_settings
 from elysium.db import Database
+from elysium.runtime import QwenRuntime
 from elysium.schemas import RuntimeProfile
+
+
+def prefix_hits(url: str) -> float:
+    metrics = httpx.get(url.removesuffix("/v1") + "/metrics", timeout=10).text
+    lines = [line for line in metrics.splitlines() if line.startswith("vllm:prefix_cache_hits_total")]
+    if not lines:
+        raise SystemExit(f"{url} exposes no vllm:prefix_cache_hits_total; this measure reads vLLM's counter")
+    return sum(float(line.rsplit(" ", 1)[1]) for line in lines)
+
+
+def first_token(url: str, question: str, context: object) -> dict[str, float | int | None]:
+    # One token of answer: the round trip is the prefill plus the first token.
+    settings = get_settings().model_copy(update={"runtime_backend": "sglang", "sglang_base_url": url, "max_new_tokens": 1, "temperature": 0.0})
+    runtime = QwenRuntime(settings)
+    before = prefix_hits(url)
+    began = time.perf_counter()
+    generation = runtime.generate(question, context)
+    seconds = time.perf_counter() - began
+    return {"seconds": round(seconds, 4), "prompt_tokens": generation.input_tokens, "cached_tokens": int(prefix_hits(url) - before)}
 
 database = Database(get_settings())
 compiler = ContextCompiler(get_settings(), database)
@@ -403,6 +437,7 @@ with database.connect() as connection:
         "SELECT event, count(*) AS n FROM cache_events WHERE layer = 'semantic' GROUP BY event"
     ).fetchall()
 counts = {row["event"]: int(row["n"]) for row in rows}
+url = sys.argv[2]
 print(
     json.dumps(
         {
@@ -410,6 +445,8 @@ print(
             "atoms": len(first.hits),
             "hit": counts.get("hit", 0),
             "miss": counts.get("miss", 0),
+            "cold": first_token(url, question, first) if url else None,
+            "warm": first_token(url, question, second) if url else None,
         }
     )
 )
@@ -423,8 +460,20 @@ if [ "$cache_same" != "True" ] || [ "$cache_atoms" -lt 1 ] || [ "$cache_hit" -lt
   echo "FAIL: the second compile did not land on the semantic cache: $cache_stats"
   exit 1
 fi
-printf '7\tPARTLY MEASURED\tthe observable half is measured: compiling the same question twice hands back the same pack (cache_trace_id equal=%s over %s atoms) and the second compile is served from the semantic cache (cache_events layer=semantic: hit=%s miss=%s). The claimed saving is time-to-first-token on a real generation, and this repo has never run the 9B generator (no model snapshot in the tree) and /api/chat returns 503 without a runtime, so that half stays unmeasured. What exists today is the scope (elysium mount/switch/unmount/append) and the launch flags in profiles.py that would deliver it\\n' \
-  "$cache_same" "$cache_atoms" "$cache_hit" "$cache_miss" >> "$results"
+if [ -z "$generator" ]; then
+  printf '7\tPARTLY MEASURED\tthe same question compiled twice hands back the same pack (cache_trace_id equal=%s over %s atoms), the second from the semantic cache (hit=%s miss=%s). The saving is time to first token, and no served model was given: rerun with ELYSIUM_KEY_TEST_GENERATOR_URL=<a vLLM /v1 URL>\n' \
+    "$cache_same" "$cache_atoms" "$cache_hit" "$cache_miss" >> "$results"
+else
+  printf '%s' "$cache_stats" | "$python_bin" -c '
+import json, sys
+s = json.load(sys.stdin)
+cold, warm = s["cold"], s["warm"]
+verdict = "PASS" if warm["cached_tokens"] > cold["cached_tokens"] else "FAIL"
+fields = (verdict, s["same_pack"], s["atoms"], s["hit"], s["miss"])
+fields += tuple(side[key] for side in (cold, warm) for key in ("seconds", "cached_tokens", "prompt_tokens"))
+print("7\t%s\tthe same pack twice (cache_trace_id equal=%s over %s atoms, semantic cache hit=%s miss=%s), each sent to the served 9B for one token: cold %s s with %s of %s prompt tokens from the prefix cache, warm %s s with %s of %s" % fields)
+' >> "$results"
+fi
 
 echo
 echo "钥匙测试 — the seven scenarios from Gaps.md §6, run against one live store"

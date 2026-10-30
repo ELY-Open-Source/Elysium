@@ -60,7 +60,7 @@ python -m bench.dense_scale                        # the vector leg at corpus si
 The generator side is written and runnable but has not been run in this
 repository's reports, so no score from it is quoted anywhere in this README:
 
-- generation with Qwen3.5-9B and the trained LoRA adapters — `elysium runtime-generation-proof`
+- generation with the trained LoRA adapters — `elysium runtime-generation-proof` (the base Qwen3.5-9B served by vLLM does run: key test 7 times its first token, `ELYSIUM_KEY_TEST_GENERATOR_URL=<vLLM /v1> bash scripts/key_test.sh`)
 - Visual HashHop multi-hop visual addressing — `elysium hashhop --kind visual`
 - the Visual Contradiction Lens — `elysium visual-contradiction-proof`
 - standard benchmarks (MMMU-Pro, OCRBench, and the rest) — `elysium run-benchmark`

@@ -260,7 +260,7 @@ frontend (React, 8 panels, 只读为主)
 | 4 分歧共存 | PASS | 两条都在库；未裁决时一页只给新边；冲突清单记下双值；`as_of` 拿回旧值；`resolve-conflicts` 之后两条都给 |
 | 5 抗污染 | PASS | 第三方说法可被本人搜到但 `quarantined=True`，编译器把它挡在正文外；换个 holder 完全答不出 |
 | 6 卡带即作用域 | PASS | 挂载后只命中卡带内容、切换随之变、卸载恢复；把快照 RoPE 改成 2.0 后拒绝挂载并点名 `factor: cartridge 4.0 vs local 2.0` |
-| 7 卡带省算力 | **PARTLY MEASURED** | 命中率半边实测：同题编译两次同一份正文（`cache_trace_id` 相同），第二次落在语义缓存（hit=1 miss=1）；TTFT 那半边要生成器，本仓没跑过 9B |
+| 7 卡带省算力 | PASS（给了服务的 9B 时） | 同题编译两次同一份正文（`cache_trace_id` 相同，约 2,000 token），第二次落在语义缓存（hit=1 miss=1）；两份各送本地 vLLM 的 Qwen3.5-9B 生成 1 个 token：冷 0.39–0.49 s、0 个 token 来自前缀缓存，热 0.058–0.095 s、1,584 个来自前缀缓存（5 次跑的范围，随负载变；`ELYSIUM_KEY_TEST_GENERATOR_URL`）。不给服务时这条仍是 PARTLY MEASURED |
 
 ---
 
