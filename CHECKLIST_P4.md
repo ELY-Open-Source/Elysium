@@ -46,6 +46,14 @@
   - 产品：`vlm_max_new_tokens` 默认 192 → 512（`658ac0c`）。harness `bench/redescribe_check.py`：复制 DESCRIBE 库，把 `image` 与 `ui_screenshot` 的 21,362 个 atom 的字、信任、metadata 换回描述前（`bench/runs/describe/before`），再用产品的 `describe_pictures` 按 512 重写；视频帧留 192 的字。`bench/tests/test_redescribe_check.py` 3 条。
   - 跑的时候抓到的写入病（`7326fe8`）：`upsert_atoms` 按 `atom_id` 删索引行，而 `atom_id` 是 FTS5 的 UNINDEXED 列，每删一行扫全索引（194,336 行，单次 0.10 s）；换回 21,362 个 atom 跑了 20 分钟没完。修法：索引行与 atom 同 rowid，写、删都按 rowid；schema 12 → 13，升级时整表重建一次（这个库 24 s）。1,000 个 atom 重写 0.29 s。`test_memory_schema.py` 加 2 条，去掉各自的修复各红 1 条。重建换了同分 atom 的扫描顺序：在新副本上重排三档，recall@10 与 `rank.json` 逐位一样、分模态一样，test MRR 0.7203 → 0.7204；所以 `rank.json` 仍是这条的 before。
   - 第二处（`describe.py`）：补描述一批 64 张，整批等最慢那张写完才发下一批；vLLM 日志里每批约 2 分钟，后半段 KV 从 80% 掉到 5%，GPU 空转。改成读这一批之前先把下一批发出去。`test_describe.py` 加 1 条，退回旧循环红。另：这台的 vLLM 没有 FlashInfer（缺 nvcc），图像编码器不走 CUDA graph，引擎单核 CPU 占满——文档图约 0.5 张/秒，是速度的主因，不在本仓能修的范围。
+  - 速度：同一个 180 张探针（`budget_finish.py 512`）这次只有 0.40 张/秒，前一晚是 2.51。vLLM 空闲时 GPU 仍 68%、114 W，`Get-Counter` 指到 Windows 上的 DesktopMate 占 3D 引擎 64%；用户关掉后功耗 306 W，补描述 3.3–4.1 张/秒。21,362 张用了 5,997 s（64 并发）。
+  - 结果（`bench/reports/REDESCRIBE.md`，`e92e453`，stamp `79d1ea8`；before 为 `rank.json`）：
+    - 不重排：dev 0.901 → 0.907，test 0.888 → 0.898，全库 0.893 → 0.901。
+    - 9B 重排：dev 0.913 → 0.920，test 0.907 → 0.913，全库 0.909 → 0.916；MRR 全库 0.801 → 0.806；chance 0.5222 / 0.5036 / 0.5099。
+    - 全库分模态（重排）：ui_screenshot 0.772 → 0.800，pdf 0.888 → 0.898，video 0.819 → 0.842，image 0.863 不变，conversation 0.948 → 0.945，code 0.977 不变。
+    - 视频帧没重写，video 和 conversation 也动了：词的常用度按全库计（`term_df`），图的描述变长后改了别的题的稀有词。dev 上逐题比两库的 `rare_terms`：video 56 题里 19 题、conversation 57 题里 33 题的稀有词集合变了。
+    - 代价：p50 不重排 0.14–0.16 s，重排 0.86–0.92 s；p95 不重排 1.49–1.56 s，重排 2.05–2.48 s（`redescribe.json` 三档，单次跑，随负载变；跑时机器 load 一度到 13.8）。
+    - 离 0.92：dev 到线，test 差 0.007，全库差 0.004。
 - [ ] **p4-4** 生成侧实测：`elysium runtime-generation-proof` 与钥匙测试场景 7 的首字时间（同题两次，第二次走缓存），把 PARTLY MEASURED 变成实数。
 - [ ] **p4-5** 验收重算：test 与全库 recall@10 对 0.92，并排 chance 与外部对手；README / Gaps / CHECKLIST 同步。
 - [ ] **p4-6** 与真 Mem0、真 Zep 对跑并出图（用户要求，2026-10-29）：同一批冻结语料与题目，三家各跑几档配置（Elysium 的 top_k 与腿；Mem0 / Zep 的检索条数与它们的 LLM 写入），纵轴 recall@10（附 holder 内 chance），横轴每题成本（对数刻度：查询耗时与写入时的 LLM token，本地 9B 承担两家的 LLM 调用），画成「每个系统一条线、点是配置档」的图，提交图与生成它的脚本。Mem0 / Zep 的 `add()` 要 LLM 抽取，量级与耗时如实写进报告；跑不全的部分照实标出，不外推。
