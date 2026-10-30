@@ -32,3 +32,4 @@ bench/corpus/*
 .pi/
 bench/runs/
 bench/models/
+.venv-external/
