@@ -16,7 +16,7 @@ def write_chart(payload: dict[str, Any], destination: Path) -> None:
     costs = [row["tokens_per_question"] for row in arms]
     low = 10 ** math.floor(math.log10(min(costs)))
     high = 10 ** math.ceil(math.log10(max(costs)))
-    chance = payload["chance"]["recall_at_10_pool"]
+    chance = payload["chance"]["recall_at_10"]
     bottom = math.floor(min([row["recall_at_10"] for row in arms] + [chance]) * 10) / 10
 
     def x(tokens: float) -> float:

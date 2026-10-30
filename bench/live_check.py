@@ -116,15 +116,17 @@ def report(pool: dict[str, Any], arms: list[dict[str, Any]], external: dict[str,
     rows = [score(arm, probes, pool["pools"], pool["elysium_store"]["tokens"]) for arm in arms]
     for row in rows:
         row.update({key: row["overall"][key] for key in ("recall_at_10", "hit_at_10", "hit_at_10_wilson_lower")})
+    per_modality = {m: sum(1 for q in probes if q.modality == m) for m in MODALITY_ORDER}
     return {
+        "meta": {"queries": len(probes), "answerable": sum(1 for q in probes if q.answerable), "limit_per_modality": per_modality},
         "commit": git_commit(),
         "machine": machine_facts(),
         "questions": len(probes),
-        "by_modality_questions": {m: sum(1 for q in probes if q.modality == m) for m in MODALITY_ORDER},
+        "by_modality_questions": per_modality,
         "pool": {key: pool[key] for key in ("seed", "spec", "chunk_chars", "sources_without_text")},
         "pool_sources": sum(len(sources) for sources in pool["pools"].values()),
         "items_given": len(pool["items"]),
-        "chance": {"recall_at_10_pool": pool["chance_recall_at_10"]},
+        "chance": {"recall_at_10": pool["chance_recall_at_10"]},
         "descriptions": {"tokens": pool["elysium_store"]["tokens"], "seconds": pool["elysium_store"]["described"]["seconds"], "pictures": pool["elysium_store"]["described"]["described"]},
         "external_limit": external["limit"],
         "arms": rows,
@@ -140,7 +142,7 @@ def write_markdown(payload: dict[str, Any], destination: Path) -> None:
             f"- {payload['questions']} test questions ({', '.join(f'{m} {n}' for m, n in payload['by_modality_questions'].items())}), "
             f"{payload['pool_sources']} sources, {payload['items_given']} items of at most {payload['pool']['chunk_chars']} characters given to Mem0"
         ),
-        f"- chance (a random ranking of the asker's pool): recall@10 {payload['chance']['recall_at_10_pool']:.4f}",
+        f"- chance (a random ranking of the asker's pool): recall@10 {payload['chance']['recall_at_10']:.4f}",
         "- LLM for every system: the same local Qwen3.5-9B on vLLM, thinking off; embedder for Mem0: local MiniLM",
         "- cost: 9B tokens per question = (descriptions + the arm's own writing) / questions + tokens spent asking",
         (
