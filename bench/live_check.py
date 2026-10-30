@@ -37,7 +37,7 @@ SCRATCH = Path("bench/runs/live")
 REPORT = Path("bench/reports/LIVE.md")
 PAYLOAD = Path("bench/reports/live.json")
 CHART = Path("bench/reports/live_cost.svg")
-SYSTEMS = {"elysium": "Elysium", "mem0": "Mem0"}
+SYSTEMS = {"elysium": "Elysian", "mem0": "Mem0"}
 
 
 def probes_of(pool: dict[str, Any]) -> list[Any]:
