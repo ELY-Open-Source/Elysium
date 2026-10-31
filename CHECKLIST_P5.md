@@ -15,8 +15,10 @@
   - 评审第 1 轮 FAIL，D1–D5：D1 安装器总把默认 home 当显式 `--elysian-home` 传给 Go，绕过项目库守卫，改为只传用户给的；D2 Go 项目根仍取 home 的父目录，项目级注册写进 `~/.mcp.json`，改为当前目录；D3 `.env` 里的 ELYSIAN_HOME 与空值让 Python、Go 选不同库，Python 设 `env_ignore_empty`，拒绝 `.env` 里的 home；D4 Go 不跟符号链接，改用 `EvalSymlinks`；D5 相对 home 让源码安装失败，安装器转绝对路径。第 2 轮 FAIL，D1 PowerShell 吞掉 setup 退出码，D3 pydantic 不分大小写而 Go 只读大写，改为拒绝任何非大写的 `ELYSIAN_` 名字。第 3 轮 PASS（`5ebeb73`）。顺带：`api.py` 的模块级 `app = create_app()` 无人使用且在导入时读真实 home，删除；两个测试原本读了开发者仓库里的 `.elysian`，改为依赖 tmp 设置。
 - [x] **p5-3** MCP 自启后端：MCP 发现 API 不通时启动 `elysian serve`（同一个 `ELYSIAN_HOME`），等它健康后再转发；日志写到 `~/.elysian/logs/api.log`；起不来就报错并指向日志。
   - 写入要 token，一键安装的人不会设：`elysian init` 一次性写 `~/.elysian/auth_token`（O_EXCL、0600、从不打印），后端与 Go 在 `ELYSIAN_AUTH_TOKEN` 为空时读它，空文件两边都报错。`scripts/mcp_autostart_smoke.sh`：新 home、API 未起，MCP 客户端写入再读回，API 在客户端退出后仍在。评审第 1 轮 FAIL，D1 只看 200 不核对 `data_home`，写进别的库；D2 并发自启时输家立即退出。第 2 轮 FAIL，D3 相对 home 被报成相对路径，同库误判异库，Settings 改为保存绝对 home。第 3 轮 FAIL，D1 用客户端目录解释旧 API 的相对路径，改为拒绝；D4 `~` 在守卫之后才展开且 Go 不展开，改为两端在守卫前同规则展开。3 轮用完，修复 `c9ad4b0` 由 p5-4 的评审复现通过。
-- [ ] **p5-4** 一条命令安装：仓库根目录 `install.sh`（`curl -fsSL … | bash`）和 `install.ps1`（`irm … | iex`）：没有 uv 就装 uv，用 uv 装 Python 与 `elysian`，建 `~/.elysian`，下载并校验 MCP 二进制，注册到本机已装的客户端。
-- [ ] **p5-5** 客户端：除 Codex、Claude Code 外，注册 Cursor、Gemini CLI、OpenCode、VS Code；格式按各家文档，不靠猜。其余客户端，安装结束时打印一段通用 stdio 配置。
+- [x] **p5-4** 一条命令安装：仓库根目录 `install.sh`（`curl -fsSL … | bash`）和 `install.ps1`（`irm … | iex`）：没有 uv 就装 uv，用 uv 装 Python 与 `elysian`，建 `~/.elysian`，下载并校验 MCP 二进制，注册到本机已装的客户端。
+  - 根目录 `install.sh` / `install.ps1` 是唯一安装器（删 `elysian-mcp/install.*`）：uv（官方脚本装到 `~/.local/bin`）、按 release tag 的 GitHub 归档装后端（不需要 Git，`--excludes opencv-python` 避开要 X 库的 GUI 版 OpenCV）、`elysian init`、校验后的 MCP 二进制、旁边放 `elysian`（Windows 复制 exe）、`elysian-mcp setup`。重装先停本 home 的 API（真实路径匹配；Linux 读 `/proc`，macOS 用 `pgrep`）。评审第 1 轮 FAIL D1–D4（注册未用解析后的 home、要 Git、sed 解析 JSON、ASCII 写 .cmd）；第 2 轮 FAIL D5（Windows 覆盖不了在跑的 elysian.exe）；第 3 轮 FAIL（停止排在 uv 重装之后）。3 轮用完，修复 `a6c757a` 与之后的真实路径匹配由 p5-5 的评审复核 PASS。
+- [x] **p5-5** 客户端：除 Codex、Claude Code 外，注册 Cursor、Gemini CLI、OpenCode、VS Code；格式按各家文档，不靠猜。其余客户端，安装结束时打印一段通用 stdio 配置。
+  - Cursor（编辑 `~/.cursor/mcp.json`，保留其它键，非 JSON 就停）、Gemini CLI、OpenCode、VS Code（WSL 下跳过）；结果附 `any_other_client` 的 `mcpServers` 条目。真实 gemini-cli 与 opencode-ai 各跑两遍：写入并替换。评审第 1 轮 FAIL 只报 p5-4 的真实路径问题；第 2 轮 PASS。
 - [ ] **p5-6** 干净机器验收：没有 Python 的 Linux 容器里跑那一条命令，再用 stdio JSON-RPC 驱动 MCP 写一条记忆、读回来；CI 在 Linux、macOS、Windows 上跑同样的步骤。
 - [ ] **p5-7** 发布：打 `mcp-v0.2.0`，安装脚本取它；README、`elysian-mcp/README.md`、AGENTS.md 同步。
 
