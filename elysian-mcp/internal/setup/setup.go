@@ -53,6 +53,14 @@ func onPath(program string) func() (string, error) {
 var clients = []client{
 	{"codex", onPath("codex"), registerCodex},
 	{"claude", onPath("claude"), registerClaude},
+	{"droid", onPath("droid"), registerDroid},
+	{"qwen", onPath("qwen"), registerQwen},
+	{"kiro", onPath("kiro-cli"), registerKiro},
+	{"agy", onPath("agy"), registerAntigravity},
+	{"kimi", onPath("kimi"), registerKimi},
+	{"copilot", onPath("copilot"), registerCopilot},
+	{"grok", onPath("grok"), registerGrok},
+	{"kigi", onPath("kigi"), registerKigi},
 	{"cursor", cursorFile, registerCursor},
 	{"gemini", onPath("gemini"), registerGemini},
 	{"opencode", onPath("opencode"), registerOpenCode},
@@ -96,22 +104,28 @@ func Run(ctx context.Context, cfg config.Config, options Options) (Result, error
 		result.Actions = append(result.Actions, action)
 	}
 	if len(result.Actions) == 0 {
-		return Result{}, errors.New("client must be all, codex, claude, cursor, gemini, opencode or vscode, got " + options.Client)
+		names := []string{"all"}
+		for _, each := range clients {
+			names = append(names, each.name)
+		}
+		return Result{}, errors.New("client must be one of " + strings.Join(names, ", ") + ", got " + options.Client)
 	}
 	result.AnyOtherClient = generic(server)
 	return result, nil
 }
 
+// registerCodex writes the server itself, since `codex mcp add` cannot set its approval mode; the old
+// entry is removed through Codex first (it exits 0 whether or not one exists).
 func registerCodex(ctx context.Context, codex string, server entry) (Action, error) {
-	args := []string{"mcp", "add", server.Name}
-	for key, value := range server.Env {
-		args = append(args, "--env", key+"="+value)
-	}
-	args = append(args, "--", server.Binary, "server")
+	args := []string{"mcp", "remove", server.Name}
 	if output, err := exec.CommandContext(ctx, codex, args...).CombinedOutput(); err != nil {
-		return Action{}, errors.New("codex mcp add failed: " + strings.TrimSpace(string(output)))
+		return Action{}, errors.New("codex mcp remove failed: " + strings.TrimSpace(string(output)))
 	}
-	return Action{Client: "codex", Target: "~/.codex/config.toml", Detail: "registered user-wide", Command: commandLine(codex, args)}, nil
+	target, err := wireCodex(ctx, codex, server)
+	if err != nil {
+		return Action{}, err
+	}
+	return Action{Client: "codex", Target: target, Detail: "registered user-wide, Elysian's tools approved; session and prompt hooks, trusted", Command: commandLine(codex, args)}, nil
 }
 
 func registerClaude(ctx context.Context, claude string, server entry) (Action, error) {
@@ -128,7 +142,11 @@ func registerClaude(ctx context.Context, claude string, server entry) (Action, e
 	if output, err := exec.CommandContext(ctx, claude, args...).CombinedOutput(); err != nil {
 		return Action{}, errors.New("claude mcp add-json failed: " + strings.TrimSpace(string(output)))
 	}
-	return Action{Client: "claude", Target: "~/.claude.json", Detail: "registered user-wide", Command: commandLine(claude, args)}, nil
+	settings, err := wireClaude(ctx, claude, server)
+	if err != nil {
+		return Action{}, err
+	}
+	return Action{Client: "claude", Target: "~/.claude.json and " + settings, Detail: "registered user-wide; session and prompt hooks; Elysian's tools approved", Command: commandLine(claude, args)}, nil
 }
 
 func commandLine(program string, args []string) string {

@@ -19,11 +19,23 @@ func fake(t *testing.T, bin string, name string, removeExists bool) {
 	if removeExists {
 		remove = `echo "Removed MCP server elysian"; exit 0`
 	}
-	script := "#!/bin/sh\necho \"$@\" >> \"" + filepath.Join(bin, name+".log") + "\"\n" +
+	script := "#!/bin/sh\nif [ \"$1\" = --version ]; then echo '2.1.314 (Claude Code)'; exit 0; fi\n" +
+		"echo \"$@\" >> \"" + filepath.Join(bin, name+".log") + "\"\n" +
 		"if [ \"$2\" = remove ]; then " + remove + "; fi\n"
 	if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// isolate points HOME and every client's config override at temporary places, so no test touches a real config.
+func isolate(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, key := range []string{"CLAUDE_CONFIG_DIR", "CODEX_HOME", "FACTORY_HOME", "QWEN_HOME", "GEMINI_CLI_HOME", "KIRO_HOME", "KIMI_CODE_HOME", "COPILOT_HOME", "GROK_HOME", "XDG_CONFIG_HOME"} {
+		t.Setenv(key, "")
+	}
+	return home
 }
 
 func logged(t *testing.T, bin string, name string) string {
@@ -39,7 +51,7 @@ func TestEveryInstalledClientIsRegisteredUserWideAndAMissingOneSkipped(t *testin
 	bin := t.TempDir()
 	fake(t, bin, "claude", false)
 	t.Setenv("PATH", bin)
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	result, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -48,12 +60,12 @@ func TestEveryInstalledClientIsRegisteredUserWideAndAMissingOneSkipped(t *testin
 	for _, action := range result.Actions {
 		details[action.Client] = action.Detail
 	}
-	for _, missing := range []string{"codex", "cursor", "gemini", "opencode", "vscode"} {
+	for _, missing := range []string{"codex", "droid", "qwen", "cursor", "gemini", "opencode", "vscode"} {
 		if details[missing] != "not installed; skipped" {
 			t.Fatalf("%s must be skipped, got %+v", missing, result.Actions)
 		}
 	}
-	if details["claude"] != "registered user-wide" {
+	if !strings.HasPrefix(details["claude"], "registered user-wide") {
 		t.Fatalf("claude must be registered, got %+v", result.Actions)
 	}
 	calls := logged(t, bin, "claude")
@@ -68,12 +80,18 @@ func TestARerunReplacesTheEntryAndANamedHomeIsCarried(t *testing.T) {
 	fake(t, bin, "claude", true)
 	fake(t, bin, "codex", true)
 	t.Setenv("PATH", bin)
-	t.Setenv("HOME", t.TempDir())
+	home := isolate(t)
 	if _, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Home: "/data/elysian"}); err != nil {
 		t.Fatalf("a re-run must replace the entries, got %v", err)
 	}
-	if calls := logged(t, bin, "codex"); !strings.Contains(calls, "mcp add elysian --env ELYSIAN_HOME=/data/elysian -- /opt/elysian-mcp server") {
-		t.Fatalf("codex must carry the named home, got %q", calls)
+	codexConfig, _ := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	if calls := logged(t, bin, "codex"); calls != "mcp remove elysian\n" ||
+		!strings.Contains(string(codexConfig), "[mcp_servers.elysian]\ncommand = \"/opt/elysian-mcp\"\nargs = [\"server\"]\ndefault_tools_approval_mode = \"approve\"\n\n[mcp_servers.elysian.env]\nELYSIAN_HOME = \"/data/elysian\"") {
+		t.Fatalf("codex must be written with its approval mode and the named home, got %q and %s", calls, codexConfig)
+	}
+	hooks, _ := os.ReadFile(filepath.Join(home, ".codex", "hooks.json"))
+	if !strings.Contains(string(hooks), "hook --client codex --elysian-home /data/elysian prompt") {
+		t.Fatalf("codex hooks must carry the named home, got %s", hooks)
 	}
 	if calls := logged(t, bin, "claude"); !strings.Contains(calls, `"env":{"ELYSIAN_HOME":"/data/elysian"}`) {
 		t.Fatalf("claude must carry the named home, got %q", calls)
@@ -82,7 +100,7 @@ func TestARerunReplacesTheEntryAndANamedHomeIsCarried(t *testing.T) {
 
 func TestANamedClientThatIsMissingIsAnError(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	_, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Client: "codex"})
 	if err == nil || !strings.Contains(err.Error(), "codex is not installed here") {
 		t.Fatalf("a named missing client must be an error, got %v", err)
@@ -95,12 +113,12 @@ func TestGeminiOpenCodeAndVSCodeAreRegisteredThroughTheirCLIs(t *testing.T) {
 	fake(t, bin, "opencode", false)
 	fake(t, bin, "code", false)
 	t.Setenv("PATH", bin)
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	result, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Home: "/data/elysian"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if calls := logged(t, bin, "gemini"); !strings.Contains(calls, "mcp add --scope user --env ELYSIAN_HOME=/data/elysian elysian /opt/elysian-mcp server") {
+	if calls := logged(t, bin, "gemini"); !strings.Contains(calls, "mcp add --scope user --trust --env ELYSIAN_HOME=/data/elysian elysian /opt/elysian-mcp server") {
 		t.Fatalf("gemini must be registered user-wide, got %q", calls)
 	}
 	if calls := logged(t, bin, "opencode"); !strings.Contains(calls, "mcp add elysian --env ELYSIAN_HOME=/data/elysian -- /opt/elysian-mcp server") {
@@ -121,8 +139,7 @@ func TestGeminiOpenCodeAndVSCodeAreRegisteredThroughTheirCLIs(t *testing.T) {
 }
 
 func TestCursorKeepsItsOtherServersAndABrokenFileIsLeftAlone(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := isolate(t)
 	t.Setenv("PATH", t.TempDir())
 	path := filepath.Join(home, ".cursor", "mcp.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

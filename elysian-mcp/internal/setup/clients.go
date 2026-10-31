@@ -11,7 +11,7 @@ import (
 )
 
 func registerGemini(ctx context.Context, gemini string, server entry) (Action, error) {
-	args := []string{"mcp", "add", "--scope", "user"}
+	args := []string{"mcp", "add", "--scope", "user", "--trust"}
 	for key, value := range server.Env {
 		args = append(args, "--env", key+"="+value)
 	}
@@ -19,7 +19,11 @@ func registerGemini(ctx context.Context, gemini string, server entry) (Action, e
 	if output, err := exec.CommandContext(ctx, gemini, args...).CombinedOutput(); err != nil {
 		return Action{}, errors.New("gemini mcp add failed: " + strings.TrimSpace(string(output)))
 	}
-	return Action{Client: "gemini", Target: "~/.gemini/settings.json", Detail: "registered user-wide", Command: commandLine(gemini, args)}, nil
+	settings, err := wireGemini(ctx, gemini, server)
+	if err != nil {
+		return Action{}, err
+	}
+	return Action{Client: "gemini", Target: settings, Detail: "registered user-wide, trusted; session and prompt hooks", Command: commandLine(gemini, args)}, nil
 }
 
 func registerOpenCode(ctx context.Context, opencode string, server entry) (Action, error) {
@@ -46,7 +50,12 @@ func registerVSCode(ctx context.Context, code string, server entry) (Action, err
 	if output, err := exec.CommandContext(ctx, code, args...).CombinedOutput(); err != nil {
 		return Action{}, errors.New("code --add-mcp failed: " + strings.TrimSpace(string(output)))
 	}
-	return Action{Client: "vscode", Target: "the VS Code user mcp.json", Detail: "registered user-wide", Command: commandLine(code, args)}, nil
+	// VS Code's default Copilot harness reads ~/.copilot, where the hooks live.
+	shared, err := registerCopilot(ctx, code, server)
+	if err != nil {
+		return Action{}, err
+	}
+	return Action{Client: "vscode", Target: "the VS Code user mcp.json and " + shared.Target, Detail: "registered user-wide; the Copilot harness gets session and prompt hooks", Command: commandLine(code, args)}, nil
 }
 
 // registerCursor edits ~/.cursor/mcp.json, the only user-wide surface Cursor documents; other entries are kept.
@@ -80,7 +89,11 @@ func registerCursor(_ context.Context, path string, server entry) (Action, error
 	if err := os.Rename(temporary, path); err != nil {
 		return Action{}, err
 	}
-	return Action{Client: "cursor", Target: path, Detail: "registered user-wide"}, nil
+	hooks, err := wireCursor(path, server)
+	if err != nil {
+		return Action{}, err
+	}
+	return Action{Client: "cursor", Target: path + " and " + hooks, Detail: "registered user-wide; session and prompt hooks"}, nil
 }
 
 // cursorFile is Cursor's user config when Cursor has been run here.
