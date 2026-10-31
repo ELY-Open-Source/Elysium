@@ -23,11 +23,8 @@ class Database:
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
-        from .vector_index import load_extension
-
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
-        load_extension(connection)
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = WAL")
         try:

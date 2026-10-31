@@ -13,6 +13,8 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import numpy as np
@@ -71,6 +73,13 @@ class VectorIndex:
         self.db = database or Database(self.settings)
         self.embeddings = embeddings or EmbeddingService(self.settings, self.db)
 
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
+        """A connection that reaches vec0. Only this index loads sqlite-vec, so a Python that cannot load extensions still keeps memory."""
+        with self.db.connect() as connection:
+            load_extension(connection)
+            yield connection
+
     def ensure(self, connection: sqlite3.Connection, dim: int) -> None:
         """Create the table, or rebuild it when the model behind the vectors changed."""
         meta = self._meta(connection)
@@ -98,7 +107,7 @@ class VectorIndex:
     def sync(self) -> dict[str, Any]:
         """Encode what is missing or stale; the repair path, not the per-query path."""
         started = time.monotonic()
-        with self.db.connect() as connection:
+        with self.connect() as connection:
             dim = self.embeddings.probe_dim()
             self.ensure(connection, dim)
             stale = self._stale(connection)
@@ -130,7 +139,7 @@ class VectorIndex:
         if not wanted or not self.settings.dense_embeddings_enabled:
             return {"encoded": 0, "dropped": 0}
         started = time.monotonic()
-        with self.db.connect() as connection:
+        with self.connect() as connection:
             dim = self.embeddings.probe_dim()
             self.ensure(connection, dim)
             current = self._current(connection, wanted)
@@ -184,7 +193,7 @@ class VectorIndex:
         narrow = to_json(scope) if scope is not None and len(scope) <= SCOPE_NARROW_MAX else None
         asked = max(limit, CANDIDATE_FLOOR)
         vector = np.asarray(query_vector, dtype=np.float32).tobytes()
-        with self.db.connect() as connection:
+        with self.connect() as connection:
             if self._dim(connection) is None:
                 return {}
             while True:
@@ -328,21 +337,20 @@ class VectorIndex:
 
     def drop_atoms(self, atom_ids: list[str]) -> int:
         """A forgotten memory must stop answering from the vector side too."""
-        with self.db.connect() as connection:
+        if not self.built():
+            return 0
+        with self.connect() as connection:
             return self._delete(connection, atom_ids)
 
-    def stats(self) -> dict[str, Any]:
+    def built(self) -> bool:
         with self.db.connect() as connection:
+            return self._dim(connection) is not None
+
+    def stats(self) -> dict[str, Any]:
+        if not self.built():
+            return {"built": False, "format": None, "dim": 0, "vectors": 0, "expected": 0, "pending": 0}
+        with self.connect() as connection:
             meta = self._meta(connection)
-            if not meta:
-                return {
-                    "built": False,
-                    "format": None,
-                    "dim": 0,
-                    "vectors": 0,
-                    "expected": 0,
-                    "pending": 0,
-                }
             rows = connection.execute("SELECT count(*) AS n FROM vec_atoms").fetchone()["n"]
             expected = _expected(connection)
             pending = len(self._stale(connection))

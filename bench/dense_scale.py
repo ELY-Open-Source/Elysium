@@ -25,7 +25,7 @@ from bench.scratch import copy_store
 from bench.systems import DENSE_MODEL, MODELS, machine_facts
 
 if TYPE_CHECKING:
-    from elysian.db import Database
+    from elysian.vector_index import VectorIndex
 
 DEFAULT_HOME = Path("bench/runs/baseline")
 DEFAULT_SCRATCH = Path("bench/runs/dense_scale")
@@ -43,14 +43,14 @@ def _one_write(index: Any, atom_id: str) -> float:
     return time.perf_counter() - began
 
 
-def vector_footprint(database: Any, table: str) -> tuple[int, str]:
+def vector_footprint(index: VectorIndex, table: str) -> tuple[int, str]:
     """What the vector table costs on disk, and how that was counted.
 
     The database file itself is a poor measure: free pages absorb a table this size, so the file
     can stay exactly the same length while the table grows. dbstat counts the pages the vec0
     shadow tables actually hold, and it works without the vec0 extension loaded.
     """
-    with database.connect() as connection:
+    with index.connect() as connection:
         try:
             pages = connection.execute(
                 "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name LIKE ?", (f"{table}%",)
@@ -65,9 +65,9 @@ def vector_footprint(database: Any, table: str) -> tuple[int, str]:
     return int(payload), "vector bytes only, this sqlite3 has no dbstat"
 
 
-def stored_vectors(database: Database) -> tuple[list[str], np.ndarray]:
+def stored_vectors(index: VectorIndex) -> tuple[list[str], np.ndarray]:
     """Every vector the engine holds, for a scan it can be checked against."""
-    with database.connect() as connection:
+    with index.connect() as connection:
         rows = connection.execute(
             """
             SELECT atom_id, embedding FROM vec_atoms ORDER BY atom_id
@@ -125,7 +125,7 @@ def measure(home: Path, scratch: Path, probes: int, model_dir: Path) -> dict[str
     began = time.perf_counter()
     index.sync()
     build_seconds = time.perf_counter() - began
-    vec_bytes, bytes_method = vector_footprint(database, "vec_atoms")
+    vec_bytes, bytes_method = vector_footprint(index, "vec_atoms")
     print(f"index built in {build_seconds:.1f}s", flush=True)
 
     began = time.perf_counter()
@@ -149,7 +149,7 @@ def measure(home: Path, scratch: Path, probes: int, model_dir: Path) -> dict[str
         if len(search_times) % 100 == 0:
             print(f"searched {len(search_times)}/{len(queries)}, p50 {sorted(search_times)[len(search_times) // 2] * 1000:.1f}ms", flush=True)
 
-    ids, matrix = stored_vectors(database)
+    ids, matrix = stored_vectors(index)
     print(f"{len(ids)} vectors read back, checking the engine against a brute-force scan", flush=True)
     checked_probes = []
     for query in queries[:CORRECTNESS_PROBES]:
