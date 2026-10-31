@@ -112,6 +112,12 @@ curl -fsSL https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/instal
 irm https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.ps1 | iex
 ```
 
+The API then runs in the background and starts at every sign-in: a systemd user service
+(`~/.config/systemd/user/elysian.service`) on Linux, a LaunchAgent (`~/Library/LaunchAgents/com.elysian.api.plist`)
+on macOS, and on Windows an `Elysian` entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` that
+runs `elysian-start.exe`, which opens no window. Without a systemd user session (a container, say) the MCP
+server starts the API on the first call instead.
+
 Run again to upgrade. From a checkout, `bash install.sh --source` installs this tree instead.
 `scripts/install_acceptance.sh` proves it in a bare Debian container with no Python and no Git, and
 CI (`.github/workflows/install.yml`) runs the installer on Linux, macOS and Windows; each run then

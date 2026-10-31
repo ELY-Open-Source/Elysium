@@ -43,7 +43,10 @@ jobs:
           base="elysian-mcp_${GOOS}_${GOARCH}"
           cd dist
           if [ "$GOOS" = "windows" ]; then
-            zip "${base}.zip" "$binary"
+            # The sign-in launcher is a GUI-subsystem program, so Windows opens no console for it.
+            (cd .. && go build -trimpath -ldflags "$ldflags -H=windowsgui" -o dist/elysian-start.exe ./cmd/elysian-start)
+            zip "${base}.zip" "$binary" elysian-start.exe
+            rm -f elysian-start.exe
           else
             tar -czf "${base}.tar.gz" "$binary"
           fi

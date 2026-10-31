@@ -91,6 +91,8 @@ $BinDir = Join-Path $HomeDir "bin"
 [IO.Directory]::CreateDirectory($BinDir) | Out-Null
 $Mcp = Join-Path $BinDir "elysian-mcp.exe"
 $Fresh = "$Mcp.new"
+$Start = Join-Path $BinDir "elysian-start.exe"
+$FreshStart = "$Start.new"
 
 Step "The MCP server"
 if ($Source) {
@@ -98,6 +100,7 @@ if ($Source) {
   try {
     $env:CGO_ENABLED = "0"
     Invoke-Checked "go" @("build", "-trimpath", "-ldflags=-s -w", "-o", $Fresh, ".\cmd\elysian-mcp")
+    Invoke-Checked "go" @("build", "-trimpath", "-ldflags=-s -w -H=windowsgui", "-o", $FreshStart, ".\cmd\elysian-start")
   }
   finally { Pop-Location }
 }
@@ -119,6 +122,8 @@ else {
     [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $tmp $asset), (Join-Path $tmp "x"))
     [IO.File]::Delete($Fresh)
     [IO.File]::Move((Join-Path $tmp "x\elysian-mcp.exe"), $Fresh)
+    [IO.File]::Delete($FreshStart)
+    [IO.File]::Move((Join-Path $tmp "x\elysian-start.exe"), $FreshStart)
   }
   finally { Remove-Item -Recurse -Force -LiteralPath $tmp }
 }
@@ -132,13 +137,25 @@ if (Test-Path -LiteralPath $Mcp) {
   [IO.File]::Move($Mcp, $Retired)
 }
 [IO.File]::Move($Fresh, $Mcp)
+[IO.File]::Delete($Start)
+[IO.File]::Move($FreshStart, $Start)
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
 [IO.File]::Copy($Elysian, (Join-Path $BinDir "elysian.exe"), $true)
+
+Step "Start at sign-in"
+# A GUI-subsystem program, so sign-in opens no console; it starts the API hidden and exits.
+$Run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+Set-ItemProperty -Path $Run -Name "Elysian" -Value "`"$Start`" --home `"$HomeDir`""
+# -Wait would also wait on the API it leaves running.
+$started = Start-Process -FilePath $Start -ArgumentList @("--home", "`"$HomeDir`"") -PassThru
+$started.WaitForExit()
+if ($started.ExitCode -ne 0) { throw "elysian-start exited $($started.ExitCode); see $(Join-Path $HomeDir 'logs\start.log')" }
+Write-Host "the API is running and starts at every sign-in ($Run\Elysian)"
 
 Step "Coding agents"
 Invoke-Checked $Mcp @("setup")
 
 Step "Done"
-Write-Host "Memory lives in $HomeDir. The MCP server is $Mcp; it starts the API when an agent first calls it."
+Write-Host "Memory lives in $HomeDir. The MCP server is $Mcp; it starts the API itself whenever the API is down."
 Write-Host "Any other MCP client: paste the any_other_client entry printed above into its MCP config."
 Write-Host "Restart your agents to load it. The CLI is $Elysian; run ``uv tool update-shell`` to put it on PATH."

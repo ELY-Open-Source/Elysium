@@ -86,6 +86,13 @@ running_apis() {
 OLD_HOME="${ELYSIAN_HOME:-$HOME/.elysian}"
 case "$OLD_HOME" in "~" | "~/"*) OLD_HOME="$HOME${OLD_HOME#\~}" ;; esac
 [[ "$OLD_HOME" == /* ]] || OLD_HOME="$PWD/$OLD_HOME"
+# The sign-in service would restart the API stopped below; stop the service first.
+LABEL="com.elysian.api"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then launchctl bootout "gui/$(id -u)/$LABEL"; fi
+elif command -v systemctl >/dev/null 2>&1 && systemctl --user cat elysian.service >/dev/null 2>&1; then
+  systemctl --user stop elysian.service
+fi
 pids=""
 # The MCP server starts the API from its own resolved directory, so match the real path; no home, no API.
 if [[ -d "$OLD_HOME/bin" ]]; then
@@ -140,10 +147,58 @@ fi
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
 ln -sf "$ELYSIAN" "$BIN_DIR/elysian"
 
+step "Start at sign-in"
+xml() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME_DIR/logs"
+  SERVICE="$HOME/Library/LaunchAgents/$LABEL.plist"
+  cat > "$SERVICE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$LABEL</string>
+  <key>ProgramArguments</key><array><string>$(xml "$BIN_DIR/elysian")</string><string>serve</string></array>
+  <key>EnvironmentVariables</key><dict><key>ELYSIAN_HOME</key><string>$(xml "$HOME_DIR")</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>StandardOutPath</key><string>$(xml "$HOME_DIR/logs/api.log")</string>
+  <key>StandardErrorPath</key><string>$(xml "$HOME_DIR/logs/api.log")</string>
+</dict></plist>
+EOF
+  launchctl bootstrap "gui/$(id -u)" "$SERVICE"
+elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+  SERVICE="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/elysian.service"
+  mkdir -p "$(dirname -- "$SERVICE")"
+  # systemd reads % as a specifier; a path holding one must double it.
+  cat > "$SERVICE" <<EOF
+[Unit]
+Description=Elysian local memory API
+
+[Service]
+Environment="ELYSIAN_HOME=${HOME_DIR//%/%%}"
+ExecStart="${BIN_DIR//%/%%}/elysian" serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+  systemctl --user daemon-reload
+  systemctl --user enable --now elysian.service
+else
+  SERVICE=""
+  echo "no systemd user session here, so nothing starts at sign-in; the MCP server starts the API when an agent first calls it"
+fi
+if [[ -n "$SERVICE" ]]; then
+  for _ in $(seq 90); do curl -fsS http://127.0.0.1:8765/api/status >/dev/null 2>&1 && break; sleep 1; done
+  curl -fsS http://127.0.0.1:8765/api/status >/dev/null 2>&1 || fail "the sign-in service $SERVICE did not answer at 127.0.0.1:8765 within 90 s; see $HOME_DIR/logs/api.log or journalctl --user -u elysian"
+  echo "the API runs from $SERVICE and starts at every sign-in"
+fi
+
 step "Coding agents"
 "$MCP" setup
 
 step "Done"
-echo "Memory lives in $HOME_DIR. The MCP server is $MCP; it starts the API when an agent first calls it."
+echo "Memory lives in $HOME_DIR. The MCP server is $MCP; it starts the API itself whenever the API is down."
 echo "Any other MCP client: paste the any_other_client entry printed above into its MCP config."
 echo "Restart your agents to load it. The CLI is $ELYSIAN; run \`$UV tool update-shell\` to put it on PATH."
