@@ -83,7 +83,11 @@ func wireCodex(_ context.Context, _ string, server entry) (string, error) {
 			if err := replaceGroups(hooks, hook.event, []any{group}, path); err != nil {
 				return err
 			}
-			positions[hook.event] = len(hooks[hook.event].([]any)) - 1
+			for index, group := range hooks[hook.event].([]any) {
+				if ours(group) {
+					positions[hook.event] = index
+				}
+			}
 		}
 		return nil
 	})
@@ -107,11 +111,15 @@ func wireCodex(_ context.Context, _ string, server entry) (string, error) {
 		block.WriteString("\n[mcp_servers." + server.Name + ".env]\nELYSIAN_HOME = \"" + tomlEscape(home) + "\"\n")
 	}
 	// The server is written here whole, so an earlier definition goes, however its header is quoted.
-	text = withoutTables(text, "mcp_servers", server.Name)
+	if text, err = withoutTables(text, "mcp_servers", server.Name); err != nil {
+		return "", errors.New(configPath + ": " + err.Error() + "; it was left untouched")
+	}
 	for _, hook := range codexHooks {
 		key := absolute + ":" + hook.snake + ":" + strconv.Itoa(positions[hook.event]) + ":0"
 		// That position now holds our hook, so any trust recorded there is stale, whoever wrote it.
-		text = withoutTables(text, "hooks", "state", key)
+		if text, err = withoutTables(text, "hooks", "state", key); err != nil {
+			return "", errors.New(configPath + ": " + err.Error() + "; it was left untouched")
+		}
 		hash, err := codexHookHash(hook.snake, hook.matcher, commands[hook.event], 30)
 		if err != nil {
 			return "", err

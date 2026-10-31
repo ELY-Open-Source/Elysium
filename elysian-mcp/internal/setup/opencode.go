@@ -4,8 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -21,12 +19,8 @@ func registerOpenCode(_ context.Context, _ string, server entry) (Action, error)
 		return Action{}, err
 	}
 	dir := filepath.Join(root, "opencode")
+	// OpenCode merges config.json, opencode.json and opencode.jsonc, so a user's commented .jsonc stays untouched.
 	path := filepath.Join(dir, "opencode.json")
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		if _, err := os.Stat(filepath.Join(dir, "opencode.jsonc")); err == nil {
-			path = filepath.Join(dir, "opencode.jsonc")
-		}
-	}
 	if err := editJSON(path, func(document map[string]any) error {
 		servers, err := object(document, "mcp", path)
 		if err != nil {

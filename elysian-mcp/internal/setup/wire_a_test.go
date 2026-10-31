@@ -321,3 +321,48 @@ func TestReviewOfP63RoundTwo(t *testing.T) {
 		}
 	})
 }
+
+func TestReviewOfP63RoundThree(t *testing.T) {
+	t.Run("D1 trust follows our group to the position it really holds", func(t *testing.T) {
+		home := isolate(t)
+		dir := filepath.Join(home, ".codex")
+		os.MkdirAll(dir, 0o700)
+		os.WriteFile(filepath.Join(dir, "hooks.json"), []byte(`{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"/opt/elysian-mcp hook --client codex prompt","timeout":30}]},{"hooks":[{"type":"command","command":"mine","timeout":5}]}]}}`), 0o600)
+		if _, err := wireCodex(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		config, _ := os.ReadFile(filepath.Join(dir, "config.toml"))
+		if !strings.Contains(string(config), ":user_prompt_submit:0:0") || strings.Contains(string(config), ":user_prompt_submit:1:0") {
+			t.Fatalf("our prompt hook is at position 0, got %s", config)
+		}
+	})
+	t.Run("D2 a header inside a multi-line string is the user's text", func(t *testing.T) {
+		home := isolate(t)
+		dir := filepath.Join(home, ".codex")
+		os.MkdirAll(dir, 0o700)
+		example := "developer_instructions = \"\"\"\nTo add a server:\n[mcp_servers.elysian]\ncommand = \"x\"\n\"\"\"\n"
+		os.WriteFile(filepath.Join(dir, "config.toml"), []byte(example), 0o600)
+		if _, err := wireCodex(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		if config, _ := os.ReadFile(filepath.Join(dir, "config.toml")); !strings.HasPrefix(string(config), example) {
+			t.Fatalf("the string must be kept whole, got %s", config)
+		}
+	})
+	t.Run("D3 a commented opencode.jsonc stays untouched beside our opencode.json", func(t *testing.T) {
+		home := isolate(t)
+		dir := filepath.Join(home, ".config", "opencode")
+		os.MkdirAll(dir, 0o700)
+		jsonc := "{\n  // mine\n  \"theme\": \"dark\",\n}\n"
+		os.WriteFile(filepath.Join(dir, "opencode.jsonc"), []byte(jsonc), 0o600)
+		if _, err := registerOpenCode(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		if data, _ := os.ReadFile(filepath.Join(dir, "opencode.jsonc")); string(data) != jsonc {
+			t.Fatalf("got %s", data)
+		}
+		if !strings.Contains(mustJSON(readJSON(t, filepath.Join(dir, "opencode.json"))), `"elysian"`) {
+			t.Fatal("our entry must be in opencode.json")
+		}
+	})
+}

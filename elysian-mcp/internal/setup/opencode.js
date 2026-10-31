@@ -58,20 +58,26 @@ export default {
         console.error(`elysian: could not ${text ? "set" : "clear"} the ${key} instructions: ${error?.message ?? error}`);
       }
     };
-    const open = perSession(async (sessionID) => put(sessionID, "elysian-session", await hook("session-start", { session_id: sessionID, cwd })));
+    // Events reach every location's plugin, so each session keeps its own folder and only its location opens it.
+    const folders = new Map();
+    const folderOf = (sessionID) => folders.get(sessionID) ?? cwd;
+    const open = perSession(async (sessionID) => put(sessionID, "elysian-session", await hook("session-start", { session_id: sessionID, cwd: folderOf(sessionID) })));
     const stop = new AbortController();
     const watching = (async () => {
       for await (const event of ctx.event.subscribe({ types: ["session.created"], signal: stop.signal })) {
-        if (event.type === "session.created") {
-          open(event.data.sessionID);
+        const location = event.data.location;
+        if (event.type !== "session.created" || location?.directory !== cwd) {
+          continue;
         }
+        folders.set(event.data.sessionID, event.data.subpath ? `${location.directory}/${event.data.subpath}` : location.directory);
+        open(event.data.sessionID);
       }
     })().catch((error) => stop.signal.aborted || console.error(`elysian: stopped watching new sessions: ${error?.message ?? error}`));
     const registration = await ctx.session.hook("prompt", async (input) => {
       await open(input.sessionID);
       const prompt = input.prompt.text.trim();
       if (prompt) {
-        await put(input.sessionID, "elysian-recall", await hook("prompt", { session_id: input.sessionID, cwd, prompt }));
+        await put(input.sessionID, "elysian-recall", await hook("prompt", { session_id: input.sessionID, cwd: folderOf(input.sessionID), prompt }));
       }
     });
     return async () => {

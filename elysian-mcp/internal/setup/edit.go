@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"slices"
@@ -314,21 +315,78 @@ func headerPath(line string) ([]string, bool) {
 	return path, len(path) > 0
 }
 
-// withoutTables removes every table whose header path starts with prefix, each up to the next header.
-func withoutTables(text string, prefix ...string) string {
+// withoutTables removes every table whose header path starts with prefix, each up to the next header;
+// a line inside a multi-line string is text, never a header. Outside those tables the result must
+// parse exactly as the original did, or nothing is removed and the reason is returned.
+func withoutTables(text string, prefix ...string) (string, error) {
 	lines := strings.Split(text, "\n")
-	kept := lines[:0]
-	skipping := false
+	kept := make([]string, 0, len(lines))
+	skipping, quote := false, ""
 	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "[") {
+		if quote == "" && strings.HasPrefix(strings.TrimSpace(line), "[") {
 			path, ok := headerPath(line)
 			skipping = ok && len(path) >= len(prefix) && slices.Equal(path[:len(prefix)], prefix)
 		}
+		quote = multiline(line, quote)
 		if !skipping {
 			kept = append(kept, line)
 		}
 	}
-	return strings.Join(kept, "\n")
+	result := strings.Join(kept, "\n")
+	before, after := map[string]any{}, map[string]any{}
+	if err := toml.Unmarshal([]byte(text), &before); err != nil {
+		return "", err
+	}
+	if err := toml.Unmarshal([]byte(result), &after); err != nil {
+		return "", errors.New("removing " + strings.Join(prefix, ".") + " would break the file: " + err.Error())
+	}
+	drop(before, prefix)
+	drop(after, prefix)
+	if !reflect.DeepEqual(pruned(before), pruned(after)) {
+		return "", errors.New("removing " + strings.Join(prefix, ".") + " would change more than that table")
+	}
+	return result, nil
+}
+
+// multiline returns the multi-line string delimiter still open after line, given the one open before.
+func multiline(line, open string) string {
+	for i := 0; i+3 <= len(line); {
+		switch {
+		case open == "" && (line[i:i+3] == `"""` || line[i:i+3] == "\x27\x27\x27"):
+			open, i = line[i:i+3], i+3
+		case open != "" && line[i:i+3] == open:
+			open, i = "", i+3
+		case open == "" && line[i] == '#':
+			return open
+		default:
+			i++
+		}
+	}
+	return open
+}
+
+// pruned drops empty tables, which hold no value, so an emptied parent compares equal to an absent one.
+func pruned(document map[string]any) map[string]any {
+	for key, value := range document {
+		if table, ok := value.(map[string]any); ok {
+			if len(pruned(table)) == 0 {
+				delete(document, key)
+			}
+		}
+	}
+	return document
+}
+
+// drop deletes the value at path from a parsed document.
+func drop(document map[string]any, path []string) {
+	for _, key := range path[:len(path)-1] {
+		next, ok := document[key].(map[string]any)
+		if !ok {
+			return
+		}
+		document = next
+	}
+	delete(document, path[len(path)-1])
 }
 
 // tomlHas reports whether a dotted path exists in a parsed TOML document.
