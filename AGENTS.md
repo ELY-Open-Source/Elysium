@@ -119,6 +119,9 @@ installers: uv, `uv tool install` of the backend at the release tag, `elysian in
 `elysian-site` on `elysian.elydora.com` (`site/wrangler.jsonc`). Scroll is time: every frame is drawn
 from one value, so scrolling back rewinds. Its numbers come only from `README.md` and `bench/reports/`.
 Gate: `cd site && pnpm build && node scripts/check.mjs --out <dir>` with `pnpm preview` running.
+The check also weighs the first desktop load, every request with headers, against a 300 KB budget.
+On the live domain Cloudflare's zone-level Web Analytics injects `beacon.min.js` (about 10 KB) into the
+HTML, so the served page differs from `dist/index.html`; the budget counts it.
 
 ## Cross-language contract
 

@@ -2,7 +2,9 @@
  * Drives the built site (run `pnpm preview` first) at desktop and phone size through every beat.
  * Usage: node scripts/check.mjs --out <dir> [--url http://localhost:4173]
  * Fails on any console error or page error, on a blank scene, on a missing install command, when
- * pointing at a person shows no memory card, and if reduced motion still scrubs instead of settling.
+ * pointing at a person shows no memory card, if reduced motion still scrubs instead of settling, and
+ * when the first desktop load moves more than BUDGET bytes, counting every request the browser makes,
+ * headers and anything the host injects included.
  */
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,6 +22,7 @@ if (!out) throw new Error('usage: node scripts/check.mjs --out <dir> [--url http
 const url = arg('--url', 'http://localhost:4173/');
 mkdirSync(out, { recursive: true });
 
+const BUDGET = 300_000;
 const INSTALL_UNIX = 'curl -fsSL https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.sh | bash';
 const INSTALL_WIN = 'irm https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.ps1 | iex';
 const VIEWPORTS = [
@@ -83,9 +86,17 @@ async function journey(browser, vp) {
   const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.isMobile, hasTouch: vp.isMobile, deviceScaleFactor: vp.isMobile ? 3 : 1 });
   const page = await context.newPage();
   watch(page, vp.name);
+  const loaded = [];
+  page.on('requestfinished', async (request) => {
+    const sizes = await request.sizes();
+    loaded.push([sizes.responseBodySize + sizes.responseHeadersSize, request.url()]);
+  });
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => document.documentElement.classList.contains('scene'));
   await page.waitForTimeout(4200);
+  const weight = loaded.reduce((sum, [bytes]) => sum + bytes, 0);
+  console.log(`${vp.name}: first load ${weight} bytes on the wire\n${loaded.map(([b, u]) => `  ${b} ${u}`).join('\n')}`);
+  if (vp.name === 'desktop' && weight > BUDGET) fail(`desktop: first load moved ${weight} bytes, over the ${BUDGET} budget`);
   await page.screenshot({ path: join(out, `${vp.name}-00-intro.png`) });
   const sections = await page.locator('[data-beat]').all();
   if (sections.length !== 7) fail(`${vp.name}: expected 7 beats, found ${sections.length}`);
