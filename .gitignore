@@ -33,3 +33,4 @@ bench/corpus/*
 bench/runs/
 bench/models/
 .venv-external/
+.claude/worktrees/

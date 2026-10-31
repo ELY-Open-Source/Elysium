@@ -8,27 +8,15 @@ The home follows the backend's rule: `--elysian-home`, else `ELYSIAN_HOME`, else
 
 ## One-command setup
 
-The installer downloads a checksum-verified prebuilt binary for the platform when a tagged release is available, otherwise it builds from source with Go from a repository checkout. Either way it installs the binary into `<elysian-home>/bin` and registers the server with Codex and Claude Code. No Docker.
+The repository's `install.sh` (Linux, macOS) and `install.ps1` (Windows) install everything; see
+the top-level README. They download the checksum-verified binary of the newest `mcp-*` release into
+`<elysian-home>/bin`, place a link to the `elysian` CLI beside it, and run `elysian-mcp setup`.
 
-Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\elysian-mcp\install.ps1 -Client both
-```
-
-Linux and macOS:
-
-```bash
-bash ./elysian-mcp/install.sh --client both
-```
-
-Force a source build (requires Go 1.25 or newer):
-
-```bash
-bash ./elysian-mcp/install.sh --method source
-```
-
-Codex registration uses `codex mcp add`. Claude Code project registration writes `.mcp.json` at the project root; `--scope user` registers through the Claude CLI instead.
+`setup` registers the server user-wide with every installed coding agent and skips the rest:
+Codex through `codex mcp add` (it replaces an entry of the same name), Claude Code through
+`claude mcp remove` then `claude mcp add-json --scope user`. `--client codex` or `--client claude`
+registers one and fails if it is missing. `ELYSIAN_HOME` is written into the entry only when it
+was set at setup time.
 
 ## Manual run
 

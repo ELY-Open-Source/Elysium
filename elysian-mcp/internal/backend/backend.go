@@ -32,9 +32,9 @@ func Ensure(ctx context.Context, baseURL string, home string) error {
 	if host := address.Hostname(); host != "127.0.0.1" && host != "localhost" {
 		return errors.New("the Elysian API at " + baseURL + " is unreachable, and only a local one can be started here")
 	}
-	program, err := exec.LookPath("elysian")
+	program, err := cli()
 	if err != nil {
-		return errors.New("the Elysian API at " + baseURL + " is down and `elysian` is not on PATH; run the installer or start `elysian serve`")
+		return errors.New("the Elysian API at " + baseURL + " is down and no `elysian` is beside this binary or on PATH; run the installer or start `elysian serve`")
 	}
 	logPath := filepath.Join(home, "logs", "api.log")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
@@ -75,6 +75,16 @@ func Ensure(ctx context.Context, baseURL string, home string) error {
 		}
 	}
 	return fmt.Errorf("`elysian serve` did not answer at %s within %s; last lines of %s:\n%s", baseURL, Wait, logPath, tail(logPath))
+}
+
+// cli finds the elysian the installer linked beside this binary, then one on PATH; a client's PATH may lack uv's bin.
+func cli() (string, error) {
+	if self, err := os.Executable(); err == nil {
+		if program, err := exec.LookPath(filepath.Join(filepath.Dir(self), "elysian")); err == nil {
+			return program, nil
+		}
+	}
+	return exec.LookPath("elysian")
 }
 
 // sameStore refuses an API that serves another home: its writes would land in the wrong store.

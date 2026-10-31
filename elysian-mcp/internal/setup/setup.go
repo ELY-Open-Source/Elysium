@@ -1,3 +1,4 @@
+// Package setup registers the MCP server, user-wide, with the coding agents installed here.
 package setup
 
 import (
@@ -6,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/ELY-Open-Source/Elysian/elysian-mcp/internal/config"
@@ -14,207 +14,116 @@ import (
 
 type Options struct {
 	Client     string
-	Scope      string
 	ServerName string
 }
 
 type Action struct {
 	Client  string `json:"client"`
-	Scope   string `json:"scope"`
 	Target  string `json:"target"`
 	Detail  string `json:"detail"`
 	Command string `json:"command,omitempty"`
 }
 
 type Result struct {
-	ServerName  string   `json:"server_name"`
-	Binary      string   `json:"binary"`
-	ProjectRoot string   `json:"project_root"`
-	Actions     []Action `json:"actions"`
+	ServerName string   `json:"server_name"`
+	Binary     string   `json:"binary"`
+	Actions    []Action `json:"actions"`
 }
 
+type client struct {
+	name     string
+	program  string
+	register func(context.Context, string, config.Config, string) (Action, error)
+}
+
+var clients = []client{
+	{"codex", "codex", registerCodex},
+	{"claude", "claude", registerClaude},
+}
+
+// Run registers with every installed client, or only the one named; a named client that is missing is an error.
 func Run(ctx context.Context, cfg config.Config, options Options) (Result, error) {
-	client := normalizeClient(options.Client)
-	if client != "codex" && client != "claude" && client != "both" {
-		return Result{}, errors.New("client must be codex, claude, or both")
-	}
-	scope := normalizeScope(options.Scope)
-	if scope != "project" && scope != "user" {
-		return Result{}, errors.New("claude scope must be project or user")
+	if cfg.Binary == "" {
+		return Result{}, errors.New("binary path is required for setup")
 	}
 	serverName := options.ServerName
 	if serverName == "" {
 		serverName = "elysian"
 	}
-	if cfg.Binary == "" {
-		return Result{}, errors.New("binary path is required for setup")
+	wanted := strings.ToLower(strings.TrimSpace(options.Client))
+	if wanted == "" {
+		wanted = "all"
 	}
-	result := Result{ServerName: serverName, Binary: cfg.Binary, ProjectRoot: cfg.ProjectRoot}
-	var actions []Action
-	if client == "codex" || client == "both" {
-		action, err := setupCodex(ctx, cfg, serverName)
+	result := Result{ServerName: serverName, Binary: cfg.Binary}
+	for _, each := range clients {
+		if wanted != "all" && wanted != each.name {
+			continue
+		}
+		program, err := exec.LookPath(each.program)
+		if err != nil {
+			if wanted == each.name {
+				return Result{}, errors.New(each.program + " is not on PATH, so " + each.name + " cannot be registered")
+			}
+			result.Actions = append(result.Actions, Action{Client: each.name, Detail: "not installed; skipped"})
+			continue
+		}
+		action, err := each.register(ctx, program, cfg, serverName)
 		if err != nil {
 			return Result{}, err
 		}
-		actions = append(actions, action)
+		result.Actions = append(result.Actions, action)
 	}
-	if client == "claude" || client == "both" {
-		action, err := setupClaude(ctx, cfg, serverName, scope)
-		if err != nil {
-			return Result{}, err
-		}
-		actions = append(actions, action)
+	if len(result.Actions) == 0 {
+		return Result{}, errors.New("client must be all, codex or claude, got " + options.Client)
 	}
-	result.Actions = actions
 	return result, nil
 }
 
-func normalizeClient(value string) string {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", "all", "both":
-		return "both"
-	case "codex", "claude":
-		return strings.ToLower(value)
-	default:
-		return value
+// serverEnv carries ELYSIAN_HOME only when the user named one; otherwise the server finds ~/.elysian itself.
+func serverEnv() map[string]string {
+	env := map[string]string{}
+	if home := os.Getenv("ELYSIAN_HOME"); home != "" {
+		env["ELYSIAN_HOME"] = home
 	}
+	return env
 }
 
-func normalizeScope(value string) string {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", "project":
-		return "project"
-	case "user":
-		return "user"
-	default:
-		return value
+func registerCodex(ctx context.Context, codex string, cfg config.Config, serverName string) (Action, error) {
+	args := []string{"mcp", "add", serverName}
+	for key, value := range serverEnv() {
+		args = append(args, "--env", key+"="+value)
 	}
-}
-
-func serverCommand(cfg config.Config) []string {
-	return []string{
-		cfg.Binary,
-		"server",
-		"--project-root",
-		cfg.ProjectRoot,
-		"--elysian-home",
-		cfg.ElysianHome,
-	}
-}
-
-func serverEnv(cfg config.Config) map[string]string {
-	return map[string]string{
-		"ELYSIAN_HOME": cfg.ElysianHome,
-	}
-}
-
-func commandLine(parts []string) string {
-	quoted := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if strings.ContainsAny(part, " \t\"'") {
-			quoted = append(quoted, `"`+strings.ReplaceAll(part, `"`, `\"`)+`"`)
-		} else {
-			quoted = append(quoted, part)
-		}
-	}
-	return strings.Join(quoted, " ")
-}
-
-func setupCodex(ctx context.Context, cfg config.Config, serverName string) (Action, error) {
-	codex, err := exec.LookPath("codex")
-	if err != nil {
-		return Action{}, errors.New("codex CLI is required to configure Codex MCP")
-	}
-	remove := exec.CommandContext(ctx, codex, "mcp", "remove", serverName)
-	_ = remove.Run()
-	args := []string{"mcp", "add", serverName, "--env", "ELYSIAN_HOME=" + cfg.ElysianHome, "--"}
-	args = append(args, serverCommand(cfg)...)
-	add := exec.CommandContext(ctx, codex, args...)
-	output, err := add.CombinedOutput()
-	if err != nil {
+	args = append(args, "--", cfg.Binary, "server")
+	if output, err := exec.CommandContext(ctx, codex, args...).CombinedOutput(); err != nil {
 		return Action{}, errors.New("codex mcp add failed: " + strings.TrimSpace(string(output)))
 	}
-	return Action{
-		Client:  "codex",
-		Scope:   "user",
-		Target:  "~/.codex/config.toml",
-		Detail:  "registered stdio MCP server through Codex CLI",
-		Command: commandLine(append([]string{"codex"}, args...)),
-	}, nil
+	return Action{Client: "codex", Target: "~/.codex/config.toml", Detail: "registered user-wide", Command: commandLine(codex, args)}, nil
 }
 
-func setupClaude(ctx context.Context, cfg config.Config, serverName string, scope string) (Action, error) {
-	if scope == "user" {
-		return setupClaudeUser(ctx, cfg, serverName)
-	}
-	if scope != "project" {
-		return Action{}, errors.New("claude scope must be project or user")
-	}
-	target := filepath.Join(cfg.ProjectRoot, ".mcp.json")
-	if err := writeProjectMCP(target, serverName, cfg); err != nil {
-		return Action{}, err
-	}
-	return Action{
-		Client: "claude",
-		Scope:  "project",
-		Target: target,
-		Detail: "wrote project-scoped .mcp.json",
-	}, nil
-}
-
-func setupClaudeUser(ctx context.Context, cfg config.Config, serverName string) (Action, error) {
-	claude, err := exec.LookPath("claude")
-	if err != nil {
-		return Action{}, errors.New("claude CLI is required for user-scoped Claude Code MCP setup")
-	}
-	payload, err := json.Marshal(mcpServerConfig(cfg))
+func registerClaude(ctx context.Context, claude string, cfg config.Config, serverName string) (Action, error) {
+	payload, err := json.Marshal(map[string]any{"type": "stdio", "command": cfg.Binary, "args": []string{"server"}, "env": serverEnv()})
 	if err != nil {
 		return Action{}, err
+	}
+	// add-json refuses a name that exists, so a re-run removes it first; absence is the only failure allowed.
+	removed, err := exec.CommandContext(ctx, claude, "mcp", "remove", serverName, "--scope", "user").CombinedOutput()
+	if err != nil && !strings.Contains(string(removed), `No MCP server named "`+serverName+`" in user scope`) {
+		return Action{}, errors.New("claude mcp remove failed: " + strings.TrimSpace(string(removed)))
 	}
 	args := []string{"mcp", "add-json", serverName, string(payload), "--scope", "user"}
-	cmd := exec.CommandContext(ctx, claude, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
+	if output, err := exec.CommandContext(ctx, claude, args...).CombinedOutput(); err != nil {
 		return Action{}, errors.New("claude mcp add-json failed: " + strings.TrimSpace(string(output)))
 	}
-	return Action{
-		Client:  "claude",
-		Scope:   "user",
-		Target:  "~/.claude.json",
-		Detail:  "registered stdio MCP server through Claude CLI",
-		Command: commandLine(append([]string{"claude"}, args...)),
-	}, nil
+	return Action{Client: "claude", Target: "~/.claude.json", Detail: "registered user-wide", Command: commandLine(claude, args)}, nil
 }
 
-func writeProjectMCP(path string, serverName string, cfg config.Config) error {
-	payload := map[string]any{}
-	data, err := os.ReadFile(path)
-	if err == nil {
-		if err := json.Unmarshal(data, &payload); err != nil {
-			return err
+func commandLine(program string, args []string) string {
+	quoted := []string{program}
+	for _, part := range args {
+		if strings.ContainsAny(part, " \t\"'") {
+			part = `"` + strings.ReplaceAll(part, `"`, `\"`) + `"`
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
+		quoted = append(quoted, part)
 	}
-	servers, ok := payload["mcpServers"].(map[string]any)
-	if !ok {
-		servers = map[string]any{}
-	}
-	servers[serverName] = mcpServerConfig(cfg)
-	payload["mcpServers"] = servers
-	data, err = json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, append(data, '\n'), 0644)
-}
-
-func mcpServerConfig(cfg config.Config) map[string]any {
-	command := serverCommand(cfg)
-	return map[string]any{
-		"type":    "stdio",
-		"command": command[0],
-		"args":    command[1:],
-		"env":     serverEnv(cfg),
-	}
+	return strings.Join(quoted, " ")
 }

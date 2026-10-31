@@ -107,7 +107,9 @@ may show an older round.
 `elysian init` makes `~/.elysian` and an owner-only operator token in `~/.elysian/auth_token`.
 The backend (`config.read_token`) and Go (`config.resolveToken`) read it when `ELYSIAN_AUTH_TOKEN`
 is unset; an empty file stops both. `elysian-mcp server` starts `elysian serve` when the local API
-is down (`internal/backend`); `scripts/mcp_autostart_smoke.sh` proves it end to end.
+is down (`internal/backend`), using the `elysian` the installer links beside the binary before PATH;
+`scripts/mcp_autostart_smoke.sh` proves it end to end. `install.sh` / `install.ps1` at the root are the only
+installers: uv, `uv tool install` of the backend at the release tag, `elysian init`, the release binary, `elysian-mcp setup`.
 
 ## Cross-language contract
 

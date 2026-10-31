@@ -64,25 +64,19 @@ func runServer(ctx context.Context, args []string) error {
 
 func runSetup(ctx context.Context, args []string) error {
 	flags := flag.NewFlagSet("setup", flag.ContinueOnError)
-	projectRoot := flags.String("project-root", "", "Elysian project root")
 	elysianHome := flags.String("elysian-home", "", "Elysian data home")
 	binary := flags.String("binary", "", "MCP server binary path")
-	client := flags.String("client", "both", "codex, claude, or both")
-	scope := flags.String("scope", "project", "Claude scope: project or user")
+	client := flags.String("client", "all", "all installed clients, codex, or claude")
 	serverName := flags.String("server-name", "elysian", "MCP server name")
 	flags.SetOutput(os.Stderr)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	cfg, err := config.Resolve(*projectRoot, *elysianHome, *binary)
+	cfg, err := config.Resolve("", *elysianHome, *binary)
 	if err != nil {
 		return err
 	}
-	result, err := setup.Run(ctx, cfg, setup.Options{
-		Client:     *client,
-		Scope:      *scope,
-		ServerName: *serverName,
-	})
+	result, err := setup.Run(ctx, cfg, setup.Options{Client: *client, ServerName: *serverName})
 	if err != nil {
 		return err
 	}
@@ -130,7 +124,7 @@ func usage() string {
 
 Commands:
   server   Run the MCP server over stdio
-  setup    Register the MCP server with Codex and Claude Code
+  setup    Register the MCP server user-wide with every installed coding agent
   status   Print read-only Elysian memory status
   version  Print the binary version
 

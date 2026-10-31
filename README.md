@@ -99,7 +99,21 @@ for is quarantined: it stays in the store, and it is not citable.
 
 ## Run it
 
-Linux and macOS:
+One command installs everything a coding agent needs: uv if it is missing, Elysian with its own
+Python, the store in `~/.elysian` with its operator token, the MCP server, and the registration
+with every installed agent (Codex, Claude Code). No Python, Go or Node is needed first.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.ps1 | iex
+```
+
+Run again to upgrade. From a checkout, `bash install.sh --source` installs this tree instead.
+
+For development, with every local model:
 
 ```bash
 bash scripts/install.sh
@@ -166,11 +180,7 @@ leaves it running for the next client; its log is `~/.elysian/logs/api.log`.
 nobody owns and memories marked for everyone; `elysian_card` answers "can this store answer my kind of question"
 before anything sensitive is sent, and it carries no memory text.
 
-```bash
-bash ./elysian-mcp/install.sh --client both
-```
-
-See `elysian-mcp/README.md` for the full tool list.
+The top-level installer sets it up; see "Run it". See `elysian-mcp/README.md` for the full tool list.
 
 ## Data layout
 

@@ -95,7 +95,7 @@ func TestOnlyALocalAPIIsStarted(t *testing.T) {
 func TestAMissingElysianIsNamed(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	err := Ensure(context.Background(), "http://127.0.0.1:"+freePort(t), t.TempDir())
-	if err == nil || !strings.Contains(err.Error(), "`elysian` is not on PATH") {
+	if err == nil || !strings.Contains(err.Error(), "no `elysian` is beside this binary or on PATH") {
 		t.Fatalf("a missing elysian must be named, got %v", err)
 	}
 }
@@ -143,5 +143,24 @@ func TestAnAPIThatReportsARelativeHomeIsRefused(t *testing.T) {
 	err := Ensure(context.Background(), api.URL, filepath.Join(t.TempDir(), "relative"))
 	if err == nil || !strings.Contains(err.Error(), "reports the relative home relative") {
 		t.Fatalf("a relative home cannot be placed from the client's directory, got %v", err)
+	}
+}
+
+func TestTheElysianBesideThisBinaryIsUsedWhenPATHLacksIt(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	beside := filepath.Join(filepath.Dir(self), "elysian")
+	if err := os.WriteFile(beside, []byte("#!/bin/sh\necho \"beside $*\"\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(beside) })
+	t.Setenv("PATH", t.TempDir())
+	home := t.TempDir()
+	err = Ensure(context.Background(), "http://127.0.0.1:"+freePort(t), home)
+	log, _ := os.ReadFile(filepath.Join(home, "logs", "api.log"))
+	if err == nil || !strings.Contains(string(log), "beside serve --host 127.0.0.1") {
+		t.Fatalf("the elysian beside this binary must be started, got %v and log %q", err, log)
 	}
 }
