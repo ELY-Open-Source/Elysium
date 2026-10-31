@@ -1,0 +1,51 @@
+name: install
+
+on:
+  push:
+    branches: [main, "ci/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The one-command installer from this checkout on each OS, then a client writes and reads a memory.
+  checkout:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: elysian-mcp/go.sum
+      - name: Install (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: |
+          bash install.sh --source
+          uv="$(command -v uv || echo "$HOME/.local/bin/uv")"
+          "$("$uv" tool dir)/elysian/bin/python" scripts/mcp_roundtrip.py "$HOME/.elysian/bin/elysian-mcp" mcp.err
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./install.ps1 -Source
+          $uv = (Get-Command uv -ErrorAction SilentlyContinue).Source
+          if (-not $uv) { $uv = Join-Path $HOME ".local\bin\uv.exe" }
+          $python = Join-Path (& $uv tool dir) "elysian\Scripts\python.exe"
+          & $python scripts/mcp_roundtrip.py (Join-Path $HOME ".elysian\bin\elysian-mcp.exe") mcp.err
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: The MCP server's log on failure
+        if: failure()
+        shell: bash
+        run: cat mcp.err "$HOME/.elysian/logs/api.log" || true
+
+  # A machine with no Python and no Git.
+  bare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/install_acceptance.sh --source
