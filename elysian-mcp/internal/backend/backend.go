@@ -4,8 +4,10 @@ package backend
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,8 +22,8 @@ var Wait = 90 * time.Second
 
 // Ensure returns once the API at baseURL answers, starting `elysian serve` for home if it does not.
 func Ensure(ctx context.Context, baseURL string, home string) error {
-	if healthy(ctx, baseURL) {
-		return nil
+	if served, ok := serving(ctx, baseURL); ok {
+		return sameStore(baseURL, served, home)
 	}
 	address, err := url.Parse(baseURL)
 	if err != nil {
@@ -51,19 +53,22 @@ func Ensure(ctx context.Context, baseURL string, home string) error {
 		return fmt.Errorf("cannot start %s serve: %w", program, err)
 	}
 	fmt.Fprintf(os.Stderr, "elysian-mcp: started `elysian serve` (pid %d) for %s; log %s\n", command.Process.Pid, baseURL, logPath)
-	exited := make(chan error, 1)
-	go func() { exited <- command.Wait() }()
+	exitedWith := make(chan error, 1)
+	go func() { exitedWith <- command.Wait() }()
+	var exitErr error
+	exited := false
 	deadline := time.Now().Add(Wait)
 	for time.Now().Before(deadline) {
-		if healthy(ctx, baseURL) {
-			return nil
+		if served, ok := serving(ctx, baseURL); ok {
+			return sameStore(baseURL, served, home)
+		}
+		// A child that lost the port race exits; the winner still holds the port while it starts.
+		if exited && !listening(address.Host) {
+			return fmt.Errorf("`elysian serve` exited (%v) and nothing holds %s; last lines of %s:\n%s", exitErr, address.Host, logPath, tail(logPath))
 		}
 		select {
-		case err := <-exited:
-			if healthy(ctx, baseURL) {
-				return nil
-			}
-			return fmt.Errorf("`elysian serve` exited (%v) before the API answered; last lines of %s:\n%s", err, logPath, tail(logPath))
+		case exitErr = <-exitedWith:
+			exited = true
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(250 * time.Millisecond):
@@ -72,17 +77,48 @@ func Ensure(ctx context.Context, baseURL string, home string) error {
 	return fmt.Errorf("`elysian serve` did not answer at %s within %s; last lines of %s:\n%s", baseURL, Wait, logPath, tail(logPath))
 }
 
-func healthy(ctx context.Context, baseURL string) bool {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(baseURL, "/")+"/api/status", nil)
+// sameStore refuses an API that serves another home: its writes would land in the wrong store.
+func sameStore(baseURL string, served string, home string) error {
+	if real(served) != real(home) {
+		return errors.New("the Elysian API at " + baseURL + " serves " + served + ", not " + home + "; stop it or point ELYSIAN_API at another port")
+	}
+	return nil
+}
+
+func real(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
+}
+
+func listening(host string) bool {
+	connection, err := net.DialTimeout("tcp", host, time.Second)
 	if err != nil {
 		return false
+	}
+	connection.Close()
+	return true
+}
+
+// serving reports whether the API answers at baseURL and which home it serves.
+func serving(ctx context.Context, baseURL string) (string, bool) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(baseURL, "/")+"/api/status", nil)
+	if err != nil {
+		return "", false
 	}
 	response, err := (&http.Client{Timeout: 2 * time.Second}).Do(request)
 	if err != nil {
-		return false
+		return "", false
 	}
-	response.Body.Close()
-	return response.StatusCode == http.StatusOK
+	defer response.Body.Close()
+	var status struct {
+		DataHome string `json:"data_home"`
+	}
+	if response.StatusCode != http.StatusOK || json.NewDecoder(response.Body).Decode(&status) != nil || status.DataHome == "" {
+		return "", false
+	}
+	return status.DataHome, true
 }
 
 func tail(path string) string {
