@@ -52,6 +52,11 @@ export function fit(x0: number, x1: number, y0: number, y1: number, top = 1.8, m
   };
 }
 
+/** Like fit, but the band's height sets the zoom and the sides are cropped: a portrait screen filled by a subject wider than tall. */
+export function fill(x0: number, x1: number, y0: number, y1: number, top = 1.8, margin = 1.05): Frame {
+  return { ...fit(x0, x1, y0, y1, top, margin), hw: 1e-3 };
+}
+
 /** Each beat's camera holds its last frame until the next beat's travel begins. */
 export function holdKeys(beats: { start: number; keys: Key[]; portrait: Key[] }[], portrait: boolean): Key[] {
   const held = beats.flatMap((b, i) => {

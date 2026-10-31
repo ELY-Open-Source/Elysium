@@ -5,7 +5,7 @@ import { FloorPhrase } from '../floortype';
 import { C, LEGS, TOPS, tri } from '../palette';
 import { box, fade, paint, rect, solid, strip, tone, toneMaterial } from '../solid';
 import { lerp, seg, ss } from '../ease';
-import { cover, fit } from '../stage';
+import { cover, fill, fit } from '../stage';
 
 const W0 = -7;
 const W1 = 5;
@@ -84,7 +84,9 @@ export function speed(root: Group): Beat {
     t0: t0 + 7.0,
     lines: [[['0.072', 'na'], [' 秒', 's']], [['165,973', 'ns'], [' 条记忆，一个文件', 's']]],
   });
-  root.add(phrase.node);
+  // A phone is too narrow for the long line; the caption carries it.
+  const numbers = new FloorPhrase({ x: x0 + 4.6, y: 6.6, t0: t0 + 7.0, lines: [[['0.072', 'na'], [' 秒', 's']], [['165,973', 'ns']]] });
+  root.add(phrase.node, numbers.node);
   const m = new Matrix4();
 
   return {
@@ -97,10 +99,10 @@ export function speed(root: Group): Beat {
       [t0 + 4.8, fit(x0 - 7.5, x0 + 7, -6.5, 8.6, 2.6, 1.04)],
     ],
     portrait: [
-      [t0 + 2.0, fit(...cover(phrase.box, [x0 - 5, x0 + 7, -5, 3]), 2.6, 1.04)],
-      [t0 + 4.8, fit(...cover(phrase.box, [x0 - 5, x0 + 6.5, -5, 3]), 2.6, 1.04)],
+      [t0 + 2.0, fill(...cover(numbers.box, [x0 + W0, x0 + W0, D0, D0]), WALL_H, 1.0)],
+      [t0 + 4.8, fill(...cover(numbers.box, [x0 + W0, x0 + W0, D0, D0]), WALL_H, 1.04)],
     ],
-    update(t) {
+    update(t, portrait) {
       const turn = ss(seg(t, t0 + 2.2, t0 + 3.6));
       const glide = ss(seg(t, t0 + 3.4, t0 + 4.4));
       roof.rotation.x = turn * (Math.PI - 0.04);
@@ -124,7 +126,9 @@ export function speed(root: Group): Beat {
       found.visible = lift > 0;
       found.position.set(target.x, target.y, lerp(0.004, 0.45, lift));
       asker.update(t);
-      phrase.update(t);
+      phrase.node.visible = !portrait;
+      numbers.node.visible = portrait;
+      (portrait ? numbers : phrase).update(t);
     },
   };
 }
