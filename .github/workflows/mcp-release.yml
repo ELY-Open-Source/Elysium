@@ -74,3 +74,11 @@ jobs:
           files: dist/*
           fail_on_unmatched_files: true
           generate_release_notes: true
+
+  # The published one-line command against the release just made, on a machine with no Python and no Git.
+  accept:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/install_acceptance.sh

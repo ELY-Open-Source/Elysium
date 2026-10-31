@@ -65,7 +65,8 @@ go run ./cmd/elysian-mcp server --elysian-home /path/to/.elysian
 Pushing a `mcp-v*` tag runs `.github/workflows/mcp-release.yml`, which cross-compiles
 the pure-Go server (CGO disabled) for Linux, macOS, and Windows on amd64 and arm64,
 then publishes the archives with a `SHA256SUMS` manifest to a GitHub Release on
-`ELY-Open-Source/Elysian`. The installers consume those assets.
+`ELY-Open-Source/Elysian`. The installers consume those assets, and the workflow's last job runs the
+published one-line command on a bare Debian (`scripts/install_acceptance.sh`) against the release it made.
 
 ## Security posture
 
