@@ -10,7 +10,7 @@ The home follows the backend's rule: `--elysian-home`, else `ELYSIAN_HOME`, else
 
 The repository's `install.sh` (Linux, macOS) and `install.ps1` (Windows) install everything; see
 the top-level README. They download the checksum-verified binary of the newest `mcp-*` release into
-`<elysian-home>/bin`, place a link to the `elysian` CLI beside it, and run `elysian-mcp setup`.
+`<elysian-home>/bin`, place the `elysian` CLI beside it (a link; a copy on Windows), and run `elysian-mcp setup`.
 
 `setup` registers the server user-wide with every installed coding agent and skips the rest:
 Codex through `codex mcp add` (it replaces an entry of the same name), Claude Code through

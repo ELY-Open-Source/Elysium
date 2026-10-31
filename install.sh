@@ -74,7 +74,7 @@ step "Elysian and its Python"
 if [[ "$METHOD" == "source" ]]; then
   "$UV" tool install --python 3.12 --reinstall "$SCRIPT_DIR/backend"
 else
-  "$UV" tool install --python 3.12 --reinstall "elysian @ git+https://github.com/${REPO}@${TAG}#subdirectory=backend"
+  "$UV" tool install --python 3.12 --reinstall "elysian @ https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz#subdirectory=backend"
 fi
 ELYSIAN="$("$UV" tool dir --bin)/elysian"
 [[ -x "$ELYSIAN" ]] || fail "uv did not install $ELYSIAN"
@@ -82,7 +82,8 @@ ELYSIAN="$("$UV" tool dir --bin)/elysian"
 step "The store and its operator token"
 INIT="$("$ELYSIAN" init)"
 printf '%s\n' "$INIT"
-HOME_DIR="$(printf '%s\n' "$INIT" | sed -n 's/^  "home": "\(.*\)",$/\1/p')"
+PYTHON="$("$UV" tool dir)/elysian/bin/python"
+HOME_DIR="$(printf '%s' "$INIT" | "$PYTHON" -c 'import json, sys; print(json.load(sys.stdin)["home"])')"
 [[ -d "$HOME_DIR" ]] || fail "elysian init named no home"
 BIN_DIR="$HOME_DIR/bin"
 mkdir -p "$BIN_DIR"

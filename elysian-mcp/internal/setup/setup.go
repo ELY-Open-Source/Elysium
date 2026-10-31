@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -15,6 +14,15 @@ import (
 type Options struct {
 	Client     string
 	ServerName string
+	// Home is the resolved home when the user named one; empty lets the server find ~/.elysian.
+	Home string
+}
+
+// entry is what every client is told to run.
+type entry struct {
+	Name   string
+	Binary string
+	Env    map[string]string
 }
 
 type Action struct {
@@ -33,7 +41,7 @@ type Result struct {
 type client struct {
 	name     string
 	program  string
-	register func(context.Context, string, config.Config, string) (Action, error)
+	register func(context.Context, string, entry) (Action, error)
 }
 
 var clients = []client{
@@ -54,6 +62,10 @@ func Run(ctx context.Context, cfg config.Config, options Options) (Result, error
 	if wanted == "" {
 		wanted = "all"
 	}
+	server := entry{Name: serverName, Binary: cfg.Binary, Env: map[string]string{}}
+	if options.Home != "" {
+		server.Env["ELYSIAN_HOME"] = options.Home
+	}
 	result := Result{ServerName: serverName, Binary: cfg.Binary}
 	for _, each := range clients {
 		if wanted != "all" && wanted != each.name {
@@ -67,7 +79,7 @@ func Run(ctx context.Context, cfg config.Config, options Options) (Result, error
 			result.Actions = append(result.Actions, Action{Client: each.name, Detail: "not installed; skipped"})
 			continue
 		}
-		action, err := each.register(ctx, program, cfg, serverName)
+		action, err := each.register(ctx, program, server)
 		if err != nil {
 			return Result{}, err
 		}
@@ -79,38 +91,29 @@ func Run(ctx context.Context, cfg config.Config, options Options) (Result, error
 	return result, nil
 }
 
-// serverEnv carries ELYSIAN_HOME only when the user named one; otherwise the server finds ~/.elysian itself.
-func serverEnv() map[string]string {
-	env := map[string]string{}
-	if home := os.Getenv("ELYSIAN_HOME"); home != "" {
-		env["ELYSIAN_HOME"] = home
-	}
-	return env
-}
-
-func registerCodex(ctx context.Context, codex string, cfg config.Config, serverName string) (Action, error) {
-	args := []string{"mcp", "add", serverName}
-	for key, value := range serverEnv() {
+func registerCodex(ctx context.Context, codex string, server entry) (Action, error) {
+	args := []string{"mcp", "add", server.Name}
+	for key, value := range server.Env {
 		args = append(args, "--env", key+"="+value)
 	}
-	args = append(args, "--", cfg.Binary, "server")
+	args = append(args, "--", server.Binary, "server")
 	if output, err := exec.CommandContext(ctx, codex, args...).CombinedOutput(); err != nil {
 		return Action{}, errors.New("codex mcp add failed: " + strings.TrimSpace(string(output)))
 	}
 	return Action{Client: "codex", Target: "~/.codex/config.toml", Detail: "registered user-wide", Command: commandLine(codex, args)}, nil
 }
 
-func registerClaude(ctx context.Context, claude string, cfg config.Config, serverName string) (Action, error) {
-	payload, err := json.Marshal(map[string]any{"type": "stdio", "command": cfg.Binary, "args": []string{"server"}, "env": serverEnv()})
+func registerClaude(ctx context.Context, claude string, server entry) (Action, error) {
+	payload, err := json.Marshal(map[string]any{"type": "stdio", "command": server.Binary, "args": []string{"server"}, "env": server.Env})
 	if err != nil {
 		return Action{}, err
 	}
 	// add-json refuses a name that exists, so a re-run removes it first; absence is the only failure allowed.
-	removed, err := exec.CommandContext(ctx, claude, "mcp", "remove", serverName, "--scope", "user").CombinedOutput()
-	if err != nil && !strings.Contains(string(removed), `No MCP server named "`+serverName+`" in user scope`) {
+	removed, err := exec.CommandContext(ctx, claude, "mcp", "remove", server.Name, "--scope", "user").CombinedOutput()
+	if err != nil && !strings.Contains(string(removed), `No MCP server named "`+server.Name+`" in user scope`) {
 		return Action{}, errors.New("claude mcp remove failed: " + strings.TrimSpace(string(removed)))
 	}
-	args := []string{"mcp", "add-json", serverName, string(payload), "--scope", "user"}
+	args := []string{"mcp", "add-json", server.Name, string(payload), "--scope", "user"}
 	if output, err := exec.CommandContext(ctx, claude, args...).CombinedOutput(); err != nil {
 		return Action{}, errors.New("claude mcp add-json failed: " + strings.TrimSpace(string(output)))
 	}

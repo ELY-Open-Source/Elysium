@@ -39,7 +39,6 @@ func TestEveryInstalledClientIsRegisteredUserWideAndAMissingOneSkipped(t *testin
 	bin := t.TempDir()
 	fake(t, bin, "claude", false)
 	t.Setenv("PATH", bin)
-	t.Setenv("ELYSIAN_HOME", "")
 	result, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -59,8 +58,7 @@ func TestARerunReplacesTheEntryAndANamedHomeIsCarried(t *testing.T) {
 	fake(t, bin, "claude", true)
 	fake(t, bin, "codex", true)
 	t.Setenv("PATH", bin)
-	t.Setenv("ELYSIAN_HOME", "/data/elysian")
-	if _, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{}); err != nil {
+	if _, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Home: "/data/elysian"}); err != nil {
 		t.Fatalf("a re-run must replace the entries, got %v", err)
 	}
 	if calls := logged(t, bin, "codex"); !strings.Contains(calls, "mcp add elysian --env ELYSIAN_HOME=/data/elysian -- /opt/elysian-mcp server") {

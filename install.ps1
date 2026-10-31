@@ -61,7 +61,7 @@ if ($Source) {
   Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", (Join-Path $Checkout "backend"))
 }
 else {
-  Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "elysian @ git+https://github.com/$Repo@$Version#subdirectory=backend")
+  Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "elysian @ https://github.com/$Repo/archive/refs/tags/$Version.tar.gz#subdirectory=backend")
 }
 $Elysian = Join-Path (& $Uv tool dir --bin) "elysian.exe"
 if (-not (Test-Path $Elysian)) { throw "uv did not install $Elysian" }
@@ -102,7 +102,7 @@ else {
   finally { Remove-Item -Recurse -Force $tmp }
 }
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
-Set-Content -Encoding ASCII -Path (Join-Path $BinDir "elysian.cmd") -Value "@`"$Elysian`" %*"
+Copy-Item -Force -Path $Elysian -Destination (Join-Path $BinDir "elysian.exe")
 
 Step "Coding agents"
 Invoke-Checked $Mcp @("setup")

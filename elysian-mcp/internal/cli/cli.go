@@ -76,7 +76,11 @@ func runSetup(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	result, err := setup.Run(ctx, cfg, setup.Options{Client: *client, ServerName: *serverName})
+	options := setup.Options{Client: *client, ServerName: *serverName}
+	if *elysianHome != "" || os.Getenv("ELYSIAN_HOME") != "" {
+		options.Home = cfg.ElysianHome
+	}
+	result, err := setup.Run(ctx, cfg, options)
 	if err != nil {
 		return err
 	}
