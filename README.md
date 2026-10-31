@@ -113,6 +113,10 @@ irm https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.ps1 |
 ```
 
 Run again to upgrade. From a checkout, `bash install.sh --source` installs this tree instead.
+`scripts/install_acceptance.sh` proves it in a bare Debian container with no Python and no Git, and
+CI (`.github/workflows/install.yml`) runs the installer on Linux, macOS and Windows; each run then
+drives the installed MCP server as a client would (`scripts/mcp_roundtrip.py`): one memory in, the
+same memory back.
 
 For development, with every local model:
 

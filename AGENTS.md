@@ -28,6 +28,8 @@ ruff check backend/src/elysian backend/tests bench
 cd elysian-mcp && go build ./... && go vet ./... && go test ./... && gofmt -l .
 cd frontend && npm run build && npx eslint src --max-warnings 0
 bash scripts/mcp_write_smoke.sh                  # two processes, one store
+bash scripts/mcp_autostart_smoke.sh              # the MCP server starts the API itself
+bash scripts/install_acceptance.sh --source      # one command on a bare Debian, then a client round trip
 ```
 
 mypy carries a pre-existing error baseline. A change is clean when the count and
