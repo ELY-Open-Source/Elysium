@@ -5,8 +5,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // recallInstruction tells a model to recall when its client cannot inject memories on a prompt.
@@ -15,6 +16,7 @@ const recallInstruction = "Elysian local memory is connected as the MCP server `
 // grokFamily is xAI's Grok Build and its fork Kigi: one config.toml, a hooks directory, and no way
 // for a prompt hook to reach the model, so hooks save and an instruction recalls.
 type grokFamily struct {
+	// homeEnv is the documented override of the client's home, empty when it has none.
 	client, homeEnv, homeName string
 	// instructions is the file the model always reads, relative to the client's home.
 	instructions string
@@ -24,7 +26,7 @@ type grokFamily struct {
 
 var (
 	grok = grokFamily{client: "grok", homeEnv: "GROK_HOME", homeName: ".grok", instructions: filepath.Join("rules", "elysian.md"), ownFile: true}
-	kigi = grokFamily{client: "kigi", homeEnv: "KIGI_HOME", homeName: ".kigi", instructions: "AGENTS.md"}
+	kigi = grokFamily{client: "kigi", homeName: ".kigi", instructions: "AGENTS.md"}
 )
 
 func registerGrok(ctx context.Context, program string, server entry) (Action, error) {
@@ -44,14 +46,17 @@ func (f grokFamily) register(_ context.Context, _ string, server entry) (Action,
 		return Action{Client: f.client, Detail: "skipped: this `grok` is the community grok-cli (~/.grok/user-settings.json), whose hooks discard their output; xAI's Grok Build is supported"}, nil
 	}
 	configPath := filepath.Join(dir, "config.toml")
-	existing, err := os.ReadFile(configPath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	text, _, err := readTOML(configPath)
+	if err != nil {
 		return Action{}, err
 	}
-	theirs := outsideBlock(string(existing))
+	theirs := map[string]any{}
+	if err := toml.Unmarshal([]byte(outsideBlock(text)), &theirs); err != nil {
+		return Action{}, errors.New(configPath + " is not valid TOML, so it was left untouched: " + err.Error())
+	}
 	var block, notes []string
-	if strings.Contains(theirs, "[mcp_servers."+server.Name+"]") {
-		notes = append(notes, "kept the [mcp_servers."+server.Name+"] already in "+configPath)
+	if tomlHas(theirs, "mcp_servers", server.Name) {
+		notes = append(notes, "kept the mcp_servers."+server.Name+" already in "+configPath)
 	} else {
 		table := "[mcp_servers." + server.Name + "]\ncommand = \"" + tomlEscape(server.Binary) + "\"\nargs = [\"server\"]\nenabled = true"
 		if home := server.Env["ELYSIAN_HOME"]; home != "" {
@@ -59,12 +64,12 @@ func (f grokFamily) register(_ context.Context, _ string, server entry) (Action,
 		}
 		block = append(block, table)
 	}
-	if regexp.MustCompile(`(?m)^\s*(\[permission\]|permission\s*[.=])`).MatchString(theirs) {
-		notes = append(notes, "add \"MCPTool("+server.Name+"__*)\" to [permission].allow in "+configPath+" by hand")
+	if tomlHas(theirs, "permission") {
+		notes = append(notes, "add \"MCPTool("+server.Name+"__*)\" to permission.allow in "+configPath+" by hand")
 	} else {
 		block = append(block, "[permission]\nallow = [\"MCPTool("+server.Name+"__*)\"]")
 	}
-	if err := managedBlock(configPath, "#", strings.Join(block, "\n\n")); err != nil {
+	if err := writeTOMLBlock(configPath, text, strings.Join(block, "\n\n")); err != nil {
 		return Action{}, err
 	}
 	command, err := plainCommand(server.Binary, windowsShell("plain"), hookArgs(server, f.client, "prompt")...)

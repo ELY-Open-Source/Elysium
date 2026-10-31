@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // wireClaude approves Elysian's tools and adds the session and prompt hooks to Claude Code's user
@@ -93,13 +95,12 @@ func wireCodex(_ context.Context, _ string, server entry) (string, error) {
 		return "", err
 	}
 	configPath := filepath.Join(dir, "config.toml")
-	existing, err := os.ReadFile(configPath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	text, _, err := readTOML(configPath)
+	if err != nil {
 		return "", err
 	}
-	if strings.Contains(outsideBlock(string(existing)), "[mcp_servers."+server.Name+"]") {
-		return "", errors.New(configPath + " still defines [mcp_servers." + server.Name + "] after `codex mcp remove`; remove it by hand")
-	}
+	// Our block is rewritten whole; what is left is the user's, checked and cleaned on its own.
+	text = outsideBlock(text)
 	var block strings.Builder
 	block.WriteString("[mcp_servers." + server.Name + "]\ncommand = \"" + tomlEscape(server.Binary) + "\"\nargs = [\"server\"]\ndefault_tools_approval_mode = \"approve\"\n")
 	if home := server.Env["ELYSIAN_HOME"]; home != "" {
@@ -107,48 +108,82 @@ func wireCodex(_ context.Context, _ string, server entry) (string, error) {
 	}
 	for _, hook := range codexHooks {
 		key := absolute + ":" + hook.snake + ":" + strconv.Itoa(positions[hook.event]) + ":0"
-		header := `[hooks.state."` + tomlEscape(key) + `"]`
-		if strings.Contains(outsideBlock(string(existing)), header) {
-			continue
-		}
+		// That position now holds our hook, so any trust recorded there is stale, whoever wrote it.
+		text = withoutTable(text, `[hooks.state."`+tomlEscape(key)+`"]`)
 		hash, err := codexHookHash(hook.snake, hook.matcher, commands[hook.event], 30)
 		if err != nil {
 			return "", err
 		}
-		block.WriteString("\n" + header + "\ntrusted_hash = \"" + hash + "\"\n")
+		block.WriteString("\n[hooks.state.\"" + tomlEscape(key) + "\"]\ntrusted_hash = \"" + hash + "\"\n")
 	}
-	return path + " and " + configPath, managedBlock(configPath, "#", block.String())
+	theirs := map[string]any{}
+	if err := toml.Unmarshal([]byte(text), &theirs); err != nil {
+		return "", errors.New(configPath + " is not valid TOML, so it was left untouched: " + err.Error())
+	}
+	if tomlHas(theirs, "mcp_servers", server.Name) {
+		return "", errors.New(configPath + " still defines mcp_servers." + server.Name + " after `codex mcp remove`; remove it by hand")
+	}
+	return path + " and " + configPath, writeTOMLBlock(configPath, text, block.String())
+}
+
+// withoutTable removes one table, from its header to the next header, from TOML text.
+func withoutTable(text, header string) string {
+	lines := strings.Split(text, "\n")
+	kept := lines[:0]
+	skipping := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == header {
+			skipping = true
+			continue
+		}
+		if skipping && strings.HasPrefix(trimmed, "[") {
+			skipping = false
+		}
+		if !skipping {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
 }
 
 func tomlEscape(text string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(text, `\`, `\\`), `"`, `\"`)
 }
 
-// outsideBlock drops our own managed block, so a header there does not count as the user's.
+// outsideBlock drops our own marked block, markers included, leaving only the user's text.
 func outsideBlock(text string) string {
-	begin := strings.Index(text, ">>> elysian")
-	end := strings.Index(text, "<<< elysian")
+	begin := strings.Index(text, "# >>> elysian")
+	end := strings.Index(text, "# <<< elysian")
 	if begin < 0 || end < begin {
 		return text
 	}
-	return text[:begin] + text[end:]
+	rest := text[end:]
+	if newline := strings.Index(rest, "\n"); newline >= 0 {
+		rest = rest[newline+1:]
+	} else {
+		rest = ""
+	}
+	return text[:begin] + rest
 }
 
-// plainCommand is a command line for a shell nobody documented: the path must need no quoting.
+// plainCommand is a command line for a shell nobody documented: no word may need quoting.
 func plainCommand(binary, shell string, args ...string) (string, error) {
-	if shell == "plain" && !plainPath.MatchString(binary) {
-		return "", errors.New(binary + " needs quoting, and this client's Windows hook shell is undocumented; install Elysian under a path without spaces")
+	if shell != "plain" {
+		return shellCommand(binary, shell, args...), nil
 	}
-	if shell == "plain" {
-		return binary + " " + strings.Join(args, " "), nil
+	for _, word := range append([]string{binary}, args...) {
+		if !plainPath.MatchString(word) {
+			return "", errors.New(word + " needs quoting, and this client's Windows hook shell is undocumented; use paths without spaces")
+		}
 	}
-	return shellCommand(binary, shell, args...), nil
+	return binary + " " + strings.Join(args, " "), nil
 }
 
 // registerDroid writes Factory Droid's MCP entry and hooks; the PreToolUse hook approves Elysian's
 // tools, which Droid's default autonomy level would otherwise ask about.
 func registerDroid(_ context.Context, _ string, server entry) (Action, error) {
-	dir, err := configHome("FACTORY_HOME", ".factory")
+	dir, err := userDir(".factory")
 	if err != nil {
 		return Action{}, err
 	}
@@ -248,11 +283,12 @@ func registerQwen(_ context.Context, _ string, server entry) (Action, error) {
 
 // wireGemini adds Gemini CLI's SessionStart and BeforeAgent hooks; Gemini times them in milliseconds.
 func wireGemini(_ context.Context, _ string, server entry) (string, error) {
-	dir, err := configHome("GEMINI_CLI_HOME", ".gemini")
+	// GEMINI_CLI_HOME stands for the home directory; Gemini keeps .gemini inside it.
+	root, err := configHome("GEMINI_CLI_HOME", "")
 	if err != nil {
 		return "", err
 	}
-	path := filepath.Join(dir, "settings.json")
+	path := filepath.Join(root, ".gemini", "settings.json")
 	shell := windowsShell("pwsh")
 	group := func(event, name string, timeout int) map[string]any {
 		return map[string]any{"matcher": "*", "hooks": []any{map[string]any{"type": "command", "name": name, "command": shellCommand(server.Binary, shell, hookArgs(server, "gemini", event)...), "timeout": timeout}}}

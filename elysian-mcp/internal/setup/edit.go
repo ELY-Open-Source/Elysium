@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // editJSON applies change to the JSON object in path, creating it when absent; a file that is not
@@ -96,8 +98,9 @@ func ours(handler any) bool {
 	return strings.Contains(string(text), "elysian-mcp") && strings.Contains(string(text), "hook")
 }
 
-// replaceGroups swaps our groups under one Claude-style event (event -> [{matcher, hooks:[...]}])
-// for fresh ones and keeps every other group, so a re-run never stacks duplicates.
+// replaceGroups drops our handlers under one Claude-style event (event -> [{matcher, hooks:[...]}]),
+// keeping every other handler and any group still holding one, then appends fresh groups; a re-run
+// never stacks duplicates and never takes a user's handler with ours.
 func replaceGroups(hooks map[string]any, event string, fresh []any, path string) error {
 	groups, ok := hooks[event].([]any)
 	if hooks[event] != nil && !ok {
@@ -105,48 +108,56 @@ func replaceGroups(hooks map[string]any, event string, fresh []any, path string)
 	}
 	kept := []any{}
 	for _, group := range groups {
-		if entry, ok := group.(map[string]any); ok {
-			if handlers, ok := entry["hooks"].([]any); ok && len(handlers) > 0 && allOurs(handlers) {
-				continue
-			}
-		}
-		if ours(group) {
+		entry, isGroup := group.(map[string]any)
+		handlers, hasHandlers := entry["hooks"].([]any)
+		if !isGroup || !hasHandlers {
+			kept = append(kept, group)
 			continue
 		}
-		kept = append(kept, group)
+		theirs := []any{}
+		for _, handler := range handlers {
+			if !ours(handler) {
+				theirs = append(theirs, handler)
+			}
+		}
+		if len(theirs) == 0 {
+			continue
+		}
+		entry["hooks"] = theirs
+		kept = append(kept, entry)
 	}
 	hooks[event] = append(kept, fresh...)
 	return nil
 }
 
-func allOurs(handlers []any) bool {
-	for _, handler := range handlers {
-		if !ours(handler) {
-			return false
-		}
-	}
-	return true
-}
-
 // plainPath matches a path every shell runs unquoted.
 var plainPath = regexp.MustCompile(`^[A-Za-z0-9_./:\\-]+$`)
 
-// shellCommand is the hook command line for a client's shell: posix sh, cmd.exe or PowerShell.
+// shellCommand is the hook command line for a client's shell: posix sh, cmd.exe or PowerShell;
+// every word that needs it is quoted, the program and its arguments alike.
 func shellCommand(binary, shell string, args ...string) string {
-	program := binary
-	if !plainPath.MatchString(binary) {
-		switch shell {
-		case "pwsh":
-			program = `& '` + strings.ReplaceAll(binary, `'`, `''`) + `'`
-		case "cmd":
-			program = `"` + binary + `"`
-		default:
-			program = `'` + strings.ReplaceAll(binary, `'`, `'\''`) + `'`
-		}
-	} else if shell == "pwsh" {
-		program = "& " + binary
+	words := make([]string, 0, len(args)+1)
+	for _, word := range append([]string{binary}, args...) {
+		words = append(words, quote(word, shell))
 	}
-	return program + " " + strings.Join(args, " ")
+	if shell == "pwsh" {
+		return "& " + strings.Join(words, " ")
+	}
+	return strings.Join(words, " ")
+}
+
+func quote(word, shell string) string {
+	if plainPath.MatchString(word) {
+		return word
+	}
+	switch shell {
+	case "pwsh":
+		return `'` + strings.ReplaceAll(word, `'`, `''`) + `'`
+	case "cmd":
+		return `"` + word + `"`
+	default:
+		return `'` + strings.ReplaceAll(word, `'`, `'\''`) + `'`
+	}
 }
 
 // windowsShell picks the shell a client's hooks run in on this OS.
@@ -157,23 +168,18 @@ func windowsShell(onWindows string) string {
 	return "sh"
 }
 
-// managedBlock replaces the text between our markers in a file, or appends it, keeping the rest;
+// withBlock returns text with the part between our markers replaced, or the block appended;
 // comment is "#" for TOML or "<!--" for Markdown.
-func managedBlock(path, comment, body string) error {
+func withBlock(text, comment, body string) (string, error) {
 	tail := ""
 	if comment == "<!--" {
 		tail = " -->"
 	}
 	begin, end := comment+" >>> elysian (written by elysian-mcp setup)"+tail, comment+" <<< elysian"+tail
-	data, err := os.ReadFile(path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	text := string(data)
 	if i := strings.Index(text, begin); i >= 0 {
 		j := strings.Index(text[i:], end)
 		if j < 0 {
-			return errors.New(path + " has an opening elysian marker with no closing one; fix it by hand")
+			return "", errors.New("an opening elysian marker has no closing one; fix it by hand")
 		}
 		text = text[:i] + text[i+j+len(end):]
 	}
@@ -181,12 +187,73 @@ func managedBlock(path, comment, body string) error {
 	if text != "" {
 		text += "\n\n"
 	}
-	return writeAtomic(path, []byte(text+begin+"\n"+strings.TrimRight(body, "\n")+"\n"+end+"\n"))
+	return text + begin + "\n" + strings.TrimRight(body, "\n") + "\n" + end + "\n", nil
+}
+
+// managedBlock writes our marked block into a Markdown file, keeping the rest.
+func managedBlock(path, comment, body string) error {
+	data, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	text, err := withBlock(string(data), comment, body)
+	if err != nil {
+		return errors.New(path + ": " + err.Error())
+	}
+	return writeAtomic(path, []byte(text))
+}
+
+// readTOML parses a TOML file, absent meaning empty; a file that does not parse stops setup.
+func readTOML(path string) (string, map[string]any, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", map[string]any{}, nil
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	document := map[string]any{}
+	if err := toml.Unmarshal(data, &document); err != nil {
+		return "", nil, errors.New(path + " is not valid TOML, so it was left untouched: " + err.Error())
+	}
+	return string(data), document, nil
+}
+
+// writeTOMLBlock writes our block into text and refuses to save a result that does not parse.
+func writeTOMLBlock(path, text, body string) error {
+	updated, err := withBlock(text, "#", body)
+	if err != nil {
+		return errors.New(path + ": " + err.Error())
+	}
+	if err := toml.Unmarshal([]byte(updated), &map[string]any{}); err != nil {
+		return errors.New("Elysian's entries would make " + path + " invalid TOML, so it was left untouched: " + err.Error())
+	}
+	return writeAtomic(path, []byte(updated))
+}
+
+// tomlHas reports whether a dotted path exists in a parsed TOML document.
+func tomlHas(document map[string]any, keys ...string) bool {
+	var node any = document
+	for _, key := range keys {
+		table, ok := node.(map[string]any)
+		if !ok {
+			return false
+		}
+		if node, ok = table[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// userDir is ~/name, for a client that documents no override.
+func userDir(name string) (string, error) {
+	return configHome("", name)
 }
 
 // configHome returns the env override when set, else ~/name.
 func configHome(env, name string) (string, error) {
-	if dir := os.Getenv(env); dir != "" {
+	if dir := os.Getenv(env); env != "" && dir != "" {
 		return dir, nil
 	}
 	user, err := os.UserHomeDir()

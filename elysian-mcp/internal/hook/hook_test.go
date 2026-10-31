@@ -229,7 +229,7 @@ func TestReviewRoundOneFindings(t *testing.T) {
 		api, cfg := serve(t, home)
 		in := Input{Prompt: "We ship from release/2026 on Fridays.", SessionID: "c1"}
 		holder := &marker{home: home, purpose: "prompt", client: "agy", session: in.SessionID, value: in.Prompt}
-		if claimed, err := holder.claim(); err != nil || !claimed {
+		if claimed, err := holder.claim(context.Background()); err != nil || !claimed {
 			t.Fatalf("got %v %v", claimed, err)
 		}
 		payload := `{"lastUserInput":"We ship from release/2026 on Fridays.","conversationId":"c1"}`
@@ -261,7 +261,7 @@ func TestAClaimTakenAfterTheHolderFinishedIsDropped(t *testing.T) {
 	if err := m.mark(); err != nil {
 		t.Fatal(err)
 	}
-	if claimed, err := m.claim(); err != nil || claimed || m.lock != nil {
+	if claimed, err := m.claim(context.Background()); err != nil || claimed || m.lock != nil {
 		t.Fatalf("a finished prompt must not be claimed nor its lock kept, got %v %v", claimed, err)
 	}
 }
@@ -276,7 +276,7 @@ func TestFiftyHooksFiredTogetherHandleOnePromptOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			m := &marker{home: home, purpose: "prompt", client: "agy", session: "c1", value: "We ship on Fridays."}
-			claimed, err := m.claim()
+			claimed, err := m.claim(context.Background())
 			if err != nil || !claimed {
 				return
 			}
@@ -301,5 +301,21 @@ func TestQuotedPasswordsAreMaskedWhole(t *testing.T) {
 				t.Fatalf("%q leaked from %q: %q", part, prompt, text)
 			}
 		}
+	}
+}
+
+func TestAStuckHolderCostsThePromptOnlyItsBudget(t *testing.T) {
+	home := t.TempDir()
+	_, cfg := serve(t, home)
+	holder := &marker{home: home, purpose: "prompt", client: "agy", session: "c3", value: "We ship from release/2026 on Fridays."}
+	if claimed, err := holder.claim(context.Background()); err != nil || !claimed {
+		t.Fatalf("got %v %v", claimed, err)
+	}
+	defer holder.release()
+	started := time.Now()
+	var out bytes.Buffer
+	err := Run(context.Background(), cfg, "agy", Prompt, strings.NewReader(`{"lastUserInput":"We ship from release/2026 on Fridays.","conversationId":"c3"}`), &out)
+	if err == nil || !strings.Contains(err.Error(), "still holds") || time.Since(started) > promptBudget+time.Second {
+		t.Fatalf("got %v after %s", err, time.Since(started))
 	}
 }

@@ -119,8 +119,8 @@ func TestDroidWritesMCPAndHooksAndKeepsSettingsHooksVisible(t *testing.T) {
 	if approve := mustJSON(hooks["PreToolUse"]); !strings.Contains(approve, `"matcher":"mcp__elysian__.*"`) || !strings.Contains(approve, "hook --client droid approve") {
 		t.Fatalf("got %s", approve)
 	}
-	other := t.TempDir()
-	t.Setenv("FACTORY_HOME", other)
+	other := filepath.Join(isolate(t), ".factory")
+	os.MkdirAll(other, 0o700)
 	os.WriteFile(filepath.Join(other, "settings.json"), []byte(`{"hooks":{"Stop":[]}}`), 0o600)
 	if _, err := registerDroid(context.Background(), "", testServer); err != nil {
 		t.Fatal(err)
@@ -176,4 +176,90 @@ func mustJSON(value any) string {
 	encoder.SetEscapeHTML(false)
 	encoder.Encode(value)
 	return strings.TrimRight(buffer.String(), "\n")
+}
+
+func TestReviewOfP63(t *testing.T) {
+	t.Run("D1 a user's handler sharing a group with ours survives a re-run", func(t *testing.T) {
+		home := isolate(t)
+		path := filepath.Join(home, ".qwen", "settings.json")
+		os.MkdirAll(filepath.Dir(path), 0o700)
+		os.WriteFile(path, []byte(`{"hooks":{"UserPromptSubmit":[{"hooks":[{"type":"command","command":"/opt/elysian-mcp hook --client qwen prompt"},{"type":"command","command":"python user_policy.py"}]}]}}`), 0o600)
+		if _, err := registerQwen(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		prompt := mustJSON(groups(t, readJSON(t, path), "UserPromptSubmit"))
+		if !strings.Contains(prompt, "user_policy.py") || strings.Count(prompt, "elysian-mcp hook") != 1 {
+			t.Fatalf("got %s", prompt)
+		}
+	})
+	t.Run("D2 a home with a space is quoted in the hook command", func(t *testing.T) {
+		home := isolate(t)
+		server := entry{Name: "elysian", Binary: "/opt/elysian-mcp", Env: map[string]string{"ELYSIAN_HOME": "/data/memory store"}}
+		if _, err := registerQwen(context.Background(), "", server); err != nil {
+			t.Fatal(err)
+		}
+		if prompt := mustJSON(groups(t, readJSON(t, filepath.Join(home, ".qwen", "settings.json")), "UserPromptSubmit")); !strings.Contains(prompt, `--elysian-home '/data/memory store' prompt`) {
+			t.Fatalf("got %s", prompt)
+		}
+		if _, err := plainCommand("/opt/elysian-mcp", "plain", "--elysian-home", "/data/memory store"); err == nil {
+			t.Fatal("an argument that needs quoting must be refused for an undocumented shell")
+		}
+	})
+	t.Run("D3 quoted table names and inline tables are read as TOML", func(t *testing.T) {
+		home := isolate(t)
+		grokConfig := filepath.Join(home, ".grok", "config.toml")
+		os.MkdirAll(filepath.Dir(grokConfig), 0o700)
+		os.WriteFile(grokConfig, []byte("[mcp_servers.\"elysian\"]\ncommand = \"x\"\n\n[\"permission\"]\nallow = []\n"), 0o600)
+		action, err := registerGrok(context.Background(), "", testServer)
+		data, _ := os.ReadFile(grokConfig)
+		if err != nil || strings.Contains(string(data), "[mcp_servers.elysian]") || strings.Contains(string(data), "\n[permission]") || !strings.Contains(action.Detail, "by hand") {
+			t.Fatalf("got %+v %v\n%s", action, err, data)
+		}
+		bin := t.TempDir()
+		kimi := filepath.Join(bin, "kimi")
+		os.WriteFile(kimi, []byte("#!/bin/sh\necho 'kimi-code 2.4.1'\n"), 0o755)
+		kimiConfig := filepath.Join(home, ".kimi-code", "config.toml")
+		os.MkdirAll(filepath.Dir(kimiConfig), 0o700)
+		os.WriteFile(kimiConfig, []byte("permission = { rules = [] }\n"), 0o600)
+		action, err = registerKimi(context.Background(), kimi, testServer)
+		data, _ = os.ReadFile(kimiConfig)
+		if _, _, parseErr := readTOML(kimiConfig); err != nil || parseErr != nil || strings.Contains(string(data), "[[permission.rules]]") || !strings.Contains(action.Detail, "by hand") {
+			t.Fatalf("got %+v %v %v\n%s", action, err, parseErr, data)
+		}
+	})
+	t.Run("D4 a stale trust at our hook's position is replaced", func(t *testing.T) {
+		home := isolate(t)
+		dir := filepath.Join(home, ".codex")
+		os.MkdirAll(dir, 0o700)
+		key := filepath.Join(dir, "hooks.json") + ":user_prompt_submit:0:0"
+		os.WriteFile(filepath.Join(dir, "config.toml"), []byte("[hooks.state.\""+key+"\"]\ntrusted_hash = \"sha256:old\"\n"), 0o600)
+		if _, err := wireCodex(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		data, _ := os.ReadFile(filepath.Join(dir, "config.toml"))
+		if strings.Contains(string(data), "sha256:old") || strings.Count(string(data), key) != 1 {
+			t.Fatalf("got %s", data)
+		}
+	})
+	t.Run("D5 GEMINI_CLI_HOME holds a .gemini directory", func(t *testing.T) {
+		isolate(t)
+		root := t.TempDir()
+		t.Setenv("GEMINI_CLI_HOME", root)
+		if _, err := wireGemini(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(root, ".gemini", "settings.json")); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("D6 legacy kimi with a named home is skipped and says why", func(t *testing.T) {
+		isolate(t)
+		bin := t.TempDir()
+		kimi := filepath.Join(bin, "kimi")
+		os.WriteFile(kimi, []byte("#!/bin/sh\necho 'kimi, version 1.52.0'\n"), 0o755)
+		server := entry{Name: "elysian", Binary: "/opt/elysian-mcp", Env: map[string]string{"ELYSIAN_HOME": "/data"}}
+		if action, err := registerKimi(context.Background(), kimi, server); err != nil || !strings.HasPrefix(action.Detail, "not registered") {
+			t.Fatalf("got %+v %v", action, err)
+		}
+	})
 }

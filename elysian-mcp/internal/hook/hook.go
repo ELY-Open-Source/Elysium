@@ -95,7 +95,7 @@ func promptTurn(ctx context.Context, cfg config.Config, api *apiclient.Client, c
 	}
 	seen := &marker{home: cfg.ElysianHome, purpose: "prompt", client: client, session: in.SessionID, value: in.Prompt}
 	if d.repeats {
-		claimed, err := seen.claim()
+		claimed, err := seen.claim(bounded)
 		if err != nil || !claimed {
 			return "", err
 		}
@@ -230,9 +230,9 @@ func (m marker) mark() error {
 	return os.WriteFile(path, []byte(want), 0o600)
 }
 
-// claim waits for the session's lock, then takes this value unless it was already finished, so hooks
+// claim waits, no longer than ctx allows, for the session's lock, then takes this value unless it was already finished, so hooks
 // fired together recall and save once. The lock is the kernel's: a process that dies drops it.
-func (m *marker) claim() (bool, error) {
+func (m *marker) claim(ctx context.Context) (bool, error) {
 	path, _ := m.path()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return false, err
@@ -241,9 +241,21 @@ func (m *marker) claim() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if err := lockFile(file); err != nil {
-		file.Close()
-		return false, err
+	for {
+		locked, err := tryLock(file)
+		if err != nil {
+			file.Close()
+			return false, err
+		}
+		if locked {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			file.Close()
+			return false, errors.New("another hook of this session still holds " + path + ".lock after the prompt's time budget")
+		case <-time.After(25 * time.Millisecond):
+		}
 	}
 	m.lock = file
 	done, err := m.done()

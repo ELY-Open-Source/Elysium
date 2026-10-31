@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -110,7 +109,7 @@ func yamlItem(keys []string, indent string) string {
 
 // registerAntigravity writes agy's MCP entry, the permission that stops it asking, and a named hook set.
 func registerAntigravity(_ context.Context, _ string, server entry) (Action, error) {
-	dir, err := configHome("ANTIGRAVITY_HOME", ".gemini")
+	dir, err := userDir(".gemini")
 	if err != nil {
 		return Action{}, err
 	}
@@ -165,6 +164,9 @@ func registerKimi(ctx context.Context, kimi string, server entry) (Action, error
 		return Action{}, errors.New("kimi --version failed: " + strings.TrimSpace(string(version)))
 	}
 	if match := versionPattern.FindStringSubmatch(string(version)); match != nil && match[1] == "1" {
+		if len(server.Env) > 0 {
+			return Action{Client: "kimi", Detail: "not registered: kimi-cli 1.x is archived and its `mcp add` cannot carry ELYSIAN_HOME; run `kimi migrate` to Kimi Code and set up again"}, nil
+		}
 		args := []string{"mcp", "add", server.Name, "--", server.Binary, "server"}
 		if output, err := exec.CommandContext(ctx, kimi, args...).CombinedOutput(); err != nil {
 			return Action{}, errors.New("kimi mcp add failed: " + strings.TrimSpace(string(output)))
@@ -190,31 +192,20 @@ func registerKimi(ctx context.Context, kimi string, server entry) (Action, error
 		return Action{}, err
 	}
 	configPath := filepath.Join(dir, "config.toml")
-	existing, err := os.ReadFile(configPath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	text, _, err := readTOML(configPath)
+	if err != nil {
 		return Action{}, err
-	}
-	theirs := outsideBlock(string(existing))
-	var block []string
-	var notes []string
-	if regexp.MustCompile(`(?m)^\s*(permission\.)?rules\s*=`).MatchString(theirs) {
-		notes = append(notes, "permission rules are written inline in "+configPath+"; add mcp__"+server.Name+"__* to them by hand")
-	} else {
-		block = append(block, "[[permission.rules]]\ndecision = \"allow\"\npattern = \"mcp__"+server.Name+"__*\"")
-	}
-	if regexp.MustCompile(`(?m)^\s*hooks\s*=`).MatchString(theirs) {
-		return Action{}, errors.New(configPath + " defines hooks inline; Elysian's [[hooks]] entry cannot be added beside it")
 	}
 	command := shellCommand(server.Binary, windowsShell("cmd"), hookArgs(server, "kimi", "prompt")...)
-	block = append(block, "[[hooks]]\nevent = \"UserPromptSubmit\"\ncommand = \""+tomlEscape(command)+"\"\ntimeout = 10")
-	if err := managedBlock(configPath, "#", strings.Join(block, "\n\n")); err != nil {
-		return Action{}, err
-	}
-	detail := "registered user-wide; prompt hook (it opens each session too)"
-	if len(notes) > 0 {
-		detail += "; " + strings.Join(notes, "; ")
-	} else {
-		detail += "; Elysian's tools allowed"
+	hook := "[[hooks]]\nevent = \"UserPromptSubmit\"\ncommand = \"" + tomlEscape(command) + "\"\ntimeout = 10"
+	rule := "[[permission.rules]]\ndecision = \"allow\"\npattern = \"mcp__" + server.Name + "__*\""
+	detail := "registered user-wide; prompt hook (it opens each session too); Elysian's tools allowed"
+	// The user's own layout decides what can be added: a rule list written inline cannot take [[...]].
+	if err := writeTOMLBlock(configPath, text, rule+"\n\n"+hook); err != nil {
+		if err := writeTOMLBlock(configPath, text, hook); err != nil {
+			return Action{}, err
+		}
+		detail = "registered user-wide; prompt hook (it opens each session too); permission rules are written inline in " + configPath + ", so add mcp__" + server.Name + "__* to them by hand"
 	}
 	return Action{Client: "kimi", Target: mcpPath + " and " + configPath, Detail: detail}, nil
 }
