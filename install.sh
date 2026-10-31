@@ -71,12 +71,26 @@ fi
 UV="$(command -v uv)"
 
 # The API a previous install started holds the old code and files; stop it before uv replaces them.
+running_apis() {
+  local needle="$1/bin/elysian serve" dir command
+  if [[ -d /proc/self ]]; then
+    for dir in /proc/[0-9]*; do
+      command="$(tr '\0' ' ' < "$dir/cmdline" 2>/dev/null)" || continue
+      [[ "$command" == *"$needle"* ]] && echo "${dir#/proc/}"
+    done
+    return 0
+  fi
+  pgrep -f -- "$(printf '%s' "$needle" | sed 's/[][\.*^$+?(){}|]/\\&/g')" || [[ $? -eq 1 ]] || fail "pgrep could not list running APIs"
+}
 # Same rule as the backend's absolute_home: ELYSIAN_HOME with ~ expanded, made absolute, else ~/.elysian.
 OLD_HOME="${ELYSIAN_HOME:-$HOME/.elysian}"
 case "$OLD_HOME" in "~" | "~/"*) OLD_HOME="$HOME${OLD_HOME#\~}" ;; esac
 [[ "$OLD_HOME" == /* ]] || OLD_HOME="$PWD/$OLD_HOME"
-pattern="$(printf '%s' "$OLD_HOME/bin/elysian serve" | sed 's/[][\.*^$+?(){}|]/\\&/g')"
-pids="$(pgrep -f -- "$pattern")" || [[ $? -eq 1 ]] || fail "pgrep could not list running APIs"
+pids=""
+# The MCP server starts the API from its own resolved directory, so match the real path; no home, no API.
+if [[ -d "$OLD_HOME/bin" ]]; then
+  pids="$(running_apis "$(cd -- "$OLD_HOME" && pwd -P)")"
+fi
 for pid in $pids; do
   kill "$pid"
   for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
@@ -85,11 +99,15 @@ for pid in $pids; do
 done
 
 step "Elysian and its Python"
+# rapidocr pulls the GUI build of OpenCV, which needs X libraries; the headless build Elysian lists serves the same cv2.
+EXCLUDES="$(mktemp)"
+echo "opencv-python" > "$EXCLUDES"
 if [[ "$METHOD" == "source" ]]; then
-  "$UV" tool install --python 3.12 --reinstall "$SCRIPT_DIR/backend"
+  "$UV" tool install --python 3.12 --reinstall --excludes "$EXCLUDES" "$SCRIPT_DIR/backend"
 else
-  "$UV" tool install --python 3.12 --reinstall "elysian @ https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz#subdirectory=backend"
+  "$UV" tool install --python 3.12 --reinstall --excludes "$EXCLUDES" "elysian @ https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz#subdirectory=backend"
 fi
+rm -f "$EXCLUDES"
 ELYSIAN="$("$UV" tool dir --bin)/elysian"
 [[ -x "$ELYSIAN" ]] || fail "uv did not install $ELYSIAN"
 

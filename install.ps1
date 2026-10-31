@@ -61,7 +61,7 @@ $Uv = (Get-Command uv).Source
 $OldHome = $env:ELYSIAN_HOME
 if (-not $OldHome) { $OldHome = Join-Path $HOME ".elysian" }
 if ($OldHome -eq "~" -or $OldHome.StartsWith("~/") -or $OldHome.StartsWith("~\")) { $OldHome = Join-Path $HOME $OldHome.Substring(1).TrimStart("/", "\") }
-$OldHome = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).Path, $OldHome))
+$OldHome = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).Path, $OldHome)).TrimEnd("\", "/")
 $Beside = Join-Path $OldHome "bin\elysian.exe"
 Get-CimInstance Win32_Process -Filter "Name = 'elysian.exe'" | Where-Object { $_.ExecutablePath -eq $Beside } | ForEach-Object {
   Stop-Process -Id $_.ProcessId -Force
@@ -69,12 +69,16 @@ Get-CimInstance Win32_Process -Filter "Name = 'elysian.exe'" | Where-Object { $_
   Write-Host "stopped the running API (pid $($_.ProcessId)); restart your agents to reconnect"
 }
 Step "Elysian and its Python"
+# rapidocr pulls the GUI build of OpenCV; the headless build Elysian lists serves the same cv2.
+$Excludes = New-TemporaryFile
+Set-Content -Path $Excludes -Value "opencv-python"
 if ($Source) {
-  Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", (Join-Path $Checkout "backend"))
+  Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "--excludes", $Excludes, (Join-Path $Checkout "backend"))
 }
 else {
-  Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "elysian @ https://github.com/$Repo/archive/refs/tags/$Version.tar.gz#subdirectory=backend")
+  Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "--excludes", $Excludes, "elysian @ https://github.com/$Repo/archive/refs/tags/$Version.tar.gz#subdirectory=backend")
 }
+Remove-Item $Excludes
 $Elysian = Join-Path (& $Uv tool dir --bin) "elysian.exe"
 if (-not (Test-Path $Elysian)) { throw "uv did not install $Elysian" }
 
