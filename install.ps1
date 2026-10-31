@@ -121,4 +121,5 @@ Invoke-Checked $Mcp @("setup")
 
 Step "Done"
 Write-Host "Memory lives in $HomeDir. The MCP server is $Mcp; it starts the API when an agent first calls it."
+Write-Host "Any other MCP client: paste the any_other_client entry printed above into its MCP config."
 Write-Host "Restart your agents to load it. The CLI is $Elysian; run ``uv tool update-shell`` to put it on PATH."

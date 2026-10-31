@@ -127,4 +127,5 @@ step "Coding agents"
 
 step "Done"
 echo "Memory lives in $HOME_DIR. The MCP server is $MCP; it starts the API when an agent first calls it."
+echo "Any other MCP client: paste the any_other_client entry printed above into its MCP config."
 echo "Restart your agents to load it. The CLI is $ELYSIAN; run \`$UV tool update-shell\` to put it on PATH."

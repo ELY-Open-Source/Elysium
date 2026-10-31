@@ -33,20 +33,30 @@ type Action struct {
 }
 
 type Result struct {
-	ServerName string   `json:"server_name"`
-	Binary     string   `json:"binary"`
-	Actions    []Action `json:"actions"`
+	ServerName     string         `json:"server_name"`
+	Binary         string         `json:"binary"`
+	Actions        []Action       `json:"actions"`
+	AnyOtherClient map[string]any `json:"any_other_client"`
 }
 
 type client struct {
-	name     string
-	program  string
+	name string
+	// find returns the client's CLI, or for Cursor its config file.
+	find     func() (string, error)
 	register func(context.Context, string, entry) (Action, error)
 }
 
+func onPath(program string) func() (string, error) {
+	return func() (string, error) { return exec.LookPath(program) }
+}
+
 var clients = []client{
-	{"codex", "codex", registerCodex},
-	{"claude", "claude", registerClaude},
+	{"codex", onPath("codex"), registerCodex},
+	{"claude", onPath("claude"), registerClaude},
+	{"cursor", cursorFile, registerCursor},
+	{"gemini", onPath("gemini"), registerGemini},
+	{"opencode", onPath("opencode"), registerOpenCode},
+	{"vscode", onPath("code"), registerVSCode},
 }
 
 // Run registers with every installed client, or only the one named; a named client that is missing is an error.
@@ -71,10 +81,10 @@ func Run(ctx context.Context, cfg config.Config, options Options) (Result, error
 		if wanted != "all" && wanted != each.name {
 			continue
 		}
-		program, err := exec.LookPath(each.program)
+		program, err := each.find()
 		if err != nil {
 			if wanted == each.name {
-				return Result{}, errors.New(each.program + " is not on PATH, so " + each.name + " cannot be registered")
+				return Result{}, errors.New(each.name + " is not installed here (" + err.Error() + "), so it cannot be registered")
 			}
 			result.Actions = append(result.Actions, Action{Client: each.name, Detail: "not installed; skipped"})
 			continue
@@ -86,8 +96,9 @@ func Run(ctx context.Context, cfg config.Config, options Options) (Result, error
 		result.Actions = append(result.Actions, action)
 	}
 	if len(result.Actions) == 0 {
-		return Result{}, errors.New("client must be all, codex or claude, got " + options.Client)
+		return Result{}, errors.New("client must be all, codex, claude, cursor, gemini, opencode or vscode, got " + options.Client)
 	}
+	result.AnyOtherClient = generic(server)
 	return result, nil
 }
 

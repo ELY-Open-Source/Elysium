@@ -13,10 +13,14 @@ the top-level README. They download the checksum-verified binary of the newest `
 `<elysian-home>/bin`, place the `elysian` CLI beside it (a link; a copy on Windows), and run `elysian-mcp setup`.
 
 `setup` registers the server user-wide with every installed coding agent and skips the rest:
-Codex through `codex mcp add` (it replaces an entry of the same name), Claude Code through
-`claude mcp remove` then `claude mcp add-json --scope user`. `--client codex` or `--client claude`
-registers one and fails if it is missing. `ELYSIAN_HOME` is written into the entry only when it
-was set at setup time.
+Codex (`codex mcp add`), Claude Code (`claude mcp remove` then `claude mcp add-json --scope user`),
+Gemini CLI (`gemini mcp add --scope user`), OpenCode (`opencode mcp add`, 1.17 or newer), VS Code
+(`code --add-mcp`; skipped under WSL, where `code` is the Windows editor) and Cursor (it edits
+`~/.cursor/mcp.json` and keeps every other entry; a file that is not JSON stops setup untouched).
+A re-run replaces the entry. `--client <name>` registers one and fails if it is missing.
+`ELYSIAN_HOME` is written into the entry only when it was set or `--elysian-home` was given, and then
+as the resolved absolute path. The JSON it prints ends with `any_other_client`, an `mcpServers` entry
+for any other MCP client.
 
 ## Manual run
 

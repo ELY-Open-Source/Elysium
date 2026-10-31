@@ -101,7 +101,8 @@ for is quarantined: it stays in the store, and it is not citable.
 
 One command installs everything a coding agent needs: uv if it is missing, Elysian with its own
 Python, the store in `~/.elysian` with its operator token, the MCP server, and the registration
-with every installed agent (Codex, Claude Code). No Python, Go or Node is needed first.
+with every installed agent (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, VS Code). Any other MCP
+client gets a ready `mcpServers` entry printed at the end. No Python, Go or Node is needed first.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.sh | bash

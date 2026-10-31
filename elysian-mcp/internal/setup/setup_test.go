@@ -39,12 +39,22 @@ func TestEveryInstalledClientIsRegisteredUserWideAndAMissingOneSkipped(t *testin
 	bin := t.TempDir()
 	fake(t, bin, "claude", false)
 	t.Setenv("PATH", bin)
+	t.Setenv("HOME", t.TempDir())
 	result, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Actions) != 2 || result.Actions[0].Detail != "not installed; skipped" || result.Actions[1].Client != "claude" {
-		t.Fatalf("codex must be skipped and claude registered, got %+v", result.Actions)
+	details := map[string]string{}
+	for _, action := range result.Actions {
+		details[action.Client] = action.Detail
+	}
+	for _, missing := range []string{"codex", "cursor", "gemini", "opencode", "vscode"} {
+		if details[missing] != "not installed; skipped" {
+			t.Fatalf("%s must be skipped, got %+v", missing, result.Actions)
+		}
+	}
+	if details["claude"] != "registered user-wide" {
+		t.Fatalf("claude must be registered, got %+v", result.Actions)
 	}
 	calls := logged(t, bin, "claude")
 	if !strings.Contains(calls, "mcp remove elysian --scope user") ||
@@ -58,6 +68,7 @@ func TestARerunReplacesTheEntryAndANamedHomeIsCarried(t *testing.T) {
 	fake(t, bin, "claude", true)
 	fake(t, bin, "codex", true)
 	t.Setenv("PATH", bin)
+	t.Setenv("HOME", t.TempDir())
 	if _, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Home: "/data/elysian"}); err != nil {
 		t.Fatalf("a re-run must replace the entries, got %v", err)
 	}
@@ -71,8 +82,69 @@ func TestARerunReplacesTheEntryAndANamedHomeIsCarried(t *testing.T) {
 
 func TestANamedClientThatIsMissingIsAnError(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	_, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Client: "codex"})
-	if err == nil || !strings.Contains(err.Error(), "codex is not on PATH") {
+	if err == nil || !strings.Contains(err.Error(), "codex is not installed here") {
 		t.Fatalf("a named missing client must be an error, got %v", err)
+	}
+}
+
+func TestGeminiOpenCodeAndVSCodeAreRegisteredThroughTheirCLIs(t *testing.T) {
+	bin := t.TempDir()
+	fake(t, bin, "gemini", false)
+	fake(t, bin, "opencode", false)
+	fake(t, bin, "code", false)
+	t.Setenv("PATH", bin)
+	t.Setenv("HOME", t.TempDir())
+	result, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Home: "/data/elysian"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls := logged(t, bin, "gemini"); !strings.Contains(calls, "mcp add --scope user --env ELYSIAN_HOME=/data/elysian elysian /opt/elysian-mcp server") {
+		t.Fatalf("gemini must be registered user-wide, got %q", calls)
+	}
+	if calls := logged(t, bin, "opencode"); !strings.Contains(calls, "mcp add elysian --env ELYSIAN_HOME=/data/elysian -- /opt/elysian-mcp server") {
+		t.Fatalf("opencode must be registered, got %q", calls)
+	}
+	code := logged(t, bin, "code")
+	if wsl() {
+		if code != "" {
+			t.Fatalf("under WSL the Windows editor must not be given a Linux path, got %q", code)
+		}
+	} else if !strings.Contains(code, `--add-mcp {"args":["server"],"command":"/opt/elysian-mcp","env":{"ELYSIAN_HOME":"/data/elysian"},"name":"elysian","type":"stdio"}`) {
+		t.Fatalf("vscode must be registered, got %q", code)
+	}
+	other := result.AnyOtherClient["mcpServers"].(map[string]any)["elysian"].(map[string]any)
+	if other["command"] != "/opt/elysian-mcp" || other["type"] != "stdio" {
+		t.Fatalf("any other client must get a stdio entry, got %+v", result.AnyOtherClient)
+	}
+}
+
+func TestCursorKeepsItsOtherServersAndABrokenFileIsLeftAlone(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	path := filepath.Join(home, ".cursor", "mcp.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"mcpServers":{"other":{"command":"x"}},"theme":"dark"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Client: "cursor"}); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), `"other"`) || !strings.Contains(string(data), `"theme": "dark"`) || !strings.Contains(string(data), `"command": "/opt/elysian-mcp"`) {
+		t.Fatalf("cursor's file must keep what it had and gain elysian, got %s", data)
+	}
+	if err := os.WriteFile(path, []byte("{ // not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Client: "cursor"}); err == nil || !strings.Contains(err.Error(), "is not JSON, so it was left untouched") {
+		t.Fatalf("a broken cursor file must stop setup, got %v", err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != "{ // not json" {
+		t.Fatalf("a broken cursor file must be left as it was, got %s", data)
 	}
 }

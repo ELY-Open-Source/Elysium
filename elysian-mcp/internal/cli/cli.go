@@ -66,7 +66,7 @@ func runSetup(ctx context.Context, args []string) error {
 	flags := flag.NewFlagSet("setup", flag.ContinueOnError)
 	elysianHome := flags.String("elysian-home", "", "Elysian data home")
 	binary := flags.String("binary", "", "MCP server binary path")
-	client := flags.String("client", "all", "all installed clients, codex, or claude")
+	client := flags.String("client", "all", "all installed clients, or one of codex, claude, cursor, gemini, opencode, vscode")
 	serverName := flags.String("server-name", "elysian", "MCP server name")
 	flags.SetOutput(os.Stderr)
 	if err := flags.Parse(args); err != nil {
