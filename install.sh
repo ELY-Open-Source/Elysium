@@ -170,7 +170,7 @@ elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >
   SERVICE="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/elysian.service"
   mkdir -p "$(dirname -- "$SERVICE")"
   # systemd refuses a program path holding a quote, backslash or control character; % is a specifier.
-  [[ "$BIN_DIR" != *[\"\\[:cntrl:]]* ]] || fail "systemd cannot run a program from $BIN_DIR: the path holds a quote, backslash or control character; set ELYSIAN_HOME to a plainer path"
+  [[ "$BIN_DIR" != *[\"\'\\[:cntrl:]]* ]] || fail "systemd cannot run a program from $BIN_DIR: the path holds a quote, backslash or control character; set ELYSIAN_HOME to a plainer path"
   UNIT_HOME="${HOME_DIR//%/%%}"
   UNIT_EXEC="${BIN_DIR//%/%%}/elysian"
   cat > "$SERVICE" <<EOF
@@ -194,13 +194,15 @@ else
 fi
 if [[ -n "$SERVICE" ]]; then
   # Another store's API on the port would answer too; only this home counts.
-  served() { curl -fsS --max-time 2 http://127.0.0.1:8765/api/status | "$PYTHON" -c 'import json, os, sys; print(os.path.realpath(json.load(sys.stdin)["data_home"]))'; }
+  served() { curl -fsS --max-time 2 http://127.0.0.1:8765/api/status | "$PYTHON" -c 'import json, os, sys; home = json.load(sys.stdin)["data_home"]; print(os.path.realpath(home) if os.path.isabs(home) else "relative " + home)'; }
   WANT="$(cd -- "$HOME_DIR" && pwd -P)"
   GOT=""
   DEADLINE=$((SECONDS + 90))
   while ((SECONDS < DEADLINE)); do
     GOT="$(served 2>/dev/null || true)"
     [[ "$GOT" == "$WANT" ]] && break
+    # An older API names its home relative to a directory this script cannot know.
+    [[ "$GOT" != "relative "* ]] || fail "the API at 127.0.0.1:8765 reports the relative home ${GOT#relative }, so its store cannot be told from here; stop it and run again"
     sleep 1
   done
   [[ "$GOT" == "$WANT" ]] || fail "the sign-in service $SERVICE did not serve $WANT at 127.0.0.1:8765 within 90 s (it answered: ${GOT:-nothing}); see $HOME_DIR/logs/api.log or journalctl --user -u elysian"
