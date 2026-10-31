@@ -126,3 +126,14 @@ func TestTheTokenFileIsReadUnlessTheEnvironmentNamesOne(t *testing.T) {
 		t.Fatalf("an empty token file must stop the server, got %v", err)
 	}
 }
+
+func TestATildeHomeIsTheUsersHomeBeforeAnyGuard(t *testing.T) {
+	root := user(t)
+	if home, err := resolveHome("~/.elysian"); err != nil || home != filepath.Join(root, "user", ".elysian") {
+		t.Fatalf("~/.elysian must be the user's home, got %q, %v", home, err)
+	}
+	store(t, filepath.Join(root, "user", ".elysium", "data", "elysium.sqlite"))
+	if _, err := resolveHome("~/.elysian"); err == nil || !strings.Contains(err.Error(), "from before the rename") {
+		t.Fatalf("an old store beside ~/.elysian must stop the server, got %v", err)
+	}
+}

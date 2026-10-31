@@ -137,12 +137,11 @@ func TestAnAPIThatDiesIsReportedWithItsLog(t *testing.T) {
 	}
 }
 
-func TestARelativeHomeIsTheSameStoreAsItsAbsolutePath(t *testing.T) {
-	root := t.TempDir()
-	t.Chdir(root)
+func TestAnAPIThatReportsARelativeHomeIsRefused(t *testing.T) {
 	api := httptest.NewServer(status("relative"))
 	defer api.Close()
-	if err := Ensure(context.Background(), api.URL, filepath.Join(root, "relative")); err != nil {
-		t.Fatalf("a relative and an absolute spelling of one home are one store, got %v", err)
+	err := Ensure(context.Background(), api.URL, filepath.Join(t.TempDir(), "relative"))
+	if err == nil || !strings.Contains(err.Error(), "reports the relative home relative") {
+		t.Fatalf("a relative home cannot be placed from the client's directory, got %v", err)
 	}
 }

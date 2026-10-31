@@ -79,6 +79,9 @@ func Ensure(ctx context.Context, baseURL string, home string) error {
 
 // sameStore refuses an API that serves another home: its writes would land in the wrong store.
 func sameStore(baseURL string, served string, home string) error {
+	if !filepath.IsAbs(served) {
+		return errors.New("the Elysian API at " + baseURL + " reports the relative home " + served + ", so its store cannot be told from here; restart it with this build")
+	}
 	if real(served) != real(home) {
 		return errors.New("the Elysian API at " + baseURL + " serves " + served + ", not " + home + "; stop it or point ELYSIAN_API at another port")
 	}
@@ -86,9 +89,6 @@ func sameStore(baseURL string, served string, home string) error {
 }
 
 func real(path string) string {
-	if absolute, err := filepath.Abs(path); err == nil {
-		path = absolute
-	}
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		return resolved
 	}

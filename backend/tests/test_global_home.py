@@ -76,3 +76,12 @@ def test_a_relative_home_is_held_absolute_so_every_face_reports_one_path(user: P
 
     assert Settings().home == user / "project" / "relative"
     assert Settings(home=Path("other")).home == user / "project" / "other"
+
+
+def test_a_tilde_home_is_the_users_home_before_any_guard(user: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ELYSIAN_HOME", "~/.elysian")
+    assert Settings().home == user / "user" / ".elysian"
+
+    (user / "user" / ".elysium" / "data").mkdir(parents=True)
+    with pytest.raises(SystemExit, match=r"user/\.elysium is the data home from before the rename"):
+        Settings()

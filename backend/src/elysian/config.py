@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotenv import dotenv_values
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The project was called Ely-Eye, then Elysium; a name it no longer reads must stop the process.
@@ -84,13 +84,16 @@ class Settings(BaseSettings):
     def db_path(self) -> Path:
         return self.data_dir / "elysian.sqlite"
 
+    @field_validator("home")
+    @classmethod
+    def _absolute_home(cls, home: Path) -> Path:
+        return absolute_home(home)
+
     @model_validator(mode="after")
     def _refuse_old_names(self) -> Settings:
         refuse_old_names(self, dict(os.environ), Path.cwd())
         if "home" not in self.model_fields_set:
             refuse_project_store(self.home, Path.cwd())
-        # Every face reports one spelling.
-        self.home = self.home.expanduser().absolute()
         if self.auth_token is None and self.token_file.is_file():
             self.auth_token = read_token(self.token_file)
         return self
@@ -109,6 +112,14 @@ class Settings(BaseSettings):
             self.adapters_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
+
+
+def absolute_home(home: Path) -> Path:
+    """`~` and `~/…` mean the user's home, as in Go's resolveHome; the guards and every face see one absolute path."""
+    text = str(home)
+    if text == "~" or text.startswith(("~/", "~" + os.sep)):
+        home = Path.home() / text[2:]
+    return home.absolute()
 
 
 def read_token(path: Path) -> str:

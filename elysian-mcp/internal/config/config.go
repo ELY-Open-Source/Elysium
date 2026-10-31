@@ -105,16 +105,20 @@ func resolveHome(elysianHome string) (string, error) {
 	if elysianHome == "" {
 		elysianHome = os.Getenv("ELYSIAN_HOME")
 	}
+	user, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	// ~ and ~/… mean the user's home, as in the backend's absolute_home.
+	if elysianHome == "~" || strings.HasPrefix(elysianHome, "~/") || strings.HasPrefix(elysianHome, "~"+string(filepath.Separator)) {
+		elysianHome = filepath.Join(user, strings.TrimLeft(elysianHome[1:], `/\`))
+	}
 	if elysianHome != "" {
 		home, err := filepath.Abs(elysianHome)
 		if err != nil {
 			return "", err
 		}
 		return home, refuseOldStores(home)
-	}
-	user, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
 	}
 	home := filepath.Join(user, ".elysian")
 	if err := refuseOldStores(home); err != nil {
