@@ -144,13 +144,16 @@ if (Test-Path -LiteralPath $Mcp) {
 
 Step "Start at sign-in"
 # A GUI-subsystem program, so sign-in opens no console; it starts the API hidden and exits.
-$Run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-Set-ItemProperty -Path $Run -Name "Elysian" -Value "`"$Start`" --home `"$HomeDir`""
+$Run = "Software\Microsoft\Windows\CurrentVersion\Run"
+# CreateSubKey opens the key or makes it on a fresh profile; it never drops the other entries.
+$key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($Run)
+try { $key.SetValue("Elysian", "`"$Start`" --home `"$HomeDir`"") }
+finally { $key.Close() }
 # -Wait would also wait on the API it leaves running.
 $started = Start-Process -FilePath $Start -ArgumentList @("--home", "`"$HomeDir`"") -PassThru
 $started.WaitForExit()
 if ($started.ExitCode -ne 0) { throw "elysian-start exited $($started.ExitCode); see $(Join-Path $HomeDir 'logs\start.log')" }
-Write-Host "the API is running and starts at every sign-in ($Run\Elysian)"
+Write-Host "the API is running and starts at every sign-in (HKCU\$Run\Elysian)"
 
 Step "Coding agents"
 Invoke-Checked $Mcp @("setup")
