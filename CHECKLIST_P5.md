@@ -32,7 +32,8 @@
   - 七幕：开场题字、各归其主（+0.455）、她知道（转介）、七分之一的代价（成本图画在地面，chance 0.591，写明 Mem0 raw 与不带 judge 的差距在误差内）、十六万条记忆一个文件（0.072 秒）、同一个柜台（六个客户端与安装命令）、结尾。手机按字幕上方实测区域取景。评审第 1 轮 PASS。
 - [x] **p5-10** 部署与验收：Worker 静态资源部署到 `elysian.elydora.com`；Playwright 桌面与手机截图、`prefers-reduced-motion`、性能预算。
   - 部署为 assets-only Worker `elysian-site`（wrangler 4.156，关遥测）到 `elysian.elydora.com`。`check.mjs --url https://elysian.elydora.com/` 桌面、手机、减少动效、无 WebGL 全过；首个桌面加载 252,116 字节（含 Cloudflare zone 注入的 beacon 10,478），预算 300 KB 由 check.mjs 在浏览器里测。评审第 1 轮 FAIL（手报 229,811 字节漏了注入的 beacon 与浏览器压缩）；第 2 轮 PASS。
-- [ ] **p5-11** 删除旧站：解绑 `model.elydora.com`，删除 Worker `ely-eye-web`。
+- [x] **p5-11** 删除旧站：解绑 `model.elydora.com`，删除 Worker `ely-eye-web`。
+  - Cloudflare API 解绑 `model.elydora.com`、删除 Worker `ely-eye-web`；`model.elydora.com` 不再解析，`elysian.elydora.com` 仍 200，仓库无残留链接。评审第 1 轮 PASS。
 
 ## C. 本地控制台（`frontend/`）
 
