@@ -131,3 +131,17 @@ func TestNewDefaultsToLocalServe(t *testing.T) {
 		t.Errorf("BaseURL = %q, want the trailing slash trimmed", got)
 	}
 }
+
+func TestALongAnswerIsReadWhole(t *testing.T) {
+	text := strings.Repeat("钥匙在玄关抽屉里。", 1000)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"text": text})
+	}))
+	defer server.Close()
+	var out struct {
+		Text string `json:"text"`
+	}
+	if err := New(server.URL).Get(context.Background(), "/api/search", &out); err != nil || out.Text != text {
+		t.Fatalf("an answer longer than the refusal cap must decode whole, got %d bytes and %v", len(out.Text), err)
+	}
+}

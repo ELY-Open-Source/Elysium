@@ -62,12 +62,17 @@ func (c *Client) do(request *http.Request, path string, out any) error {
 	}
 	defer response.Body.Close()
 
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxErrorBody))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		reason, err := io.ReadAll(io.LimitReader(response.Body, maxErrorBody))
+		if err != nil {
+			return fmt.Errorf("%s was rejected with HTTP %d and an unreadable body: %w", path, response.StatusCode, err)
+		}
+		return errors.New(path + " was rejected: " + serverReason(response.StatusCode, reason))
+	}
+	// Only a refusal is capped; an answer is read whole.
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return fmt.Errorf("%s returned an unreadable body: %w", path, err)
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return errors.New(path + " was rejected: " + serverReason(response.StatusCode, data))
 	}
 	if out == nil {
 		return nil

@@ -37,7 +37,7 @@ function Get-Platform {
 }
 
 $Checkout = ""
-if ($PSScriptRoot -and (Test-Path (Join-Path $PSScriptRoot "backend\pyproject.toml"))) { $Checkout = $PSScriptRoot }
+if ($PSScriptRoot -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot "backend\pyproject.toml"))) { $Checkout = $PSScriptRoot }
 if ($Source) {
   if (-not $Checkout) { throw "-Source must run from a checkout" }
   if (-not (Get-Command go -ErrorAction SilentlyContinue)) { throw "-Source needs Go 1.25 or newer" }
@@ -71,16 +71,16 @@ Get-CimInstance Win32_Process -Filter "Name = 'elysian.exe'" | Where-Object { $_
 Step "Elysian and its Python"
 # rapidocr pulls the GUI build of OpenCV; the headless build Elysian lists serves the same cv2.
 $Excludes = New-TemporaryFile
-Set-Content -Path $Excludes -Value "opencv-python"
+Set-Content -LiteralPath $Excludes -Value "opencv-python"
 if ($Source) {
   Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "--excludes", $Excludes, (Join-Path $Checkout "backend"))
 }
 else {
   Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "--excludes", $Excludes, "elysian @ https://github.com/$Repo/archive/refs/tags/$Version.tar.gz#subdirectory=backend")
 }
-Remove-Item $Excludes
+Remove-Item -LiteralPath $Excludes
 $Elysian = Join-Path (& $Uv tool dir --bin) "elysian.exe"
-if (-not (Test-Path $Elysian)) { throw "uv did not install $Elysian" }
+if (-not (Test-Path -LiteralPath $Elysian)) { throw "uv did not install $Elysian" }
 
 Step "The store and its operator token"
 $Init = & $Elysian init
@@ -88,24 +88,16 @@ if ($LASTEXITCODE -ne 0) { throw "elysian init failed with exit code $LASTEXITCO
 $Init | Write-Host
 $HomeDir = ($Init | Out-String | ConvertFrom-Json).home
 $BinDir = Join-Path $HomeDir "bin"
-New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
+[IO.Directory]::CreateDirectory($BinDir) | Out-Null
 $Mcp = Join-Path $BinDir "elysian-mcp.exe"
-# A connected agent keeps the old elysian-mcp.exe open; Windows lets it be renamed, not replaced.
-if (Test-Path $Mcp) {
-  $Retired = "$Mcp.old"
-  if (Test-Path $Retired) {
-    try { Remove-Item -Force $Retired }
-    catch { throw "$Retired is still held by an agent from an earlier upgrade; close your agents and run again" }
-  }
-  Move-Item -Force -Path $Mcp -Destination $Retired
-}
+$Fresh = "$Mcp.new"
 
 Step "The MCP server"
 if ($Source) {
-  Push-Location (Join-Path $Checkout "elysian-mcp")
+  Push-Location -LiteralPath (Join-Path $Checkout "elysian-mcp")
   try {
     $env:CGO_ENABLED = "0"
-    Invoke-Checked "go" @("build", "-trimpath", "-ldflags=-s -w", "-o", $Mcp, ".\cmd\elysian-mcp")
+    Invoke-Checked "go" @("build", "-trimpath", "-ldflags=-s -w", "-o", $Fresh, ".\cmd\elysian-mcp")
   }
   finally { Pop-Location }
 }
@@ -113,21 +105,35 @@ else {
   $asset = "elysian-mcp_$(Get-Platform).zip"
   $base = "https://github.com/$Repo/releases/download/$Version"
   $tmp = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString())
-  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  [IO.Directory]::CreateDirectory($tmp) | Out-Null
   try {
-    Invoke-WebRequest -Uri "$base/$asset" -OutFile (Join-Path $tmp $asset)
-    Invoke-WebRequest -Uri "$base/elysian-mcp_SHA256SUMS.txt" -OutFile (Join-Path $tmp "SHA256SUMS")
-    $line = Select-String -Path (Join-Path $tmp "SHA256SUMS") -Pattern ("\*?" + [Regex]::Escape($asset) + "$") | Select-Object -First 1
+    # .NET file calls take paths literally; a [ in a user name breaks the cmdlets' wildcard paths.
+    $web = New-Object Net.WebClient
+    $web.DownloadFile("$base/$asset", (Join-Path $tmp $asset))
+    $web.DownloadFile("$base/elysian-mcp_SHA256SUMS.txt", (Join-Path $tmp "SHA256SUMS"))
+    $line = Select-String -LiteralPath (Join-Path $tmp "SHA256SUMS") -Pattern ("\*?" + [Regex]::Escape($asset) + "$") | Select-Object -First 1
     if (-not $line) { throw "no checksum for $asset in $Version" }
-    $actual = (Get-FileHash -Algorithm SHA256 -Path (Join-Path $tmp $asset)).Hash
+    $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $tmp $asset)).Hash
     if (($line.Line -split "\s+")[0].ToLower() -ne $actual.ToLower()) { throw "checksum mismatch for $asset" }
-    Expand-Archive -Force -Path (Join-Path $tmp $asset) -DestinationPath $tmp
-    Move-Item -Force -Path (Join-Path $tmp "elysian-mcp.exe") -Destination $Mcp
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $tmp $asset), (Join-Path $tmp "x"))
+    [IO.File]::Delete($Fresh)
+    [IO.File]::Move((Join-Path $tmp "x\elysian-mcp.exe"), $Fresh)
   }
-  finally { Remove-Item -Recurse -Force $tmp }
+  finally { Remove-Item -Recurse -Force -LiteralPath $tmp }
 }
+# The new binary is in hand; a connected agent keeps the old one open, which Windows lets be renamed, not replaced.
+if (Test-Path -LiteralPath $Mcp) {
+  $Retired = "$Mcp.old"
+  if (Test-Path -LiteralPath $Retired) {
+    try { [IO.File]::Delete($Retired) }
+    catch { throw "$Retired is still held by an agent from an earlier upgrade; close your agents and run again" }
+  }
+  [IO.File]::Move($Mcp, $Retired)
+}
+[IO.File]::Move($Fresh, $Mcp)
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
-Copy-Item -Force -Path $Elysian -Destination (Join-Path $BinDir "elysian.exe")
+[IO.File]::Copy($Elysian, (Join-Path $BinDir "elysian.exe"), $true)
 
 Step "Coding agents"
 Invoke-Checked $Mcp @("setup")
