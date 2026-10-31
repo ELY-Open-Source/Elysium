@@ -86,10 +86,13 @@ func sameStore(baseURL string, served string, home string) error {
 }
 
 func real(path string) string {
+	if absolute, err := filepath.Abs(path); err == nil {
+		path = absolute
+	}
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		return resolved
 	}
-	return filepath.Clean(path)
+	return path
 }
 
 func listening(host string) bool {

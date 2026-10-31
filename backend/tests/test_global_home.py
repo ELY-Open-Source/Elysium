@@ -69,3 +69,10 @@ def test_a_variable_the_mcp_server_would_not_read_is_refused(user: Path, monkeyp
 
     with pytest.raises(SystemExit, match=f"{name} is read here but the MCP server reads only {name.upper()}"):
         Settings()
+
+
+def test_a_relative_home_is_held_absolute_so_every_face_reports_one_path(user: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ELYSIAN_HOME", "relative")
+
+    assert Settings().home == user / "project" / "relative"
+    assert Settings(home=Path("other")).home == user / "project" / "other"

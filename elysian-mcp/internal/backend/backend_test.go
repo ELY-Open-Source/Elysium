@@ -136,3 +136,13 @@ func TestAnAPIThatDiesIsReportedWithItsLog(t *testing.T) {
 		t.Fatalf("a dead API must be reported with its log, got %v", err)
 	}
 }
+
+func TestARelativeHomeIsTheSameStoreAsItsAbsolutePath(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	api := httptest.NewServer(status("relative"))
+	defer api.Close()
+	if err := Ensure(context.Background(), api.URL, filepath.Join(root, "relative")); err != nil {
+		t.Fatalf("a relative and an absolute spelling of one home are one store, got %v", err)
+	}
+}

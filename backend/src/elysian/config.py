@@ -89,6 +89,8 @@ class Settings(BaseSettings):
         refuse_old_names(self, dict(os.environ), Path.cwd())
         if "home" not in self.model_fields_set:
             refuse_project_store(self.home, Path.cwd())
+        # Every face reports one spelling.
+        self.home = self.home.expanduser().absolute()
         if self.auth_token is None and self.token_file.is_file():
             self.auth_token = read_token(self.token_file)
         return self
