@@ -90,6 +90,15 @@ $HomeDir = ($Init | Out-String | ConvertFrom-Json).home
 $BinDir = Join-Path $HomeDir "bin"
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 $Mcp = Join-Path $BinDir "elysian-mcp.exe"
+# A connected agent keeps the old elysian-mcp.exe open; Windows lets it be renamed, not replaced.
+if (Test-Path $Mcp) {
+  $Retired = "$Mcp.old"
+  if (Test-Path $Retired) {
+    try { Remove-Item -Force $Retired }
+    catch { throw "$Retired is still held by an agent from an earlier upgrade; close your agents and run again" }
+  }
+  Move-Item -Force -Path $Mcp -Destination $Retired
+}
 
 Step "The MCP server"
 if ($Source) {
