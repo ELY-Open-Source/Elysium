@@ -93,7 +93,7 @@ func promptTurn(ctx context.Context, cfg config.Config, api *apiclient.Client, c
 	if err := backend.Verify(bounded, cfg.APIBaseURL, cfg.ElysianHome); err != nil {
 		return "", err
 	}
-	seen := marker{cfg.ElysianHome, "prompt", client, in.SessionID, in.Prompt}
+	seen := &marker{home: cfg.ElysianHome, purpose: "prompt", client: client, session: in.SessionID, value: in.Prompt}
 	if d.repeats {
 		claimed, err := seen.claim()
 		if err != nil || !claimed {
@@ -108,7 +108,7 @@ func promptTurn(ctx context.Context, cfg config.Config, api *apiclient.Client, c
 		return "", nil
 	}
 	var parts []string
-	opened := marker{cfg.ElysianHome, "session", client, in.SessionID, ""}
+	opened := marker{home: cfg.ElysianHome, purpose: "session", client: client, session: in.SessionID}
 	opening := false
 	if d.noSessionHook {
 		done, err := opened.done()
@@ -202,7 +202,10 @@ func save(ctx context.Context, api *apiclient.Client, client string, in Input) e
 
 // marker remembers, per client session and purpose, the last value a hook finished with; it is
 // written only after the work succeeds, so a failed turn is retried rather than skipped.
-type marker struct{ home, purpose, client, session, value string }
+type marker struct {
+	home, purpose, client, session, value string
+	lock                                  *os.File
+}
 
 func (m marker) path() (string, string) {
 	key := sha256.Sum256([]byte(m.purpose + "\n" + m.client + "\n" + m.session))
@@ -227,52 +230,37 @@ func (m marker) mark() error {
 	return os.WriteFile(path, []byte(want), 0o600)
 }
 
-// staleClaim is how long a claim from a process that died is honoured before another may take it.
-const staleClaim = 30 * time.Second
-
-// claim takes this value for one process: false when it was already finished or another process
-// holds it, so two hooks fired together recall and save once.
-func (m marker) claim() (bool, error) {
-	if done, err := m.done(); err != nil || done {
+// claim waits for the session's lock, then takes this value unless it was already finished, so hooks
+// fired together recall and save once. The lock is the kernel's: a process that dies drops it.
+func (m *marker) claim() (bool, error) {
+	path, _ := m.path()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return false, err
 	}
-	path, want := m.path()
-	lock := path + "." + want[:16] + ".lock"
-	if err := os.MkdirAll(filepath.Dir(lock), 0o700); err != nil {
+	file, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
 		return false, err
 	}
-	for attempt := 0; attempt < 2; attempt++ {
-		file, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-		if err == nil {
-			if err := file.Close(); err != nil {
-				return false, err
-			}
-			// The holder before us may have finished between our check and our claim.
-			done, err := m.done()
-			if err != nil || done {
-				m.release()
-				return false, err
-			}
-			return true, nil
-		}
-		if !errors.Is(err, os.ErrExist) {
-			return false, err
-		}
-		info, statErr := os.Stat(lock)
-		if statErr != nil || time.Since(info.ModTime()) < staleClaim {
-			return false, nil
-		}
-		if err := os.Remove(lock); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return false, err
-		}
+	if err := lockFile(file); err != nil {
+		file.Close()
+		return false, err
 	}
-	return false, nil
+	m.lock = file
+	done, err := m.done()
+	if err != nil || done {
+		m.release()
+		return false, err
+	}
+	return true, nil
 }
 
-// release drops the claim whether the work succeeded or not; only mark records success.
-func (m marker) release() {
-	path, want := m.path()
-	_ = os.Remove(path + "." + want[:16] + ".lock")
+// release drops the lock whether the work succeeded or not; only mark records success.
+func (m *marker) release() {
+	if m.lock != nil {
+		_ = unlockFile(m.lock)
+		_ = m.lock.Close()
+		m.lock = nil
+	}
 }
 
 // project names the scenario a memory is filed under: the git root's name, else the folder's.

@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -226,23 +224,26 @@ func TestReviewRoundOneFindings(t *testing.T) {
 			t.Fatalf("got %v and %d saves", err, len(api.saved))
 		}
 	})
-	t.Run("a prompt another process holds is left to it, a stale hold is taken", func(t *testing.T) {
+	t.Run("a prompt another hook holds waits for it and is not run twice", func(t *testing.T) {
 		home := t.TempDir()
 		api, cfg := serve(t, home)
 		in := Input{Prompt: "We ship from release/2026 on Fridays.", SessionID: "c1"}
-		m := marker{home, "prompt", "agy", in.SessionID, in.Prompt}
-		path, want := m.path()
-		lock := path + "." + want[:16] + ".lock"
-		os.MkdirAll(filepath.Dir(lock), 0o700)
-		os.WriteFile(lock, nil, 0o600)
-		payload := `{"lastUserInput":"We ship from release/2026 on Fridays.","conversationId":"c1"}`
-		if out := run(t, cfg, "agy", Prompt, payload); out != "" || api.searches != 0 {
-			t.Fatalf("a held prompt must be skipped, got %q", out)
+		holder := &marker{home: home, purpose: "prompt", client: "agy", session: in.SessionID, value: in.Prompt}
+		if claimed, err := holder.claim(); err != nil || !claimed {
+			t.Fatalf("got %v %v", claimed, err)
 		}
-		old := time.Now().Add(-time.Minute)
-		os.Chtimes(lock, old, old)
-		if out := run(t, cfg, "agy", Prompt, payload); out == "" || api.searches != 1 {
-			t.Fatalf("a stale hold must be taken, got %q", out)
+		payload := `{"lastUserInput":"We ship from release/2026 on Fridays.","conversationId":"c1"}`
+		finished := make(chan string)
+		go func() {
+			var out bytes.Buffer
+			Run(context.Background(), cfg, "agy", Prompt, strings.NewReader(payload), &out)
+			finished <- out.String()
+		}()
+		time.Sleep(200 * time.Millisecond)
+		holder.mark()
+		holder.release()
+		if out := <-finished; out != "" || api.searches != 0 {
+			t.Fatalf("a prompt the holder finished must not run again, got %q after %d searches", out, api.searches)
 		}
 	})
 	t.Run("kimi opens the session before it saves the first prompt", func(t *testing.T) {
@@ -256,16 +257,12 @@ func TestReviewRoundOneFindings(t *testing.T) {
 
 func TestAClaimTakenAfterTheHolderFinishedIsDropped(t *testing.T) {
 	home := t.TempDir()
-	m := marker{home, "prompt", "agy", "c1", "We ship on Fridays."}
+	m := &marker{home: home, purpose: "prompt", client: "agy", session: "c1", value: "We ship on Fridays."}
 	if err := m.mark(); err != nil {
 		t.Fatal(err)
 	}
-	if claimed, err := m.claim(); err != nil || claimed {
-		t.Fatalf("a finished prompt must not be claimed, got %v %v", claimed, err)
-	}
-	path, want := m.path()
-	if _, err := os.Stat(path + "." + want[:16] + ".lock"); !os.IsNotExist(err) {
-		t.Fatal("no claim may be left behind")
+	if claimed, err := m.claim(); err != nil || claimed || m.lock != nil {
+		t.Fatalf("a finished prompt must not be claimed nor its lock kept, got %v %v", claimed, err)
 	}
 }
 
@@ -278,7 +275,7 @@ func TestFiftyHooksFiredTogetherHandleOnePromptOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			m := marker{home, "prompt", "agy", "c1", "We ship on Fridays."}
+			m := &marker{home: home, purpose: "prompt", client: "agy", session: "c1", value: "We ship on Fridays."}
 			claimed, err := m.claim()
 			if err != nil || !claimed {
 				return
@@ -297,9 +294,9 @@ func TestFiftyHooksFiredTogetherHandleOnePromptOnce(t *testing.T) {
 }
 
 func TestQuotedPasswordsAreMaskedWhole(t *testing.T) {
-	for _, prompt := range []string{`{"password":"correct horse battery staple"}`, `{"password":"abcd1234,efgh5678"}`} {
+	for _, prompt := range []string{`{"password":"correct horse battery staple"}`, `{"password":"abcd1234,efgh5678"}`, `{"password":"prefix\"SYNTHETIC_PRIVATE_TAIL"}`} {
 		text, _ := capturable("save this config " + prompt)
-		for _, part := range []string{"horse", "staple", "abcd1234", "efgh5678"} {
+		for _, part := range []string{"horse", "staple", "abcd1234", "efgh5678", "SYNTHETIC_PRIVATE_TAIL"} {
 			if strings.Contains(text, part) {
 				t.Fatalf("%q leaked from %q: %q", part, prompt, text)
 			}

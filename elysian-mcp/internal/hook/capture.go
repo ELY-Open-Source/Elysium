@@ -33,8 +33,8 @@ var secrets = []*regexp.Regexp{
 	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
 	regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}\b`),
 	regexp.MustCompile(`(?i)\bbearer\s+[^\s"',}]{8,}`),
-	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*"[^"]*"`),
-	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*'[^']*'`),
+	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*"(?:[^"\\]|\\.)*"`),
+	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*'(?:[^'\\]|\\.)*'`),
 	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*[^\s"']\S*`),
 }
 
