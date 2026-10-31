@@ -26,7 +26,8 @@
 
 ## B. 宣传站（`site/` → `elysian.elydora.com`）
 
-- [ ] **p5-8** 骨架与等距引擎：pnpm + Vite + three.js + Lenis；正交相机锁在等距角，三色平涂、无描边无阴影，按地面足迹排序，背影小人，地面衬线字逐字落下。
+- [x] **p5-8** 骨架与等距引擎：pnpm + Vite + three.js + Lenis；正交相机锁在等距角，三色平涂、无描边无阴影，按地面足迹排序，背影小人，地面衬线字逐字落下。
+  - 宣传站由一个 agent 在独立 worktree 写成，合并 `619920c`。评审第 1 轮 FAIL，D1 pnpm 11 拒绝 esbuild、workerd 的构建脚本（加 `site/pnpm-workspace.yaml` 的 `allowBuilds`）；D2 保持帧早于末帧，相机在 t=70 瞬跳（只在更晚时追加，加载时检查关键帧递增）。第 2 轮 PASS。
 - [ ] **p5-9** 场景：滚动驱动的连续一块地面，讲 Elysian 的规则——各人的记忆各归各人（holder 作用域）、"我不知道，但我妻子知道"（转介）、和 Mem0 比成本（地面上的条形）、一条命令安装、接任何 agent。数字只用 README 与 `bench/reports/` 里测过的。
 - [ ] **p5-10** 部署与验收：Worker 静态资源部署到 `elysian.elydora.com`；Playwright 桌面与手机截图、`prefers-reduced-motion`、性能预算。
 - [ ] **p5-11** 删除旧站：解绑 `model.elydora.com`，删除 Worker `ely-eye-web`。
