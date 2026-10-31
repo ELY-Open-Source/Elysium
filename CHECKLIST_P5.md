@@ -11,7 +11,8 @@
 
 - [x] **p5-1** 拆依赖：`pip install ./backend` 只装核心（存、取、检索、API、CLI、MCP 需要的后端）；torch、transformers、sentence-transformers、peft、bitsandbytes、accelerate、datasets、qwen-vl-utils 进 `elysian[models]`。一个干净 venv 只装核心，`elysian remember / search / serve` 能跑，`torch` 不在环境里；一个测试钉住核心模块导入时不加载 torch。`scripts/install.sh` 与 `.ps1` 跟着改。
   - 核心依赖 17 个，干净 venv 785 MB（pyarrow、pymupdf、opencv、onnxruntime 占大头），没有 torch；`networkx`、`platformdirs` 无人引用，删除；`rank-bm25` 只有 bench 用，进 dev。`backend/tests/test_core_install.py` 在新解释器里跑 remember、search 与建 API，再读 `sys.modules`；注入一行 `import transformers` 时它失败。评审第 1 轮 PASS（`afc51c0`）。
-- [ ] **p5-2** 全局库：后端和 Go MCP 用同一条规则找库：`ELYSIAN_HOME`，没有就是 `~/.elysian`。当前目录有旧的 `.elysian` 库而 `ELYSIAN_HOME` 没指向它时，报错并给出命令，不静默开一个空库。
+- [x] **p5-2** 全局库：后端和 Go MCP 用同一条规则找库：`ELYSIAN_HOME`，没有就是 `~/.elysian`。当前目录有旧的 `.elysian` 库而 `ELYSIAN_HOME` 没指向它时，报错并给出命令，不静默开一个空库。
+  - 评审第 1 轮 FAIL，D1–D5：D1 安装器总把默认 home 当显式 `--elysian-home` 传给 Go，绕过项目库守卫，改为只传用户给的；D2 Go 项目根仍取 home 的父目录，项目级注册写进 `~/.mcp.json`，改为当前目录；D3 `.env` 里的 ELYSIAN_HOME 与空值让 Python、Go 选不同库，Python 设 `env_ignore_empty`，拒绝 `.env` 里的 home；D4 Go 不跟符号链接，改用 `EvalSymlinks`；D5 相对 home 让源码安装失败，安装器转绝对路径。第 2 轮 FAIL，D1 PowerShell 吞掉 setup 退出码，D3 pydantic 不分大小写而 Go 只读大写，改为拒绝任何非大写的 `ELYSIAN_` 名字。第 3 轮 PASS（`5ebeb73`）。顺带：`api.py` 的模块级 `app = create_app()` 无人使用且在导入时读真实 home，删除；两个测试原本读了开发者仓库里的 `.elysian`，改为依赖 tmp 设置。
 - [ ] **p5-3** MCP 自启后端：MCP 发现 API 不通时启动 `elysian serve`（同一个 `ELYSIAN_HOME`），等它健康后再转发；日志写到 `~/.elysian/logs/api.log`；起不来就报错并指向日志。
 - [ ] **p5-4** 一条命令安装：仓库根目录 `install.sh`（`curl -fsSL … | bash`）和 `install.ps1`（`irm … | iex`）：没有 uv 就装 uv，用 uv 装 Python 与 `elysian`，建 `~/.elysian`，下载并校验 MCP 二进制，注册到本机已装的客户端。
 - [ ] **p5-5** 客户端：除 Codex、Claude Code 外，注册 Cursor、Gemini CLI、OpenCode、VS Code；格式按各家文档，不靠猜。其余客户端，安装结束时打印一段通用 stdio 配置。
