@@ -54,3 +54,18 @@ def test_a_home_in_the_dotenv_file_is_refused(user: Path) -> None:
 
     with pytest.raises(SystemExit, match="sets ELYSIAN_HOME, which the MCP server does not read"):
         Settings()
+
+
+def test_a_lower_case_home_in_the_dotenv_file_is_refused(user: Path) -> None:
+    (user / "project" / ".env").write_text("elysian_home=relative\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="sets ELYSIAN_HOME, which the MCP server does not read"):
+        Settings()
+
+
+@pytest.mark.parametrize("name", ["elysian_home", "Elysian_Auth_Token"])
+def test_a_variable_the_mcp_server_would_not_read_is_refused(user: Path, monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    monkeypatch.setenv(name, str(user / "elsewhere"))
+
+    with pytest.raises(SystemExit, match=f"{name} is read here but the MCP server reads only {name.upper()}"):
+        Settings()

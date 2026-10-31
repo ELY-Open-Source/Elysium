@@ -134,3 +134,4 @@ switch ($Method) {
   --project-root $ProjectRoot `
   @HomeArgs `
   --binary $Binary
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -122,10 +122,17 @@ def refuse_old_names(settings: Settings, environment: dict[str, str], cwd: Path)
     dotenv = cwd / ".env"
     names = list(environment) + (list(dotenv_values(dotenv)) if dotenv.is_file() else [])
     old = sorted((name, prefix) for name in names for prefix in OLD_ENV_PREFIXES if name.startswith(prefix))
-    if dotenv.is_file() and "ELYSIAN_HOME" in dotenv_values(dotenv):
+    if dotenv.is_file() and any(name.upper() == "ELYSIAN_HOME" for name in dotenv_values(dotenv)):
         raise SystemExit(
             f"{dotenv} sets ELYSIAN_HOME, which the MCP server does not read, so the two would open "
             "different stores; export ELYSIAN_HOME instead"
+        )
+    # Go reads upper case only.
+    spelled = sorted(name for name in names if name.upper().startswith("ELYSIAN_") and name != name.upper())
+    if spelled:
+        raise SystemExit(
+            f"{spelled[0]} is read here but the MCP server reads only {spelled[0].upper()}, so the two "
+            f"would disagree; rename it {spelled[0].upper()}"
         )
     if "ELYSIAN_VLM_MODEL_DIR" in names:
         raise SystemExit(
