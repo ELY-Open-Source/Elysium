@@ -56,6 +56,18 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 }
 $Uv = (Get-Command uv).Source
 
+# The API a previous install started holds the old files; stop it before uv replaces them.
+# Same rule as the backend's absolute_home: ELYSIAN_HOME with ~ expanded, made absolute, else ~\.elysian.
+$OldHome = $env:ELYSIAN_HOME
+if (-not $OldHome) { $OldHome = Join-Path $HOME ".elysian" }
+if ($OldHome -eq "~" -or $OldHome.StartsWith("~/") -or $OldHome.StartsWith("~\")) { $OldHome = Join-Path $HOME $OldHome.Substring(1).TrimStart("/", "\") }
+$OldHome = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).Path, $OldHome))
+$Beside = Join-Path $OldHome "bin\elysian.exe"
+Get-CimInstance Win32_Process -Filter "Name = 'elysian.exe'" | Where-Object { $_.ExecutablePath -eq $Beside } | ForEach-Object {
+  Stop-Process -Id $_.ProcessId -Force
+  Wait-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
+  Write-Host "stopped the running API (pid $($_.ProcessId)); restart your agents to reconnect"
+}
 Step "Elysian and its Python"
 if ($Source) {
   Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", (Join-Path $Checkout "backend"))
@@ -101,15 +113,8 @@ else {
   }
   finally { Remove-Item -Recurse -Force $tmp }
 }
-# An API this home already runs holds the old elysian.exe; stop it so the copy can replace it.
-$Beside = Join-Path $BinDir "elysian.exe"
-Get-CimInstance Win32_Process -Filter "Name = 'elysian.exe'" | Where-Object { $_.ExecutablePath -eq $Beside } | ForEach-Object {
-  Stop-Process -Id $_.ProcessId -Force
-  Wait-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
-  Write-Host "stopped the running API (pid $($_.ProcessId)); restart your agents to reconnect"
-}
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
-Copy-Item -Force -Path $Elysian -Destination $Beside
+Copy-Item -Force -Path $Elysian -Destination (Join-Path $BinDir "elysian.exe")
 
 Step "Coding agents"
 Invoke-Checked $Mcp @("setup")

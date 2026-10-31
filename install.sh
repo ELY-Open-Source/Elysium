@@ -70,6 +70,20 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 UV="$(command -v uv)"
 
+# The API a previous install started holds the old code and files; stop it before uv replaces them.
+# Same rule as the backend's absolute_home: ELYSIAN_HOME with ~ expanded, made absolute, else ~/.elysian.
+OLD_HOME="${ELYSIAN_HOME:-$HOME/.elysian}"
+case "$OLD_HOME" in "~" | "~/"*) OLD_HOME="$HOME${OLD_HOME#\~}" ;; esac
+[[ "$OLD_HOME" == /* ]] || OLD_HOME="$PWD/$OLD_HOME"
+pattern="$(printf '%s' "$OLD_HOME/bin/elysian serve" | sed 's/[][\.*^$+?(){}|]/\\&/g')"
+pids="$(pgrep -f -- "$pattern")" || [[ $? -eq 1 ]] || fail "pgrep could not list running APIs"
+for pid in $pids; do
+  kill "$pid"
+  for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+  ! kill -0 "$pid" 2>/dev/null || fail "the running API (pid $pid) did not stop within 10 s; stop it and run again"
+  echo "stopped the running API (pid $pid); restart your agents to reconnect"
+done
+
 step "Elysian and its Python"
 if [[ "$METHOD" == "source" ]]; then
   "$UV" tool install --python 3.12 --reinstall "$SCRIPT_DIR/backend"
@@ -105,15 +119,6 @@ else
   mv "$tmp/elysian-mcp" "$MCP"
   chmod +x "$MCP"
 fi
-# An API this home already runs holds the old code; stop it so the next agent call starts the new one.
-pattern="$(printf '%s' "$BIN_DIR/elysian serve" | sed 's/[][\.*^$+?(){}|]/\\&/g')"
-pids="$(pgrep -f -- "$pattern")" || [[ $? -eq 1 ]] || fail "pgrep could not list running APIs"
-for pid in $pids; do
-  kill "$pid"
-  for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
-  ! kill -0 "$pid" 2>/dev/null || fail "the running API (pid $pid) did not stop within 10 s; stop it and run again"
-  echo "stopped the running API (pid $pid); restart your agents to reconnect"
-done
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
 ln -sf "$ELYSIAN" "$BIN_DIR/elysian"
 
