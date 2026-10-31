@@ -16,5 +16,5 @@ model choosing to call a tool. Each item lands through the codex reviewer (AGENT
       Grok Build and Kigi (capture hooks plus a recall instruction: neither injects context on a prompt).
       Three rounds used; the round-3 findings (trust position, multi-line strings) were verified in p6-4's PASS.
 - [x] p6-4 OpenCode: one plugin for V1 and V2, proven against both installed versions.
-- [ ] p6-5 installers, README and AGENTS say what runs where and what each client still gates
+- [x] p6-5 installers, README and AGENTS say what runs where and what each client still gates
       (folder trust in Claude Code, Droid, Gemini, Grok, Kiro); release mcp-v0.3.0.
