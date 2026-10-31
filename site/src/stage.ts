@@ -54,12 +54,17 @@ export function fit(x0: number, x1: number, y0: number, y1: number, top = 1.8, m
 
 /** Each beat's camera holds its last frame until the next beat's travel begins. */
 export function holdKeys(beats: { start: number; keys: Key[]; portrait: Key[] }[], portrait: boolean): Key[] {
-  return beats.flatMap((b, i) => {
+  const held = beats.flatMap((b, i) => {
     const keys = portrait ? b.portrait : b.keys;
     const next = beats[i + 1];
     const last = keys[keys.length - 1];
-    return next ? [...keys, [next.start - 1.4, last[1]] as Key] : keys;
+    const hold = next ? next.start - 1.4 : -Infinity;
+    return hold > last[0] ? [...keys, [hold, last[1]] as Key] : keys;
   });
+  held.forEach(([t], i) => {
+    if (i > 0 && t <= held[i - 1][0]) throw new Error(`camera key at t=${t} follows one at t=${held[i - 1][0]}; frameAt would jump`);
+  });
+  return held;
 }
 
 /** Interpolates camera keys: translation eases, zoom eases in log space so a pull-out feels even. */
