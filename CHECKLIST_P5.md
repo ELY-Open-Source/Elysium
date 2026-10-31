@@ -42,4 +42,5 @@
 
 ## D. 收尾
 
-- [ ] **p5-13** AGENTS.md、README 与技术栈同步；输出验收逐条核对表。
+- [x] **p5-13** AGENTS.md、README 与技术栈同步；输出验收逐条核对表。
+  - AGENTS.md 写入安装合同、宣传站、门禁（pnpm、mcp_autostart_smoke、install_acceptance）、审阅人 gpt-6-astra、CHECKLIST_P5；README 与 elysian-mcp/README 同步。评审第 1 轮 FAIL（MCP 资源文件说成放在库旁，实为项目根）；第 2 轮 PASS。
