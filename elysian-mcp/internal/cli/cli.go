@@ -30,6 +30,8 @@ func Run(ctx context.Context, args []string) error {
 		return runSetup(ctx, args[1:])
 	case "status":
 		return runStatus(ctx, args[1:])
+	case "hook":
+		return runHook(ctx, args[1:])
 	case "version":
 		fmt.Println(version)
 		return nil
@@ -130,6 +132,7 @@ Commands:
   server   Run the MCP server over stdio
   setup    Register the MCP server user-wide with every installed coding agent
   status   Print read-only Elysian memory status
+  hook     Run as a coding agent's hook: hook --client <name> <session-start|prompt|approve>
   version  Print the binary version
 
 `
