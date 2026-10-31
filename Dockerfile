@@ -1,10 +1,11 @@
 FROM node:22-bookworm-slim AS ui
 
 WORKDIR /ui
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN npm install -g pnpm@11.28.3
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY frontend ./
-RUN npm run build
+RUN pnpm build
 
 
 FROM nvidia/cuda:13.3.0-runtime-ubuntu24.04

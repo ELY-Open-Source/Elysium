@@ -26,7 +26,7 @@ ruff check backend/src/elysian backend/tests bench
 .venv/bin/python -m mypy backend/src/elysian backend/tests   # cold cache; baseline is 17 errors in 5 files
 ./node_modules/.bin/pyright <the files you touched>          # must be 0 errors on touched files
 cd elysian-mcp && go build ./... && go vet ./... && go test ./... && gofmt -l .
-cd frontend && npm run build && npx eslint src --max-warnings 0
+cd frontend && pnpm build && pnpm exec eslint src --max-warnings 0
 bash scripts/mcp_write_smoke.sh                  # two processes, one store
 bash scripts/mcp_autostart_smoke.sh              # the MCP server starts the API itself
 bash scripts/install_acceptance.sh --source      # one command on a bare Debian, then a client round trip

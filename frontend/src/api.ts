@@ -4,13 +4,15 @@ import type {
   AnswerResponse,
   AtomPage,
   CartridgeManifest,
+  EvidenceAtom,
   ForgetReport,
   HashHopProof,
+  Holder,
   IngestResponse,
+  Modality,
   MountState,
   ProofSuiteReport,
   RuntimeProfile,
-  RuntimeProfileReport,
   SearchFilters,
   SearchResult,
   SystemStatus,
@@ -31,6 +33,30 @@ export function writeToken(token: string): void {
   }
 }
 
+/** A refusal from the API, with the status so a caller can tell "not there yet" from "broken". */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function refusal(response: Response): Promise<ApiError> {
+  const body = await response.text();
+  let detail = body || response.statusText;
+  try {
+    const parsed = JSON.parse(body) as { detail?: unknown };
+    if (parsed.detail !== undefined) {
+      detail = typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail);
+    }
+  } catch {
+    // A body that is not JSON is shown as the server sent it.
+  }
+  return new ApiError(response.status, `${response.status} ${new URL(response.url).pathname}: ${detail}`);
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   const token = readToken();
@@ -39,10 +65,20 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
   const response = await fetch(url, { ...init, headers });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail));
+    throw await refusal(response);
   }
   return (await response.json()) as T;
+}
+
+function post<T>(url: string, body?: unknown): Promise<T> {
+  if (body === undefined) {
+    return request<T>(url, { method: 'POST' });
+  }
+  return request<T>(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export function getStatus(): Promise<SystemStatus> {
@@ -57,16 +93,12 @@ export function getRuntimeAdapters(): Promise<AdapterLoadReport> {
   return request<AdapterLoadReport>('/api/runtime/adapters');
 }
 
-export function getRuntimeProfiles(): Promise<RuntimeProfileReport> {
-  return request<RuntimeProfileReport>('/api/runtime/profiles');
+export function listHolders(): Promise<Holder[]> {
+  return request<Holder[]>('/api/holders');
 }
 
 export function ingestPath(path: string, cartridgeName: string): Promise<IngestResponse> {
-  return request<IngestResponse>('/api/ingest/path', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, cartridge_name: cartridgeName || null }),
-  });
+  return post<IngestResponse>('/api/ingest/path', { path, cartridge_name: cartridgeName || null });
 }
 
 export function uploadFiles(files: File[], cartridgeName: string): Promise<IngestResponse> {
@@ -78,36 +110,27 @@ export function uploadFiles(files: File[], cartridgeName: string): Promise<Inges
   if (cartridgeName) {
     query.set('cartridge_name', cartridgeName);
   }
-  return request<IngestResponse>(`/api/ingest/upload?${query.toString()}`, {
-    method: 'POST',
-    body: form,
-  });
+  return request<IngestResponse>(`/api/ingest/upload?${query.toString()}`, { method: 'POST', body: form });
 }
 
 export function askQuestion(question: string, profile: RuntimeProfile): Promise<AnswerResponse> {
-  return request<AnswerResponse>('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, profile }),
-  });
+  return post<AnswerResponse>('/api/chat', { question, profile });
 }
 
-export function search(query: string, filters: SearchFilters = {}, topK = 8): Promise<SearchResult> {
-  const compact: SearchFilters = {};
-  for (const [key, value] of Object.entries(filters)) {
-    if (value !== '' && value !== null && value !== undefined) {
-      compact[key as keyof SearchFilters] = value;
-    }
-  }
-  return request<SearchResult>('/api/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, top_k: topK, filters: compact }),
-  });
+export function search(query: string, filters: SearchFilters, topK = 8): Promise<SearchResult> {
+  const named = Object.entries(filters).filter(([, value]) => value !== '' && value !== null && value !== undefined);
+  return post<SearchResult>('/api/search', { query, top_k: topK, filters: Object.fromEntries(named) });
 }
 
-export function listAtoms(options: { limit?: number; cursor?: string; modality?: string; holder?: string } = {}): Promise<AtomPage> {
-  const query = new URLSearchParams({ limit: String(options.limit ?? 12) });
+export interface AtomQuery {
+  limit: number;
+  cursor?: string;
+  modality?: Modality | '';
+  holder?: string;
+}
+
+export function listAtoms(options: AtomQuery): Promise<AtomPage> {
+  const query = new URLSearchParams({ limit: String(options.limit) });
   if (options.cursor) {
     query.set('cursor', options.cursor);
   }
@@ -124,20 +147,16 @@ export function atomImageUrl(atomId: string): string {
   return `/api/atoms/${encodeURIComponent(atomId)}/image`;
 }
 
-export function remember(text: string, scenario: string): Promise<unknown> {
-  return request<unknown>('/api/memory', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, scenario: scenario || null }),
-  });
+export function remember(text: string, scenario: string): Promise<EvidenceAtom> {
+  return post<EvidenceAtom>('/api/memory', { text, scenario });
 }
 
-export function forget(atomId: string, reason = ''): Promise<ForgetReport> {
-  return request<ForgetReport>('/api/memory/forget', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ atom_id: atomId, reason }),
-  });
+export function supersede(atomId: string, text: string, scenario: string): Promise<EvidenceAtom> {
+  return post<EvidenceAtom>('/api/memory/supersede', { atom_id: atomId, text, scenario });
+}
+
+export function forget(atomId: string, reason: string): Promise<ForgetReport> {
+  return post<ForgetReport>('/api/memory/forget', { atom_id: atomId, reason });
 }
 
 export function listCartridges(): Promise<CartridgeManifest[]> {
@@ -148,34 +167,28 @@ export function getMounts(): Promise<MountState> {
   return request<MountState>('/api/mounts');
 }
 
-export function mountCartridge(cartridgeId: string): Promise<CartridgeManifest> {
-  return request<CartridgeManifest>(`/api/cartridges/${encodeURIComponent(cartridgeId)}/mount`, { method: 'POST' });
-}
+export type MountVerb = 'mount' | 'switch' | 'unmount';
 
-export function switchCartridge(cartridgeId: string): Promise<CartridgeManifest> {
-  return request<CartridgeManifest>(`/api/cartridges/${encodeURIComponent(cartridgeId)}/switch`, { method: 'POST' });
-}
-
-export function unmountCartridge(cartridgeId: string): Promise<MountState> {
-  return request<MountState>(`/api/cartridges/${encodeURIComponent(cartridgeId)}/unmount`, { method: 'POST' });
+export function changeMount(cartridgeId: string, verb: MountVerb): Promise<CartridgeManifest | MountState> {
+  return post<CartridgeManifest | MountState>(`/api/cartridges/${encodeURIComponent(cartridgeId)}/${verb}`);
 }
 
 export function runHashHop(kind: 'text' | 'visual', hops: number, tokenEquivalent: number): Promise<HashHopProof> {
-  return request<HashHopProof>('/api/hashhop', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind, hops, token_equivalent: tokenEquivalent }),
-  });
+  return post<HashHopProof>('/api/hashhop', { kind, hops, token_equivalent: tokenEquivalent });
 }
 
-export function runProofSuite(cartridgeId?: string): Promise<ProofSuiteReport> {
-  return request<ProofSuiteReport>('/api/proof-suite', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cartridge_id: cartridgeId ?? null }),
-  });
+export function runProofSuite(): Promise<ProofSuiteReport> {
+  return post<ProofSuiteReport>('/api/proof-suite', { cartridge_id: null });
 }
 
-export function getLatestProofSuite(): Promise<ProofSuiteReport> {
-  return request<ProofSuiteReport>('/api/proof-suite/latest');
+/** The latest suite, or null when this store has never run one (the API answers 404). */
+export async function getLatestProofSuite(): Promise<ProofSuiteReport | null> {
+  try {
+    return await request<ProofSuiteReport>('/api/proof-suite/latest');
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
 }

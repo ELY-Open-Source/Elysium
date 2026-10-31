@@ -1,0 +1,380 @@
+:root {
+  --paper: #f1e8d8;
+  --paper-lift: #faf4e8;
+  --carpet: #f2e5ce;
+  --concrete: #eae2d3;
+  --ghost: #d6ccba;
+  --ink: #2a2e29;
+  --soft: #6f695e;
+  --accent: #d0573a;
+  --accent-light: #edbfa9;
+  --green: #3d6b59;
+  --green-light: #a7c2b2;
+  --ginger: #e2ae3a;
+  --latin: 'Newsreader Variable', 'Noto Serif SC', serif;
+  --han: 'Noto Serif SC', 'Newsreader Variable', serif;
+  --calm: cubic-bezier(0.22, 1, 0.36, 1);
+  --gutter: clamp(16px, 4vw, 48px);
+  --masthead: 64px;
+
+  color-scheme: light;
+  font-family: var(--latin);
+  font-optical-sizing: auto;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--paper);
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+dl,
+dd {
+  margin: 0;
+}
+
+:lang(zh) {
+  font-family: var(--han);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.mono {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-size: 0.78rem;
+  color: var(--soft);
+  overflow-wrap: anywhere;
+}
+
+/* The masthead */
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  min-height: var(--masthead);
+  padding: 0 var(--gutter);
+  background: var(--paper);
+  border-bottom: 1px solid var(--ghost);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-style: italic;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand span {
+  font-size: 1.35rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.masthead nav {
+  display: flex;
+  gap: 22px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.masthead nav a {
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+  color: var(--soft);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.4s var(--calm), border-color 0.4s var(--calm);
+}
+
+.masthead nav a:hover {
+  color: var(--ink);
+}
+
+.masthead nav a.active {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.masthead-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.token {
+  width: 150px;
+  padding: 4px 0;
+  border: 0;
+  border-bottom: 1.5px solid var(--ghost);
+  background: transparent;
+}
+
+/* Controls */
+
+.solid,
+.quiet-button {
+  border: 0;
+  border-radius: 2px;
+  padding: 10px 22px;
+  font-weight: 600;
+  transition: background 0.35s var(--calm), color 0.35s var(--calm);
+}
+
+.solid {
+  background: var(--ink);
+  color: var(--paper-lift);
+}
+
+.solid:hover:not(:disabled) {
+  background: var(--green);
+}
+
+.quiet-button {
+  background: var(--ghost);
+  color: var(--ink);
+}
+
+.quiet-button:hover:not(:disabled) {
+  background: var(--green-light);
+}
+
+.solid:disabled,
+.quiet-button:disabled {
+  background: var(--concrete);
+  color: var(--soft);
+}
+
+.link {
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--ghost);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 0.3s var(--calm);
+}
+
+.link:hover:not(:disabled) {
+  text-decoration-color: var(--ink);
+}
+
+.link:disabled {
+  color: var(--ghost);
+  text-decoration: none;
+}
+
+.link.lit {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+.field,
+.big-field,
+.filters label {
+  display: grid;
+  gap: 4px;
+}
+
+.field > span,
+.big-field > span,
+.filters label > span {
+  color: var(--soft);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.field input,
+.big-field input,
+.big-field textarea,
+.filters input,
+.filters select {
+  width: 100%;
+  border: 0;
+  border-bottom: 1.5px solid var(--ink);
+  border-radius: 0;
+  padding: 6px 0;
+  background: transparent;
+  transition: border-color 0.3s var(--calm);
+}
+
+.big-field input,
+.big-field textarea {
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ghost);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-bottom-color: var(--green);
+}
+
+input[type='file'] {
+  border-bottom: 0;
+  font-size: 0.9rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+}
+
+/* Floor type: a word lying on the isometric ground, landing one character at a time */
+
+.floor {
+  display: inline-block;
+  white-space: nowrap;
+  font-family: var(--han);
+  font-weight: 700;
+  line-height: 1;
+  transform: matrix(0.866, -0.5, 0.866, 0.5, 0, 0);
+  transform-origin: 0 100%;
+  user-select: none;
+}
+
+.floor > span {
+  display: inline-block;
+  opacity: 0;
+  color: var(--ghost);
+  transform: scale(1.22);
+  transition:
+    opacity 0.7s var(--calm),
+    transform 0.7s var(--calm),
+    color 0.9s var(--calm);
+}
+
+.floor.landed > span {
+  opacity: 1;
+  color: var(--ink);
+  transform: none;
+}
+
+.floor-big {
+  font-size: 84px;
+  margin: 132px 0 12px 76px;
+}
+
+/* Lines that speak */
+
+.notice,
+.fault {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-left: 4px solid var(--green);
+  background: color-mix(in srgb, var(--green-light) 40%, transparent);
+}
+
+.fault {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-light) 45%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.quiet {
+  color: var(--soft);
+  font-style: italic;
+}
+
+.state {
+  display: inline-block;
+  border-radius: 2px;
+  padding: 1px 8px;
+  background: var(--concrete);
+  color: var(--soft);
+  font-size: 0.8rem;
+}
+
+.state.good {
+  background: var(--green-light);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floor > span {
+    opacity: 1;
+    color: var(--ink);
+    transform: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 860px) {
+  :root {
+    --masthead: 96px;
+  }
+
+  .masthead {
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 4px 16px;
+  }
+
+  .masthead nav {
+    order: 3;
+    width: 100%;
+  }
+
+  .token {
+    width: 96px;
+  }
+
+  .floor-big {
+    font-size: 60px;
+    margin: 96px 0 8px 54px;
+  }
+}

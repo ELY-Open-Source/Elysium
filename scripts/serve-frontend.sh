@@ -2,4 +2,4 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 cd frontend
-exec npm run dev
+exec pnpm dev
