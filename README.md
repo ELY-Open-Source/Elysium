@@ -102,10 +102,11 @@ for is quarantined: it stays in the store, and it is not citable.
 One command installs everything a coding agent needs: uv if it is missing, Elysian with its own
 Python, the store in `~/.elysian` with its operator token, the MCP server, and the registration
 with every installed agent: Claude Code, Codex, Cursor, Copilot CLI, VS Code, Gemini CLI, Antigravity,
-Qwen Code, Kimi Code, Kiro, Factory Droid, OpenCode, Grok Build and Kigi. Each agent then uses memory
-by itself: a hook adds the project's memories when a session starts, recalls what matches each prompt,
-and saves the prompt, with no tool for the model to remember to call and no toggle to turn on
-(`elysian-mcp/README.md` lists what is written where). Any other MCP client gets a ready
+Qwen Code, Kimi Code, Kiro, Factory Droid, OpenCode, Grok Build and Kigi. In all but the last two a
+hook adds the project's memories when a session starts, recalls what matches each prompt and saves the
+prompt, with no tool for the model to remember to call and no toggle to turn on. Grok Build and Kigi
+cannot add context from a hook: theirs saves each prompt, and a rules file asks the model to recall
+(`elysian-mcp/README.md` lists what is written where, and what a client may still ask for). Any other MCP client gets a ready
 `mcpServers` entry printed at the end. No Python, Go or Node is needed first.
 
 ```bash

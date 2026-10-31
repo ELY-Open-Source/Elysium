@@ -161,5 +161,5 @@ Invoke-Checked $Mcp @("setup")
 Step "Done"
 Write-Host "Memory lives in $HomeDir. The MCP server is $Mcp; it starts the API itself whenever the API is down."
 Write-Host "Any other MCP client: paste the any_other_client entry printed above into its MCP config."
-Write-Host "Each agent above now recalls and saves memory by itself through its hooks; Claude Code, Droid, Gemini, Grok and Kiro run them once you trust a folder."
+Write-Host "The agents above save each prompt and, except Grok Build and Kigi, recall into context through their hooks; Claude Code, Droid, Gemini and Kiro run hooks once you trust a folder. Any line setup asks you to add by hand is in its output above."
 Write-Host "Restart your agents to load it. The CLI is $Elysian; run ``uv tool update-shell`` to put it on PATH."

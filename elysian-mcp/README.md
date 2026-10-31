@@ -13,7 +13,8 @@ the top-level README. They download the checksum-verified binary of the newest `
 `<elysian-home>/bin`, place the `elysian` CLI beside it (a link; a copy on Windows), and run `elysian-mcp setup`.
 
 `setup` wires every installed coding agent so memory works by itself, and skips the rest. For each it
-registers the server user-wide, turns off the prompt before Elysian's tools run, and adds hooks that run
+registers the server user-wide, adds the setting that stops the prompt before Elysian's tools run where
+the user's own config leaves room for it, and adds hooks that run
 `elysian-mcp hook --client <name> <event>`: at session start it adds the project's memories to the
 agent's context, and on each prompt it recalls what matches, then saves the prompt (secrets masked;
 commands, one-word replies and short questions skipped). A hook that fails never blocks the turn; it
@@ -34,10 +35,14 @@ writes the reason to stderr and `<elysian-home>/logs/hook.log`.
 | OpenCode (1.x and 2.x) | `~/.config/opencode/opencode.json` | a plugin, `plugins/elysian.js` |
 | Grok Build, Kigi | `[mcp_servers.elysian]` and `MCPTool(elysian__*)` in `config.toml` | a prompt hook that saves; their hooks cannot add context, so a rules file tells the model to recall |
 
-What a client still asks for, setup does not decide for the user: Claude Code, Droid, Gemini CLI,
-Grok and Kiro hold hooks (and some, the server) until a folder is trusted once. A file setup cannot
-read as its format, or a TOML table it would have to define twice, stops that client untouched and is
-named. A re-run replaces only Elysian's own entries. `--client <name>` wires one and fails if it is
+What a client still asks for, setup does not decide for the user. Claude Code, Droid, Gemini CLI and
+Kiro hold hooks (and some, the server) until a folder is trusted once. Where a user's config already
+holds its own permission list in a layout setup will not rewrite (a Grok or Kigi `[permission]` table,
+Kimi rules written inline, a Kiro `permissions.yaml` of another shape), setup leaves it, wires the rest,
+and its output names the line to add by hand. A file setup cannot read as its format, or a TOML table
+it would have to define twice, stops setup at that file, which is left untouched and named; files it
+had already written for that client stay written, and a re-run after the fix completes it. A re-run
+replaces only Elysian's own entries. `--client <name>` wires one and fails if it is
 missing. `ELYSIAN_HOME` is written into entries and hooks only when it was set or `--elysian-home`
 was given. The JSON it prints ends with `any_other_client`, an `mcpServers` entry for any other client.
 
