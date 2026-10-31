@@ -59,13 +59,14 @@ func (s *Server) registerResources(server *mcp.Server) {
 	addFileResource(server, "elysian://project/mcp-research", "Elysian MCP research notes", filepath.Join(s.cfg.ProjectRoot, "elysian-mcp", "docs", "RESEARCH.md"))
 }
 
-// Hints a client reads to run a tool without asking: reads change nothing, writes add or close
-// memories without destroying them, and only forget removes one.
+// Hints a client reads before it asks the user, held to the MCP meaning: read-only changes nothing;
+// non-destructive only adds. A search records that it recalled a memory, a count that only grows; every
+// write that replaces or removes state says so.
 var (
 	no, yes     = false, true
 	readOnly    = &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}
+	recalls     = &mcp.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &no}
 	additive    = &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true, OpenWorldHint: &no}
-	appends     = &mcp.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &no}
 	destructive = &mcp.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &no}
 )
 

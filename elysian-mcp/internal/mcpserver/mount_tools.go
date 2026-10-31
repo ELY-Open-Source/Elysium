@@ -42,19 +42,19 @@ func (s *Server) registerMountTools(server *mcp.Server) {
 	}, s.mountTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "switch_cartridge",
-		Annotations: additive,
+		Annotations: destructive,
 		Title:       "Switch to one cartridge",
 		Description: "Mount one cartridge and nothing else.",
 	}, s.switchTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "unmount_cartridge",
-		Annotations: additive,
+		Annotations: destructive,
 		Title:       "Unmount a cartridge",
 		Description: "Remove one cartridge from the mounted set and report what is left.",
 	}, s.unmountTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "append_to_cartridge",
-		Annotations: appends,
+		Annotations: destructive,
 		Title:       "Append memories to a cartridge",
 		Description: "Add atoms to an existing cartridge. The bundle and its DNA are rewritten, so the cartridge id keeps describing the bytes it holds.",
 	}, s.appendTool)

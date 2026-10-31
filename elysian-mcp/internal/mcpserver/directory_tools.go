@@ -33,7 +33,7 @@ func (s *Server) registerDirectoryTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Title:       "Ask and get referred",
 		Name:        "ask",
-		Annotations: readOnly,
+		Annotations: recalls,
 		Description: "Ask the asker's own memory, then the directory. answered means somebody's memory matched; referred means the best holder's memory is private, so the answer is the pointer and contact, never the text.",
 	}, s.askMemory)
 

@@ -43,13 +43,13 @@ type ForgetOutput struct {
 func (s *Server) registerWriteTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "remember",
-		Annotations: additive,
+		Annotations: destructive,
 		Title:       "Remember",
 		Description: "Store a new memory. The Elysian server stamps the holder, origin and ingestion time, so a caller cannot claim to be somebody else.",
 	}, s.rememberTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "supersede_memory",
-		Annotations: appends,
+		Annotations: destructive,
 		Title:       "Supersede a memory",
 		Description: "Replace a memory with a newer statement. The old one stops being retrievable but keeps its record, so the timeline stays readable.",
 	}, s.supersedeTool)

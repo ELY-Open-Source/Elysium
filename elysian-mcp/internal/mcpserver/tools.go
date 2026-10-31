@@ -111,7 +111,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 	}, s.getCartridgeTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search_atoms",
-		Annotations: readOnly,
+		Annotations: recalls,
 		Title:       "Search Evidence Atoms",
 		Description: "Search the local Elysian FTS index and return ranked Evidence Atoms.",
 	}, s.searchAtomsTool)
@@ -123,7 +123,7 @@ func (s *Server) registerTools(server *mcp.Server) {
 	}, s.fetchAtomTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "compile_context",
-		Annotations: readOnly,
+		Annotations: recalls,
 		Title:       "Compile Evidence Context",
 		Description: "Compile a question into an Elysian evidence pack using local retrieval and the same profile names as the app.",
 	}, s.compileContextTool)
