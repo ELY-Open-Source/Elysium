@@ -15,7 +15,7 @@ implementation; these pieces are adapted from the demo's `kit.js`:
 ```
 MIT License
 
-Copyright (c) lemomo-ai and the lemo-opuscar contributors
+Copyright (c) 2026 LemoLab
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
