@@ -87,6 +87,15 @@ func cli() (string, error) {
 	return exec.LookPath("elysian")
 }
 
+// Verify returns nil only when the API at baseURL answers and serves home; it starts nothing.
+func Verify(ctx context.Context, baseURL string, home string) error {
+	served, ok := serving(ctx, baseURL)
+	if !ok {
+		return errors.New("the Elysian API at " + baseURL + " is not answering; it starts at sign-in, or run `elysian serve`")
+	}
+	return sameStore(baseURL, served, home)
+}
+
 // sameStore refuses an API that serves another home: its writes would land in the wrong store.
 func sameStore(baseURL string, served string, home string) error {
 	if !filepath.IsAbs(served) {

@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ELY-Open-Source/Elysian/elysian-mcp/internal/config"
 )
@@ -18,19 +21,22 @@ type fakeAPI struct {
 	mu       sync.Mutex
 	saved    []map[string]any
 	searches int
+	order    []string
+	served   string
 }
 
 func serve(t *testing.T, home string) (*fakeAPI, config.Config) {
 	t.Helper()
-	api := &fakeAPI{}
+	api := &fakeAPI{served: home}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		api.mu.Lock()
 		defer api.mu.Unlock()
 		switch r.URL.Path {
 		case "/api/status":
-			json.NewEncoder(w).Encode(map[string]any{"data_home": home})
+			json.NewEncoder(w).Encode(map[string]any{"data_home": api.served})
 		case "/api/search":
 			api.searches++
+			api.order = append(api.order, "search")
 			json.NewEncoder(w).Encode(map[string]any{"status": "hits", "hits": []any{map[string]any{
 				"atom": map[string]any{"text": "The release branch is release/2026.", "ingested_at": "2026-10-30T09:00:00Z", "scenario": "demo"}, "final_score": 1.0,
 			}}})
@@ -38,6 +44,7 @@ func serve(t *testing.T, home string) (*fakeAPI, config.Config) {
 			var body map[string]any
 			json.NewDecoder(r.Body).Decode(&body)
 			api.saved = append(api.saved, body)
+			api.order = append(api.order, "save")
 			json.NewEncoder(w).Encode(map[string]any{"atom_id": "a1", "text": body["text"]})
 		default:
 			http.NotFound(w, r)
@@ -181,4 +188,68 @@ func TestUnknownClientAndBrokenPayloadAreNamed(t *testing.T) {
 	if FailExit("kiro") != 0 || FailExit("claude") != 1 {
 		t.Fatal("kiro must fail with 0, claude with 1")
 	}
+}
+
+func TestAFailedTurnIsRetriedNotSkippedAndJSONSecretsAreMasked(t *testing.T) {
+	home := t.TempDir()
+	cfg := config.Config{APIBaseURL: "http://127.0.0.1:1", ElysianHome: home}
+	payload := `{"lastUserInput":"We ship from release/2026 on Fridays.","conversationId":"c9"}`
+	var out bytes.Buffer
+	if err := Run(context.Background(), cfg, "agy", Prompt, strings.NewReader(payload), &out); err == nil {
+		t.Fatal("an unreachable API must be an error")
+	}
+	api, live := serve(t, home)
+	if got := run(t, live, "agy", Prompt, payload); got == "" || len(api.saved) != 1 {
+		t.Fatalf("the retry must run, got %q and %d saves", got, len(api.saved))
+	}
+	text, _ := capturable(`config {"api_key": "abcd1234efgh5678", "client_secret":"zyxw9876vuts5432"}`)
+	if strings.Contains(text, "abcd1234") || strings.Contains(text, "zyxw9876") {
+		t.Fatalf("got %q", text)
+	}
+}
+
+func TestReviewRoundOneFindings(t *testing.T) {
+	t.Run("prefixed environment names and JSON keys are masked", func(t *testing.T) {
+		text, _ := capturable(`run with ELYSIAN_AUTH_TOKEN=abcd1234efgh AWS_SECRET_ACCESS_KEY=wxyz98765432 {"password":"hunter2hunter2"}`)
+		for _, secret := range []string{"abcd1234efgh", "wxyz98765432", "hunter2hunter2"} {
+			if strings.Contains(text, secret) {
+				t.Fatalf("%s leaked in %q", secret, text)
+			}
+		}
+	})
+	t.Run("a prompt refuses an API that serves another store", func(t *testing.T) {
+		api, cfg := serve(t, t.TempDir())
+		api.served = "/somewhere/else"
+		var out bytes.Buffer
+		err := Run(context.Background(), cfg, "claude", Prompt, strings.NewReader("{"+statement+"}"), &out)
+		if err == nil || !strings.Contains(err.Error(), "serves /somewhere/else") || len(api.saved) != 0 {
+			t.Fatalf("got %v and %d saves", err, len(api.saved))
+		}
+	})
+	t.Run("a prompt another process holds is left to it, a stale hold is taken", func(t *testing.T) {
+		home := t.TempDir()
+		api, cfg := serve(t, home)
+		in := Input{Prompt: "We ship from release/2026 on Fridays.", SessionID: "c1"}
+		m := marker{home, "prompt", "agy", in.SessionID, in.Prompt}
+		path, want := m.path()
+		lock := path + "." + want[:16] + ".lock"
+		os.MkdirAll(filepath.Dir(lock), 0o700)
+		os.WriteFile(lock, nil, 0o600)
+		payload := `{"lastUserInput":"We ship from release/2026 on Fridays.","conversationId":"c1"}`
+		if out := run(t, cfg, "agy", Prompt, payload); out != "" || api.searches != 0 {
+			t.Fatalf("a held prompt must be skipped, got %q", out)
+		}
+		old := time.Now().Add(-time.Minute)
+		os.Chtimes(lock, old, old)
+		if out := run(t, cfg, "agy", Prompt, payload); out == "" || api.searches != 1 {
+			t.Fatalf("a stale hold must be taken, got %q", out)
+		}
+	})
+	t.Run("kimi opens the session before it saves the first prompt", func(t *testing.T) {
+		api, cfg := serve(t, t.TempDir())
+		run(t, cfg, "kimi", Prompt, `{"prompt":"We ship from release/2026 every Friday.","session_id":"k2","cwd":"/tmp/demo"}`)
+		if strings.Join(api.order, ",") != "search,search,save" {
+			t.Fatalf("got %v", api.order)
+		}
+	})
 }

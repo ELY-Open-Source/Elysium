@@ -29,7 +29,8 @@ var secrets = []*regexp.Regexp{
 	regexp.MustCompile(`\bxox[abprs]-[A-Za-z0-9\-]{10,}`),
 	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
 	regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}\b`),
-	regexp.MustCompile(`(?i)\b(bearer|token|password|passwd|secret|api[_-]?key)(\s*[:=]\s*|\s+)["']?[^\s"']{8,}`),
+	regexp.MustCompile(`(?i)\bbearer\s+[^\s"',}]{8,}`),
+	regexp.MustCompile(`(?i)\b[\w-]*(token|password|passwd|secret|api[_-]?key|access[_-]?key|private[_-]?key)[\w-]*["']?\s*[:=]\s*["']?[^\s"',}]{8,}`),
 }
 
 // capturable returns the prompt as it will be stored, or false for a command, a one-word reply,

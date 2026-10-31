@@ -85,33 +85,59 @@ func Run(ctx context.Context, cfg config.Config, client string, event Event, std
 	return d.write(stdout, event, extra)
 }
 
-// promptTurn runs once per user prompt: save it, recall for it, and open the session where the
-// client has no session hook of its own.
+// promptTurn runs once per user prompt: open the session where the client has no session hook,
+// recall, then save, so nothing this turn writes is recalled by it.
 func promptTurn(ctx context.Context, cfg config.Config, api *apiclient.Client, client string, d dialect, in Input) (string, error) {
-	if d.repeats {
-		fresh, err := firstSight(cfg.ElysianHome, "prompt", client, in.SessionID, in.Prompt)
-		if err != nil || !fresh {
-			return "", err
-		}
-	}
 	bounded, cancel := context.WithTimeout(ctx, promptBudget)
 	defer cancel()
+	if err := backend.Verify(bounded, cfg.APIBaseURL, cfg.ElysianHome); err != nil {
+		return "", err
+	}
+	seen := marker{cfg.ElysianHome, "prompt", client, in.SessionID, in.Prompt}
+	if d.repeats {
+		claimed, err := seen.claim()
+		if err != nil || !claimed {
+			return "", err
+		}
+		defer seen.release()
+	}
 	if d.captureOnly {
-		return "", save(bounded, api, client, in)
+		if err := save(bounded, api, client, in); err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	var parts []string
+	opened := marker{cfg.ElysianHome, "session", client, in.SessionID, ""}
+	opening := false
+	if d.noSessionHook {
+		done, err := opened.done()
+		if err != nil {
+			return "", err
+		}
+		if !done {
+			session, err := sessionContext(bounded, api, project(in.Cwd))
+			if err != nil {
+				return "", err
+			}
+			parts, opening = append(parts, session), true
+		}
 	}
 	recalled, err := promptContext(bounded, api, client, in)
-	if err != nil || !d.noSessionHook {
-		return recalled, err
-	}
-	opening, err := firstSight(cfg.ElysianHome, "session", client, in.SessionID, "")
-	if err != nil || !opening {
-		return recalled, err
-	}
-	session, err := sessionContext(bounded, api, project(in.Cwd))
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(session + "\n" + recalled), nil
+	if opening {
+		if err := opened.mark(); err != nil {
+			return "", err
+		}
+	}
+	if d.repeats {
+		if err := seen.mark(); err != nil {
+			return "", err
+		}
+	}
+	return strings.TrimSpace(strings.Join(append(parts, recalled), "\n")), nil
 }
 
 // readPayload decodes the client's JSON; an empty stdin is an empty payload, broken JSON is an error.
@@ -174,23 +200,70 @@ func save(ctx context.Context, api *apiclient.Client, client string, in Input) e
 	return api.Post(ctx, "/api/memory", body, &saved)
 }
 
-// firstSight records the last value a session showed for one purpose and reports whether this one is new.
-func firstSight(home, purpose, client, session, value string) (bool, error) {
-	key := sha256.Sum256([]byte(purpose + "\n" + client + "\n" + session))
-	path := filepath.Join(home, "hooks", "seen", hex.EncodeToString(key[:8]))
-	digest := sha256.Sum256([]byte(value))
-	want := hex.EncodeToString(digest[:])
+// marker remembers, per client session and purpose, the last value a hook finished with; it is
+// written only after the work succeeds, so a failed turn is retried rather than skipped.
+type marker struct{ home, purpose, client, session, value string }
+
+func (m marker) path() (string, string) {
+	key := sha256.Sum256([]byte(m.purpose + "\n" + m.client + "\n" + m.session))
+	digest := sha256.Sum256([]byte(m.value))
+	return filepath.Join(m.home, "hooks", "seen", hex.EncodeToString(key[:8])), hex.EncodeToString(digest[:])
+}
+
+func (m marker) done() (bool, error) {
+	path, want := m.path()
 	last, err := os.ReadFile(path)
-	if err == nil && string(last) == want {
+	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return false, err
-	}
+	return err == nil && string(last) == want, err
+}
+
+func (m marker) mark() error {
+	path, want := m.path()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(want), 0o600)
+}
+
+// staleClaim is how long a claim from a process that died is honoured before another may take it.
+const staleClaim = 30 * time.Second
+
+// claim takes this value for one process: false when it was already finished or another process
+// holds it, so two hooks fired together recall and save once.
+func (m marker) claim() (bool, error) {
+	if done, err := m.done(); err != nil || done {
 		return false, err
 	}
-	return true, os.WriteFile(path, []byte(want), 0o600)
+	path, want := m.path()
+	lock := path + "." + want[:16] + ".lock"
+	if err := os.MkdirAll(filepath.Dir(lock), 0o700); err != nil {
+		return false, err
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		file, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err == nil {
+			return true, file.Close()
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return false, err
+		}
+		info, statErr := os.Stat(lock)
+		if statErr != nil || time.Since(info.ModTime()) < staleClaim {
+			return false, nil
+		}
+		if err := os.Remove(lock); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// release drops the claim whether the work succeeded or not; only mark records success.
+func (m marker) release() {
+	path, want := m.path()
+	_ = os.Remove(path + "." + want[:16] + ".lock")
 }
 
 // project names the scenario a memory is filed under: the git root's name, else the folder's.
