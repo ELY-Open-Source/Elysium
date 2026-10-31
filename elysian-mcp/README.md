@@ -58,7 +58,7 @@ go run ./cmd/elysian-mcp server --elysian-home /path/to/.elysian
 
 ## Resources
 
-`elysian://project/prd`, `elysian://project/readme`, and `elysian://project/mcp-research` expose `PRD.md`, the project README, and these research notes when those files are present next to the store.
+`elysian://project/prd`, `elysian://project/readme`, and `elysian://project/mcp-research` expose `PRD.md`, `README.md` and `elysian-mcp/docs/RESEARCH.md` from the project root: the directory the server was started in, or `--project-root`. The store's location plays no part. A file that is missing there is not listed.
 
 ## Releases
 
