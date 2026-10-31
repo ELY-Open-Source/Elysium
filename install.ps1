@@ -101,8 +101,15 @@ else {
   }
   finally { Remove-Item -Recurse -Force $tmp }
 }
+# An API this home already runs holds the old elysian.exe; stop it so the copy can replace it.
+$Beside = Join-Path $BinDir "elysian.exe"
+Get-CimInstance Win32_Process -Filter "Name = 'elysian.exe'" | Where-Object { $_.ExecutablePath -eq $Beside } | ForEach-Object {
+  Stop-Process -Id $_.ProcessId -Force
+  Wait-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
+  Write-Host "stopped the running API (pid $($_.ProcessId)); restart your agents to reconnect"
+}
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
-Copy-Item -Force -Path $Elysian -Destination (Join-Path $BinDir "elysian.exe")
+Copy-Item -Force -Path $Elysian -Destination $Beside
 
 Step "Coding agents"
 Invoke-Checked $Mcp @("setup")

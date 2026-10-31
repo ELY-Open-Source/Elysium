@@ -105,6 +105,15 @@ else
   mv "$tmp/elysian-mcp" "$MCP"
   chmod +x "$MCP"
 fi
+# An API this home already runs holds the old code; stop it so the next agent call starts the new one.
+pattern="$(printf '%s' "$BIN_DIR/elysian serve" | sed 's/[][\.*^$+?(){}|]/\\&/g')"
+pids="$(pgrep -f -- "$pattern")" || [[ $? -eq 1 ]] || fail "pgrep could not list running APIs"
+for pid in $pids; do
+  kill "$pid"
+  for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+  ! kill -0 "$pid" 2>/dev/null || fail "the running API (pid $pid) did not stop within 10 s; stop it and run again"
+  echo "stopped the running API (pid $pid); restart your agents to reconnect"
+done
 # The MCP server starts the API from the elysian beside it; a client's PATH may not hold uv's bin.
 ln -sf "$ELYSIAN" "$BIN_DIR/elysian"
 
