@@ -9,7 +9,7 @@ ignored `ELY_EYE_AUTH_TOKEN` or `ELYSIUM_AUTH_TOKEN` would start a server with n
 The bench data root stays `~/ely_eye_bench_data` because the frozen stores record 50,155 source paths
 under it. Frozen reports keep the arm names they were measured under (`elysium`); the harness reads them as Elysian.
 
-Read `CHECKLIST.md` (phases 0–3) and `CHECKLIST_P4.md` (phase 4) for the ordered work list and `Gaps.md` for the audit the
+Read `CHECKLIST.md` (phases 0–3), `CHECKLIST_P4.md` (phase 4) and `CHECKLIST_P5.md` (phase 5: install, site, console) for the ordered work list and `Gaps.md` for the audit the
 work started from. Measured results live in `bench/reports/`. If a sentence in
 this repository states a capability, there must be a command that demonstrates
 it — otherwise the sentence belongs in the "not measured" section.
@@ -97,7 +97,7 @@ the commit you branched from, do not assume it.
 
 Every task lands through an independent reviewer running in a `herdr` pane
 against the commit, not against a description of it. The reviewer is
-`codex --yolo -m gpt-6.1-sol -c model_reasoning_effort=xhigh -c service_tier=fast`,
+`codex --yolo -m gpt-6-astra -c model_reasoning_effort=xhigh -c service_tier=fast`,
 at most 3 rounds per item. Findings are numbered
 `D1…Dn`; fix the mechanism, not the wording, and re-measure. A checklist item is
 not `[x]` before the reviewer returns PASS. Read the reviewer's verdict from its

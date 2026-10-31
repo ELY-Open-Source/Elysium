@@ -37,7 +37,8 @@
 
 ## C. 本地控制台（`frontend/`）
 
-- [ ] **p5-12** 重写控制台：同一套 API、同样的功能，同一种等距画册风格，改用 pnpm；`frontend/scripts/verify-ui.mjs` 按新界面重写，覆盖原来的每个流程；`scripts/ui_smoke.sh` 通过。
+- [x] **p5-12** 重写控制台：同一套 API、同样的功能，同一种等距画册风格，改用 pnpm；`frontend/scripts/verify-ui.mjs` 按新界面重写，覆盖原来的每个流程；`scripts/ui_smoke.sh` 通过。
+  - 控制台由一个 agent 在独立 worktree 重写（React + three.js 货架 + Lenis，pnpm），合并时取其版本并带入改名（`b4138cd`）。同一套 API，旧面板能力全在，新增已有接口上的 Replace；`verify-ui.mjs` 覆盖旧流程并加上传、点亮货架、remember/replace、Ask（stub）；`ui_smoke.sh` 在 main 上 PASS。评审第 1 轮 PASS。
 
 ## D. 收尾
 
