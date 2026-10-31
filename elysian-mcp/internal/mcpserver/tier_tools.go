@@ -30,11 +30,13 @@ type ConflictsOutput struct {
 func (s *Server) registerTierTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "working_set",
+		Annotations: readOnly,
 		Title:       "Load a session's working memory",
 		Description: "Return everything one holder recorded in one session, oldest first, with no ranking involved. Use it to resume a conversation rather than to search it.",
 	}, s.workingSetTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "memory_conflicts",
+		Annotations: readOnly,
 		Title:       "List unsettled memory conflicts",
 		Description: "Return disagreements the store noticed between two memories and nobody has settled. While one stands, a search answers with the newer side and hides the older one.",
 	}, s.conflictsTool)

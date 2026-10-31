@@ -23,6 +23,7 @@ type CardOutput struct {
 func (s *Server) registerCardTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "elysian_card",
+		Annotations: readOnly,
 		Title:       "Capability card",
 		Description: "What this store can answer, derived from what it holds: schema version, senses present, which holders exist and what they hold, and what is mounted. No memory text is shown, so it is safe to read before trusting the store.",
 	}, s.cardTool)

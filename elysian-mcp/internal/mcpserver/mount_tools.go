@@ -30,26 +30,31 @@ type MountStateOutput struct {
 func (s *Server) registerMountTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mounted_cartridges",
+		Annotations: readOnly,
 		Title:       "Mounted cartridges",
 		Description: "Report which cartridges are mounted. A mounted cartridge narrows every later search; nothing mounted means the whole library is searchable.",
 	}, s.mountsTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mount_cartridge",
+		Annotations: additive,
 		Title:       "Mount a cartridge",
 		Description: "Add one cartridge to the mounted set. The server refuses a cartridge whose KV fingerprint does not match this machine, because mismatched RoPE or quantization settings attend to wrong positions instead of failing.",
 	}, s.mountTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "switch_cartridge",
+		Annotations: additive,
 		Title:       "Switch to one cartridge",
 		Description: "Mount one cartridge and nothing else.",
 	}, s.switchTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "unmount_cartridge",
+		Annotations: additive,
 		Title:       "Unmount a cartridge",
 		Description: "Remove one cartridge from the mounted set and report what is left.",
 	}, s.unmountTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "append_to_cartridge",
+		Annotations: appends,
 		Title:       "Append memories to a cartridge",
 		Description: "Add atoms to an existing cartridge. The bundle and its DNA are rewritten, so the cartridge id keeps describing the bytes it holds.",
 	}, s.appendTool)

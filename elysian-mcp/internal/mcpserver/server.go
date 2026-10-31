@@ -59,6 +59,16 @@ func (s *Server) registerResources(server *mcp.Server) {
 	addFileResource(server, "elysian://project/mcp-research", "Elysian MCP research notes", filepath.Join(s.cfg.ProjectRoot, "elysian-mcp", "docs", "RESEARCH.md"))
 }
 
+// Hints a client reads to run a tool without asking: reads change nothing, writes add or close
+// memories without destroying them, and only forget removes one.
+var (
+	no, yes     = false, true
+	readOnly    = &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}
+	additive    = &mcp.ToolAnnotations{DestructiveHint: &no, IdempotentHint: true, OpenWorldHint: &no}
+	appends     = &mcp.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &no}
+	destructive = &mcp.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &no}
+)
+
 // addFileResource registers a project document only when it exists on disk.
 // External deployments rarely ship the Elysian repository documents, so a
 // missing file is a normal condition and the resource is simply omitted.

@@ -93,46 +93,55 @@ type GetProofSuiteOutput struct {
 func (s *Server) registerTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "elysian_status",
+		Annotations: readOnly,
 		Title:       "Elysian status",
 		Description: "Return read-only counts and cache layer status from the local Elysian database.",
 	}, s.statusTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_cartridges",
+		Annotations: readOnly,
 		Title:       "List Context Cartridges",
 		Description: "List local Elysian Context Cartridges with DNA, token-equivalent capacity, and manifest JSON.",
 	}, s.listCartridgesTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_cartridge",
+		Annotations: readOnly,
 		Title:       "Get Context Cartridge",
 		Description: "Read one local Elysian Context Cartridge, including artifacts, memory capsule index, and asset report when present.",
 	}, s.getCartridgeTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search_atoms",
+		Annotations: readOnly,
 		Title:       "Search Evidence Atoms",
 		Description: "Search the local Elysian FTS index and return ranked Evidence Atoms.",
 	}, s.searchAtomsTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "fetch_atom",
+		Annotations: readOnly,
 		Title:       "Fetch Evidence Atom",
 		Description: "Read one Evidence Atom by exact atom id.",
 	}, s.fetchAtomTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "compile_context",
+		Annotations: readOnly,
 		Title:       "Compile Evidence Context",
 		Description: "Compile a question into an Elysian evidence pack using local retrieval and the same profile names as the app.",
 	}, s.compileContextTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_proof_suites",
+		Annotations: readOnly,
 		Title:       "List Proof Suites",
 		Description: "List local PRD proof suites from .elysian/data/eval_proofs.",
 	}, s.listProofSuitesTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_hashhop_proofs",
+		Annotations: readOnly,
 		Title:       "List HashHop Proofs",
 		Description: "Aggregate local HashHop and Visual HashHop long-context addressing proofs by kind, hop count, and token budget, with pass counts and example proofs.",
 	}, s.listHashHopProofsTool)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_proof_suite",
+		Annotations: readOnly,
 		Title:       "Get Proof Suite",
 		Description: "Read one local PRD proof suite by id, including all checks and a summary of its HashHop proofs.",
 	}, s.getProofSuiteTool)

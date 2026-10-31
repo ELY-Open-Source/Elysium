@@ -26,18 +26,21 @@ func (s *Server) registerDirectoryTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Title:       "Who knows",
 		Name:        "who_knows",
+		Annotations: readOnly,
 		Description: "Rank the holders whose memories answer a query, with the evidence and how to reach them. The directory counts memories the asker cannot read; that is the point. no_holder_knows is a result, not a failure.",
 	}, s.whoKnows)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Title:       "Ask and get referred",
 		Name:        "ask",
+		Annotations: readOnly,
 		Description: "Ask the asker's own memory, then the directory. answered means somebody's memory matched; referred means the best holder's memory is private, so the answer is the pointer and contact, never the text.",
 	}, s.askMemory)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Title:       "List holders",
 		Name:        "list_holders",
+		Annotations: readOnly,
 		Description: "List registered holders: the people, agents, and services a referral can walk to.",
 	}, s.listHolders)
 }
