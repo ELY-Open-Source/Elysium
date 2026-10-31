@@ -98,9 +98,31 @@ func TestAProjectLinkToTheGlobalStoreIsTheSameStore(t *testing.T) {
 
 func TestTheProjectRootIsTheWorkingDirectoryNotTheHomesParent(t *testing.T) {
 	root := user(t)
-	store(t, filepath.Join(root, "user", ".elysian", "data", "elysian.sqlite"))
 	cfg, err := Resolve("", "", "")
 	if err != nil || cfg.ProjectRoot != filepath.Join(root, "project") {
 		t.Fatalf("the project root must be the working directory, got %q, %v", cfg.ProjectRoot, err)
+	}
+}
+
+func TestTheTokenFileIsReadUnlessTheEnvironmentNamesOne(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("ELYSIAN_AUTH_TOKEN", "")
+	if token, err := resolveToken(home); err != nil || token != "" {
+		t.Fatalf("no token anywhere must read as none, got %q, %v", token, err)
+	}
+	store(t, filepath.Join(home, "auth_token"))
+	if token, err := resolveToken(home); err != nil || token != "store" {
+		t.Fatalf("the token file must be read, got %q, %v", token, err)
+	}
+	t.Setenv("ELYSIAN_AUTH_TOKEN", "from-env")
+	if token, err := resolveToken(home); err != nil || token != "from-env" {
+		t.Fatalf("the environment must win, got %q, %v", token, err)
+	}
+	t.Setenv("ELYSIAN_AUTH_TOKEN", "")
+	if err := os.WriteFile(filepath.Join(home, "auth_token"), []byte("\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveToken(home); err == nil || !strings.Contains(err.Error(), "is empty; delete it and run `elysian init`") {
+		t.Fatalf("an empty token file must stop the server, got %v", err)
 	}
 }

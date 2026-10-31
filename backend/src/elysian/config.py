@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 OLD_ENV_PREFIXES = ("ELY_EYE_", "ELYSIUM_")
 OLD_HOME_NAMES = (".ely_eye", ".elysium")
 OLD_DATABASE_NAMES = ("ely_eye.sqlite", "elysium.sqlite")
+TOKEN_FILE = "auth_token"
 
 
 class Settings(BaseSettings):
@@ -88,7 +89,13 @@ class Settings(BaseSettings):
         refuse_old_names(self, dict(os.environ), Path.cwd())
         if "home" not in self.model_fields_set:
             refuse_project_store(self.home, Path.cwd())
+        if self.auth_token is None and self.token_file.is_file():
+            self.auth_token = read_token(self.token_file)
         return self
+
+    @property
+    def token_file(self) -> Path:
+        return self.home / TOKEN_FILE
 
     def ensure_dirs(self) -> None:
         for path in (
@@ -100,6 +107,14 @@ class Settings(BaseSettings):
             self.adapters_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
+
+
+def read_token(path: Path) -> str:
+    """The operator token `elysian init` wrote; an empty file is a broken install, not an open door."""
+    token = path.read_text(encoding="utf-8").strip()
+    if not token:
+        raise SystemExit(f"{path} is empty; delete it and run `elysian init` to write a new token")
+    return token
 
 
 def refuse_project_store(home: Path, cwd: Path) -> None:

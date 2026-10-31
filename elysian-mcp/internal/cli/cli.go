@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ELY-Open-Source/Elysian/elysian-mcp/internal/backend"
 	"github.com/ELY-Open-Source/Elysian/elysian-mcp/internal/config"
 	"github.com/ELY-Open-Source/Elysian/elysian-mcp/internal/mcpserver"
 	"github.com/ELY-Open-Source/Elysian/elysian-mcp/internal/setup"
@@ -52,6 +53,12 @@ func runServer(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := backend.Ensure(ctx, cfg.APIBaseURL, cfg.ElysianHome); err != nil {
+		return err
+	}
+	if err := config.RequireDatabase(cfg); err != nil {
+		return err
+	}
 	return mcpserver.Run(ctx, cfg, version)
 }
 
@@ -92,6 +99,9 @@ func runStatus(ctx context.Context, args []string) error {
 	}
 	cfg, err := config.Resolve(*projectRoot, *elysianHome, "")
 	if err != nil {
+		return err
+	}
+	if err := config.RequireDatabase(cfg); err != nil {
 		return err
 	}
 	db, err := store.Open(ctx, cfg)

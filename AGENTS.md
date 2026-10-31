@@ -102,6 +102,13 @@ not `[x]` before the reviewer returns PASS. Read the reviewer's verdict from its
 session JSONL (the last assistant text block), not from a pane scroll-back that
 may show an older round.
 
+## Local install contract
+
+`elysian init` makes `~/.elysian` and an owner-only operator token in `~/.elysian/auth_token`.
+The backend (`config.read_token`) and Go (`config.resolveToken`) read it when `ELYSIAN_AUTH_TOKEN`
+is unset; an empty file stops both. `elysian-mcp server` starts `elysian serve` when the local API
+is down (`internal/backend`); `scripts/mcp_autostart_smoke.sh` proves it end to end.
+
 ## Cross-language contract
 
 `backend/src/elysian/schemas.py` is the source of truth. `elysian-mcp/internal/domain/types.go`

@@ -2,7 +2,7 @@
 
 Elysian MCP exposes a local Context Cartridge memory store as a stdio Model Context Protocol server for coding agents such as Codex and Claude Code.
 
-The server is local-first. Reads open `<elysian-home>/data/elysian.sqlite` read-only; writes go through the Elysian API, which owns the memory rules.
+The server is local-first. Reads open `<elysian-home>/data/elysian.sqlite` read-only; writes go through the Elysian API, which owns the memory rules. When the API at `ELYSIAN_API` (default `http://127.0.0.1:8765`) does not answer, `server` starts `elysian serve` for the same home in its own session, waits up to 90 s for `/api/status`, and logs to `<elysian-home>/logs/api.log`; a remote `ELYSIAN_API` is never started. The operator token is `ELYSIAN_AUTH_TOKEN`, else `<elysian-home>/auth_token`, which `elysian init` writes.
 
 The home follows the backend's rule: `--elysian-home`, else `ELYSIAN_HOME`, else `~/.elysian`. A per-project store left in the working directory stops the server with the command that keeps it.
 

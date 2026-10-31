@@ -20,6 +20,7 @@ type Config struct {
 	Database    string `json:"database"`
 	Binary      string `json:"binary"`
 	APIBaseURL  string `json:"api_base_url"`
+	Token       string `json:"-"`
 }
 
 // Resolve locates the Elysian data home and its SQLite database by the backend's rule:
@@ -33,9 +34,9 @@ func Resolve(projectRoot string, elysianHome string, binary string) (Config, err
 	if err != nil {
 		return Config{}, err
 	}
-	db := filepath.Join(home, "data", "elysian.sqlite")
-	if _, err := os.Stat(db); err != nil {
-		return Config{}, errors.New("Elysian database is required at " + db)
+	token, err := resolveToken(home)
+	if err != nil {
+		return Config{}, err
 	}
 	root := projectRoot
 	if root == "" {
@@ -57,10 +58,39 @@ func Resolve(projectRoot string, elysianHome string, binary string) (Config, err
 	return Config{
 		ProjectRoot: root,
 		ElysianHome: home,
-		Database:    db,
+		Database:    filepath.Join(home, "data", "elysian.sqlite"),
 		Binary:      binary,
 		APIBaseURL:  apiBaseURL(),
+		Token:       token,
 	}, nil
+}
+
+// RequireDatabase names the missing store instead of letting SQLite say it cannot open a file.
+func RequireDatabase(cfg Config) error {
+	if !exists(cfg.Database) {
+		return errors.New("no Elysian store at " + cfg.Database + "; run `elysian init`")
+	}
+	return nil
+}
+
+// resolveToken mirrors the backend: ELYSIAN_AUTH_TOKEN, else the token `elysian init` wrote.
+func resolveToken(home string) (string, error) {
+	if token := strings.TrimSpace(os.Getenv("ELYSIAN_AUTH_TOKEN")); token != "" {
+		return token, nil
+	}
+	path := filepath.Join(home, "auth_token")
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	token := strings.TrimSpace(string(raw))
+	if token == "" {
+		return "", errors.New(path + " is empty; delete it and run `elysian init` to write a new token")
+	}
+	return token, nil
 }
 
 // apiBaseURL points at the Elysian API that owns every write rule.

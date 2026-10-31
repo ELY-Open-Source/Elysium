@@ -27,13 +27,15 @@ func Run(ctx context.Context, cfg config.Config, version string) error {
 		return err
 	}
 	defer db.Close()
-	server := &Server{cfg: cfg, store: db, api: apiclient.New(cfg.APIBaseURL), version: version}
+	api := apiclient.New(cfg.APIBaseURL)
+	api.Token = cfg.Token
+	server := &Server{cfg: cfg, store: db, api: api, version: version}
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "elysian",
 		Title:   "Elysian Context Cartridge MCP",
 		Version: version,
 	}, &mcp.ServerOptions{
-		Instructions: "Use Elysian tools to retrieve local cartridge context, evidence atoms, proof suites, and compiled evidence packs. Read tools mirror local Elysian state without writing. remember, supersede_memory and forget_memory mutate memory through the Elysian API, which must be running (`elysian serve`); the server, not the caller, decides who owns a memory. mount_cartridge and switch_cartridge decide what a search may see: mount a cartridge to ask only that cartridge, and unmount everything to ask the whole library. working_set reloads what one session already recorded, in order, without searching; memory_conflicts reports what the store has not reconciled, and settling one is the operator's act, not a tool's. elysian_card says what the store can answer before anything is sent: schema version, which senses its memory covers, and who holds what. A read with no ELYSIAN_AUTH_TOKEN sees only memories nobody owns and memories marked for everyone, so a private answer needs the token.",
+		Instructions: "Use Elysian tools to retrieve local cartridge context, evidence atoms, proof suites, and compiled evidence packs. Read tools mirror local Elysian state without writing. remember, supersede_memory and forget_memory mutate memory through the Elysian API, which this server starts when it is down; the server, not the caller, decides who owns a memory. mount_cartridge and switch_cartridge decide what a search may see: mount a cartridge to ask only that cartridge, and unmount everything to ask the whole library. working_set reloads what one session already recorded, in order, without searching; memory_conflicts reports what the store has not reconciled, and settling one is the operator's act, not a tool's. elysian_card says what the store can answer before anything is sent: schema version, which senses its memory covers, and who holds what. A read with no operator token (ELYSIAN_AUTH_TOKEN or the one `elysian init` wrote) sees only memories nobody owns and memories marked for everyone.",
 	})
 	server.registerTools(mcpServer)
 	server.registerWriteTools(mcpServer)

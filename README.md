@@ -157,9 +157,13 @@ is no index to rebuild.
 
 `elysian-mcp/` is a Go MCP server. One command builds a native binary and
 registers it with Codex and Claude Code. Reads mirror the store; writes go
-through the API, so the write rules live in one place. A read with no
-`ELYSIAN_AUTH_TOKEN` sees only memories nobody owns and memories marked for
-everyone; `elysian_card` answers "can this store answer my kind of question"
+through the API, so the write rules live in one place. When the API is down, the
+MCP server starts `elysian serve` for the same home, waits for it to answer, and
+leaves it running for the next client; its log is `~/.elysian/logs/api.log`.
+`elysian init` makes the store and an operator token in `~/.elysian/auth_token`
+(owner-only, never printed) that the API and the MCP server both read when
+`ELYSIAN_AUTH_TOKEN` is unset. A read with no operator token sees only memories
+nobody owns and memories marked for everyone; `elysian_card` answers "can this store answer my kind of question"
 before anything sensitive is sent, and it carries no memory text.
 
 ```bash
