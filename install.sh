@@ -169,14 +169,17 @@ EOF
 elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
   SERVICE="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/elysian.service"
   mkdir -p "$(dirname -- "$SERVICE")"
-  # systemd reads % as a specifier; a path holding one must double it.
+  # systemd refuses a program path holding a quote, backslash or control character; % is a specifier.
+  [[ "$BIN_DIR" != *[\"\\[:cntrl:]]* ]] || fail "systemd cannot run a program from $BIN_DIR: the path holds a quote, backslash or control character; set ELYSIAN_HOME to a plainer path"
+  UNIT_HOME="${HOME_DIR//%/%%}"
+  UNIT_EXEC="${BIN_DIR//%/%%}/elysian"
   cat > "$SERVICE" <<EOF
 [Unit]
 Description=Elysian local memory API
 
 [Service]
-Environment="ELYSIAN_HOME=${HOME_DIR//%/%%}"
-ExecStart="${BIN_DIR//%/%%}/elysian" serve
+Environment="ELYSIAN_HOME=$UNIT_HOME"
+ExecStart="$UNIT_EXEC" serve
 Restart=on-failure
 RestartSec=5
 
@@ -190,8 +193,17 @@ else
   echo "no systemd user session here, so nothing starts at sign-in; the MCP server starts the API when an agent first calls it"
 fi
 if [[ -n "$SERVICE" ]]; then
-  for _ in $(seq 90); do curl -fsS http://127.0.0.1:8765/api/status >/dev/null 2>&1 && break; sleep 1; done
-  curl -fsS http://127.0.0.1:8765/api/status >/dev/null 2>&1 || fail "the sign-in service $SERVICE did not answer at 127.0.0.1:8765 within 90 s; see $HOME_DIR/logs/api.log or journalctl --user -u elysian"
+  # Another store's API on the port would answer too; only this home counts.
+  served() { curl -fsS --max-time 2 http://127.0.0.1:8765/api/status | "$PYTHON" -c 'import json, os, sys; print(os.path.realpath(json.load(sys.stdin)["data_home"]))'; }
+  WANT="$(cd -- "$HOME_DIR" && pwd -P)"
+  GOT=""
+  DEADLINE=$((SECONDS + 90))
+  while ((SECONDS < DEADLINE)); do
+    GOT="$(served 2>/dev/null || true)"
+    [[ "$GOT" == "$WANT" ]] && break
+    sleep 1
+  done
+  [[ "$GOT" == "$WANT" ]] || fail "the sign-in service $SERVICE did not serve $WANT at 127.0.0.1:8765 within 90 s (it answered: ${GOT:-nothing}); see $HOME_DIR/logs/api.log or journalctl --user -u elysian"
   echo "the API runs from $SERVICE and starts at every sign-in"
 fi
 
