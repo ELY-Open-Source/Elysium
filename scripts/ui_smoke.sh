@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # The console is proven by driving it: a fresh home, the built interface served by the
-# API itself, and a browser that searches, pages, forgets, mounts and reads adapter states.
+# API itself, and a browser that uploads, searches, pages, remembers, replaces, forgets, asks,
+# mounts and reads adapter states.
 # ELYSIUM_UI_SMOKE_KEEP=1 leaves the temporary home in place and prints it.
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 python="${PYTHON:-$repo/.venv/bin/python}"
@@ -30,7 +31,7 @@ cleanup() {
 trap cleanup EXIT
 
 if [[ ! -f "$repo/frontend/dist/index.html" ]]; then
-  (cd "$repo/frontend" && npm run build)
+  (cd "$repo/frontend" && pnpm build)
 fi
 
 export ELYSIUM_HOME="$home"
@@ -69,4 +70,4 @@ fi
 
 (cd "$repo/frontend" && ELYSIUM_API="$api" ELYSIUM_UI_URL="$api/" ELYSIUM_UI_SMOKE_DIR="$home" node scripts/verify-ui.mjs)
 
-echo "PASS: the console searches, pages, forgets, mounts and reports adapter states"
+echo "PASS: the console uploads, searches, pages, remembers, replaces, forgets, asks, mounts and reports adapter states"
