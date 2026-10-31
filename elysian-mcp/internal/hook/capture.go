@@ -21,6 +21,9 @@ const (
 	recallBudget = 3000
 )
 
+// secretKeys name a field whose value is a credential, whatever its length or punctuation.
+const secretKeys = `token|password|passwd|secret|api[_-]?key|access[_-]?key|private[_-]?key`
+
 // secrets are credentials a user may paste; they are masked before anything is stored.
 var secrets = []*regexp.Regexp{
 	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----`),
@@ -30,7 +33,9 @@ var secrets = []*regexp.Regexp{
 	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
 	regexp.MustCompile(`\bAIza[0-9A-Za-z_\-]{35}\b`),
 	regexp.MustCompile(`(?i)\bbearer\s+[^\s"',}]{8,}`),
-	regexp.MustCompile(`(?i)\b[\w-]*(token|password|passwd|secret|api[_-]?key|access[_-]?key|private[_-]?key)[\w-]*["']?\s*[:=]\s*["']?[^\s"',}]{8,}`),
+	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*"[^"]*"`),
+	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*'[^']*'`),
+	regexp.MustCompile(`(?i)\b[\w-]*(` + secretKeys + `)[\w-]*["']?\s*[:=]\s*[^\s"']\S*`),
 }
 
 // capturable returns the prompt as it will be stored, or false for a command, a one-word reply,

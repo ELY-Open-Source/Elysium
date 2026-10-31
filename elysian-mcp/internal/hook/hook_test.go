@@ -210,8 +210,8 @@ func TestAFailedTurnIsRetriedNotSkippedAndJSONSecretsAreMasked(t *testing.T) {
 
 func TestReviewRoundOneFindings(t *testing.T) {
 	t.Run("prefixed environment names and JSON keys are masked", func(t *testing.T) {
-		text, _ := capturable(`run with ELYSIAN_AUTH_TOKEN=abcd1234efgh AWS_SECRET_ACCESS_KEY=wxyz98765432 {"password":"hunter2hunter2"}`)
-		for _, secret := range []string{"abcd1234efgh", "wxyz98765432", "hunter2hunter2"} {
+		text, _ := capturable(`run with ELYSIAN_AUTH_TOKEN=abcd1234efgh AWS_SECRET_ACCESS_KEY=wxyz98765432 {"password":"correct horse, battery"} passwd=hunt,er2 api_key: 'short'`)
+		for _, secret := range []string{"abcd1234efgh", "wxyz98765432", "horse", "battery", "er2", "short"} {
 			if strings.Contains(text, secret) {
 				t.Fatalf("%s leaked in %q", secret, text)
 			}
@@ -252,4 +252,57 @@ func TestReviewRoundOneFindings(t *testing.T) {
 			t.Fatalf("got %v", api.order)
 		}
 	})
+}
+
+func TestAClaimTakenAfterTheHolderFinishedIsDropped(t *testing.T) {
+	home := t.TempDir()
+	m := marker{home, "prompt", "agy", "c1", "We ship on Fridays."}
+	if err := m.mark(); err != nil {
+		t.Fatal(err)
+	}
+	if claimed, err := m.claim(); err != nil || claimed {
+		t.Fatalf("a finished prompt must not be claimed, got %v %v", claimed, err)
+	}
+	path, want := m.path()
+	if _, err := os.Stat(path + "." + want[:16] + ".lock"); !os.IsNotExist(err) {
+		t.Fatal("no claim may be left behind")
+	}
+}
+
+func TestFiftyHooksFiredTogetherHandleOnePromptOnce(t *testing.T) {
+	home := t.TempDir()
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	handled := 0
+	for range 50 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m := marker{home, "prompt", "agy", "c1", "We ship on Fridays."}
+			claimed, err := m.claim()
+			if err != nil || !claimed {
+				return
+			}
+			defer m.release()
+			mu.Lock()
+			handled++
+			mu.Unlock()
+			m.mark()
+		}()
+	}
+	wg.Wait()
+	if handled != 1 {
+		t.Fatalf("one prompt was handled %d times", handled)
+	}
+}
+
+func TestQuotedPasswordsAreMaskedWhole(t *testing.T) {
+	for _, prompt := range []string{`{"password":"correct horse battery staple"}`, `{"password":"abcd1234,efgh5678"}`} {
+		text, _ := capturable("save this config " + prompt)
+		for _, part := range []string{"horse", "staple", "abcd1234", "efgh5678"} {
+			if strings.Contains(text, part) {
+				t.Fatalf("%q leaked from %q: %q", part, prompt, text)
+			}
+		}
+	}
 }

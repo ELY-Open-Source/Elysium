@@ -244,7 +244,16 @@ func (m marker) claim() (bool, error) {
 	for attempt := 0; attempt < 2; attempt++ {
 		file, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
-			return true, file.Close()
+			if err := file.Close(); err != nil {
+				return false, err
+			}
+			// The holder before us may have finished between our check and our claim.
+			done, err := m.done()
+			if err != nil || done {
+				m.release()
+				return false, err
+			}
+			return true, nil
 		}
 		if !errors.Is(err, os.ErrExist) {
 			return false, err
