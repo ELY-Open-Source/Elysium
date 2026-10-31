@@ -113,6 +113,13 @@ is down (`internal/backend`), using the `elysian` the installer links beside the
 `scripts/mcp_autostart_smoke.sh` proves it end to end. `install.sh` / `install.ps1` at the root are the only
 installers: uv, `uv tool install` of the backend at the release tag, `elysian init`, the release binary, `elysian-mcp setup`.
 
+## Public site
+
+`site/` is the public site: pnpm, Vite, three.js and Lenis, an assets-only Cloudflare Worker
+`elysian-site` on `elysian.elydora.com` (`site/wrangler.jsonc`). Scroll is time: every frame is drawn
+from one value, so scrolling back rewinds. Its numbers come only from `README.md` and `bench/reports/`.
+Gate: `cd site && pnpm build && node scripts/check.mjs --out <dir>` with `pnpm preview` running.
+
 ## Cross-language contract
 
 `backend/src/elysian/schemas.py` is the source of truth. `elysian-mcp/internal/domain/types.go`

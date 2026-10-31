@@ -215,6 +215,7 @@ bench/       the benchmark suite: frozen third-party corpora, harnesses, reports
 frontend/    the local dashboard (Vite + React)
 scripts/     install, serving, runtimes, smoke (.sh on Linux/macOS, .ps1 on Windows)
 elysian-mcp/ Go: the MCP server
+site/        the public site at elysian.elydora.com (pnpm, Vite, three.js, Lenis; a Cloudflare Worker)
 ```
 
 `CHECKLIST.md` is the ordered work list with the acceptance line for every item;
