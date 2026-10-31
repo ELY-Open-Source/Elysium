@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -16,26 +17,35 @@ import (
 // editJSON applies change to the JSON object in path, creating it when absent; a file that is not
 // a JSON object is left untouched and named, so a hand-written config is never clobbered.
 func editJSON(path string, change func(document map[string]any) error) error {
+	encoded, err := planJSON(path, change)
+	if err != nil {
+		return err
+	}
+	return writeAtomic(path, encoded)
+}
+
+// planJSON is editJSON without the write, for a change that must land with another file or not at all.
+func planJSON(path string, change func(document map[string]any) error) ([]byte, error) {
 	document := map[string]any{}
 	data, err := os.ReadFile(path)
 	if err == nil && strings.TrimSpace(string(data)) != "" {
 		if err := json.Unmarshal(data, &document); err != nil {
-			return errors.New(path + " is not a JSON object, so it was left untouched: " + err.Error())
+			return nil, errors.New(path + " is not a JSON object, so it was left untouched: " + err.Error())
 		}
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
+		return nil, err
 	}
 	if err := change(document); err != nil {
-		return err
+		return nil, err
 	}
 	var encoded bytes.Buffer
 	encoder := json.NewEncoder(&encoded)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(document); err != nil {
-		return err
+		return nil, err
 	}
-	return writeAtomic(path, encoded.Bytes())
+	return encoded.Bytes(), nil
 }
 
 // editJSONRead hands a readable JSON object in path to look; an absent or broken file shows nothing.
@@ -98,15 +108,15 @@ func ours(handler any) bool {
 	return strings.Contains(string(text), "elysian-mcp") && strings.Contains(string(text), "hook")
 }
 
-// replaceGroups drops our handlers under one Claude-style event (event -> [{matcher, hooks:[...]}]),
-// keeping every other handler and any group still holding one, then appends fresh groups; a re-run
-// never stacks duplicates and never takes a user's handler with ours.
+// replaceGroups puts fresh groups under one Claude-style event (event -> [{matcher, hooks:[...]}]) where
+// ours stood, so no other group changes position (Codex ties a hook's trust to its position); our
+// handlers leave mixed groups, a user's handler never leaves with them, and a re-run adds nothing.
 func replaceGroups(hooks map[string]any, event string, fresh []any, path string) error {
 	groups, ok := hooks[event].([]any)
 	if hooks[event] != nil && !ok {
 		return errors.New(path + ` holds hooks.` + event + ` that is not a list, so it was left untouched`)
 	}
-	kept := []any{}
+	kept, placed := []any{}, false
 	for _, group := range groups {
 		entry, isGroup := group.(map[string]any)
 		handlers, hasHandlers := entry["hooks"].([]any)
@@ -120,44 +130,87 @@ func replaceGroups(hooks map[string]any, event string, fresh []any, path string)
 				theirs = append(theirs, handler)
 			}
 		}
-		if len(theirs) == 0 {
-			continue
+		switch {
+		case len(theirs) == len(handlers):
+			kept = append(kept, group)
+		case len(theirs) > 0:
+			entry["hooks"] = theirs
+			kept = append(kept, entry)
+		case !placed:
+			kept, placed = append(kept, fresh...), true
 		}
-		entry["hooks"] = theirs
-		kept = append(kept, entry)
 	}
-	hooks[event] = append(kept, fresh...)
+	if !placed {
+		kept = append(kept, fresh...)
+	}
+	hooks[event] = kept
 	return nil
 }
 
-// plainPath matches a path every shell runs unquoted.
-var plainPath = regexp.MustCompile(`^[A-Za-z0-9_./:\\-]+$`)
+// Words a shell reads literally without quotes: POSIX shells treat a backslash as an escape,
+// Windows shells read it as a path separator.
+var (
+	plainPosix   = regexp.MustCompile(`^[A-Za-z0-9_./:-]+$`)
+	plainWindows = regexp.MustCompile(`^[A-Za-z0-9_./:\\-]+$`)
+)
 
-// shellCommand is the hook command line for a client's shell: posix sh, cmd.exe or PowerShell;
-// every word that needs it is quoted, the program and its arguments alike.
-func shellCommand(binary, shell string, args ...string) string {
+// shellCommand is the hook command line for a client's shell: "sh", "cmd", "pwsh", or "plain" for a
+// Windows shell nobody documented, which takes only words that need no quoting at all.
+func shellCommand(binary, shell string, args ...string) (string, error) {
 	words := make([]string, 0, len(args)+1)
 	for _, word := range append([]string{binary}, args...) {
-		words = append(words, quote(word, shell))
+		quoted, err := quote(word, shell)
+		if err != nil {
+			return "", err
+		}
+		words = append(words, quoted)
 	}
 	if shell == "pwsh" {
-		return "& " + strings.Join(words, " ")
+		return "& " + strings.Join(words, " "), nil
 	}
-	return strings.Join(words, " ")
+	return strings.Join(words, " "), nil
 }
 
-func quote(word, shell string) string {
-	if plainPath.MatchString(word) {
-		return word
-	}
+func quote(word, shell string) (string, error) {
 	switch shell {
+	case "sh":
+		if plainPosix.MatchString(word) {
+			return word, nil
+		}
+		return `'` + strings.ReplaceAll(word, `'`, `'\''`) + `'`, nil
 	case "pwsh":
-		return `'` + strings.ReplaceAll(word, `'`, `''`) + `'`
+		if plainWindows.MatchString(word) {
+			return word, nil
+		}
+		return `'` + strings.ReplaceAll(word, `'`, `''`) + `'`, nil
 	case "cmd":
-		return `"` + word + `"`
+		// cmd.exe expands %VARIABLES% even inside quotes, and a quote cannot be escaped in one.
+		if strings.ContainsAny(word, `%"`) {
+			return "", errors.New(word + " holds % or \", which cmd.exe cannot pass through literally; use a path without them")
+		}
+		if plainWindows.MatchString(word) {
+			return word, nil
+		}
+		return `"` + word + `"`, nil
 	default:
-		return `'` + strings.ReplaceAll(word, `'`, `'\''`) + `'`
+		if plainWindows.MatchString(word) {
+			return word, nil
+		}
+		return "", errors.New(word + " needs quoting, and this client's Windows hook shell is undocumented; use paths without spaces")
 	}
+}
+
+// hookCommands is the command line for each event in one client's shell.
+func hookCommands(server entry, client, shell string, events ...string) (map[string]string, error) {
+	commands := map[string]string{}
+	for _, event := range events {
+		command, err := shellCommand(server.Binary, shell, hookArgs(server, client, event)...)
+		if err != nil {
+			return nil, err
+		}
+		commands[event] = command
+	}
+	return commands, nil
 }
 
 // windowsShell picks the shell a client's hooks run in on this OS.
@@ -221,14 +274,61 @@ func readTOML(path string) (string, map[string]any, error) {
 
 // writeTOMLBlock writes our block into text and refuses to save a result that does not parse.
 func writeTOMLBlock(path, text, body string) error {
+	updated, err := planTOMLBlock(path, text, body)
+	if err != nil {
+		return err
+	}
+	return writeAtomic(path, updated)
+}
+
+// planTOMLBlock is writeTOMLBlock without the write.
+func planTOMLBlock(path, text, body string) ([]byte, error) {
 	updated, err := withBlock(text, "#", body)
 	if err != nil {
-		return errors.New(path + ": " + err.Error())
+		return nil, errors.New(path + ": " + err.Error())
 	}
 	if err := toml.Unmarshal([]byte(updated), &map[string]any{}); err != nil {
-		return errors.New("Elysian's entries would make " + path + " invalid TOML, so it was left untouched: " + err.Error())
+		return nil, errors.New("Elysian's entries would make " + path + " invalid TOML, so it was left untouched: " + err.Error())
 	}
-	return writeAtomic(path, []byte(updated))
+	return []byte(updated), nil
+}
+
+// headerPath reads a table header line, [a."b".'c'], as the key path TOML gives it; any other line,
+// an array-of-tables header included, is not one.
+func headerPath(line string) ([]string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(trimmed, "[") || strings.HasPrefix(trimmed, "[[") {
+		return nil, false
+	}
+	document := map[string]any{}
+	if toml.Unmarshal([]byte(trimmed+"\n"), &document) != nil {
+		return nil, false
+	}
+	var path []string
+	for node := document; len(node) == 1; {
+		for key, value := range node {
+			path = append(path, key)
+			node, _ = value.(map[string]any)
+		}
+	}
+	return path, len(path) > 0
+}
+
+// withoutTables removes every table whose header path starts with prefix, each up to the next header.
+func withoutTables(text string, prefix ...string) string {
+	lines := strings.Split(text, "\n")
+	kept := lines[:0]
+	skipping := false
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "[") {
+			path, ok := headerPath(line)
+			skipping = ok && len(path) >= len(prefix) && slices.Equal(path[:len(prefix)], prefix)
+		}
+		if !skipping {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
 }
 
 // tomlHas reports whether a dotted path exists in a parsed TOML document.

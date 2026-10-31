@@ -163,7 +163,7 @@ func TestSessionStartNamesTheProjectsMemories(t *testing.T) {
 }
 
 func TestCaptureSkipsCommandsRepliesAndShortQuestionsAndMasksSecrets(t *testing.T) {
-	for _, skipped := range []string{"/compact", "!ls", "ok", "继续", "发布前要跑什么检查？", "what branch do we ship from?"} {
+	for _, skipped := range []string{"/compact", "!ls", "ok", "继续", "发布前要跑什么检查？", "what branch do we ship from?", `"Which host does the staging database live on?"`} {
 		if _, ok := capturable(skipped); ok {
 			t.Fatalf("%q must not be saved", skipped)
 		}

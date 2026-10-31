@@ -161,11 +161,20 @@ func TestShellCommandsQuoteForEachShell(t *testing.T) {
 		"pwsh": `& '/home/a b/elysian-mcp' hook`,
 	}
 	for shell, want := range cases {
-		if got := shellCommand("/home/a b/elysian-mcp", shell, "hook"); got != want {
-			t.Fatalf("%s: got %s, want %s", shell, got, want)
+		if got, err := shellCommand("/home/a b/elysian-mcp", shell, "hook"); err != nil || got != want {
+			t.Fatalf("%s: got %s %v, want %s", shell, got, err, want)
 		}
 	}
-	if _, err := plainCommand(`C:\Users\a b\elysian-mcp.exe`, "plain", "hook"); err == nil {
+	if got, _ := shellCommand("/opt/elysian-mcp", "sh", `memory\store`); got != `/opt/elysian-mcp 'memory\store'` {
+		t.Fatalf("a POSIX shell must not read a backslash as an escape, got %s", got)
+	}
+	if got, _ := shellCommand(`C:\Users\a\elysian-mcp.exe`, "pwsh", "hook"); got != `& C:\Users\a\elysian-mcp.exe hook` {
+		t.Fatalf("a Windows path needs no quoting in PowerShell, got %s", got)
+	}
+	if _, err := shellCommand(`C:\%HOME%\elysian-mcp.exe`, "cmd", "hook"); err == nil {
+		t.Fatal("cmd.exe expands %VARIABLES% inside quotes, so such a path must be refused")
+	}
+	if _, err := shellCommand(`C:\Users\a b\elysian-mcp.exe`, "plain", "hook"); err == nil {
 		t.Fatal("a path that needs quoting must be refused for an undocumented shell")
 	}
 }
@@ -201,7 +210,7 @@ func TestReviewOfP63(t *testing.T) {
 		if prompt := mustJSON(groups(t, readJSON(t, filepath.Join(home, ".qwen", "settings.json")), "UserPromptSubmit")); !strings.Contains(prompt, `--elysian-home '/data/memory store' prompt`) {
 			t.Fatalf("got %s", prompt)
 		}
-		if _, err := plainCommand("/opt/elysian-mcp", "plain", "--elysian-home", "/data/memory store"); err == nil {
+		if _, err := shellCommand("/opt/elysian-mcp", "plain", "--elysian-home", "/data/memory store"); err == nil {
 			t.Fatal("an argument that needs quoting must be refused for an undocumented shell")
 		}
 	})
@@ -260,6 +269,55 @@ func TestReviewOfP63(t *testing.T) {
 		server := entry{Name: "elysian", Binary: "/opt/elysian-mcp", Env: map[string]string{"ELYSIAN_HOME": "/data"}}
 		if action, err := registerKimi(context.Background(), kimi, server); err != nil || !strings.HasPrefix(action.Detail, "not registered") {
 			t.Fatalf("got %+v %v", action, err)
+		}
+	})
+}
+
+func TestReviewOfP63RoundTwo(t *testing.T) {
+	t.Run("D1 a re-run keeps every other Codex hook where its trust was recorded", func(t *testing.T) {
+		home := isolate(t)
+		if _, err := wireCodex(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(home, ".codex", "hooks.json")
+		document := readJSON(t, path)
+		hooks := document["hooks"].(map[string]any)
+		hooks["UserPromptSubmit"] = append(hooks["UserPromptSubmit"].([]any), map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "mine", "timeout": 5}}})
+		data, _ := json.Marshal(document)
+		os.WriteFile(path, data, 0o600)
+		if _, err := wireCodex(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		prompt := groups(t, readJSON(t, path), "UserPromptSubmit")
+		if len(prompt) != 2 || !strings.Contains(mustJSON(prompt[0]), "elysian-mcp") || !strings.Contains(mustJSON(prompt[1]), `"mine"`) {
+			t.Fatalf("the user's hook must stay at position 1, got %s", mustJSON(prompt))
+		}
+	})
+	t.Run("D3 a trust header quoted another way is replaced, and an inline server stops before any write", func(t *testing.T) {
+		home := isolate(t)
+		dir := filepath.Join(home, ".codex")
+		os.MkdirAll(dir, 0o700)
+		key := filepath.Join(dir, "hooks.json") + ":session_start:0:0"
+		config := filepath.Join(dir, "config.toml")
+		os.WriteFile(config, []byte("[hooks.state.'"+key+"']\ntrusted_hash = \"sha256:old\"\n\n[mcp_servers.\"elysian\"]\ncommand = \"old\"\n"), 0o600)
+		if _, err := wireCodex(context.Background(), "", testServer); err != nil {
+			t.Fatal(err)
+		}
+		data, _ := os.ReadFile(config)
+		if strings.Contains(string(data), "sha256:old") || strings.Contains(string(data), `"old"`) {
+			t.Fatalf("got %s", data)
+		}
+		inline := "mcp_servers = { elysian = { command = \"x\" } }\n"
+		os.WriteFile(config, []byte(inline), 0o600)
+		hooksBefore, _ := os.ReadFile(filepath.Join(dir, "hooks.json"))
+		if _, err := wireCodex(context.Background(), "", testServer); err == nil || !strings.Contains(err.Error(), "inline") {
+			t.Fatalf("got %v", err)
+		}
+		if data, _ := os.ReadFile(config); string(data) != inline {
+			t.Fatalf("a refused config must be left as it was, got %s", data)
+		}
+		if after, _ := os.ReadFile(filepath.Join(dir, "hooks.json")); string(after) != string(hooksBefore) {
+			t.Fatal("a refusal must leave hooks.json as it was")
 		}
 	})
 }

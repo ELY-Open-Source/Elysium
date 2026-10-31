@@ -85,7 +85,7 @@ func TestARerunReplacesTheEntryAndANamedHomeIsCarried(t *testing.T) {
 		t.Fatalf("a re-run must replace the entries, got %v", err)
 	}
 	codexConfig, _ := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
-	if calls := logged(t, bin, "codex"); calls != "mcp remove elysian\n" ||
+	if calls := logged(t, bin, "codex"); calls != "" ||
 		!strings.Contains(string(codexConfig), "[mcp_servers.elysian]\ncommand = \"/opt/elysian-mcp\"\nargs = [\"server\"]\ndefault_tools_approval_mode = \"approve\"\n\n[mcp_servers.elysian.env]\nELYSIAN_HOME = \"/data/elysian\"") {
 		t.Fatalf("codex must be written with its approval mode and the named home, got %q and %s", calls, codexConfig)
 	}
@@ -113,7 +113,7 @@ func TestGeminiOpenCodeAndVSCodeAreRegisteredThroughTheirCLIs(t *testing.T) {
 	fake(t, bin, "opencode", false)
 	fake(t, bin, "code", false)
 	t.Setenv("PATH", bin)
-	isolate(t)
+	home := isolate(t)
 	result, err := Run(context.Background(), config.Config{Binary: "/opt/elysian-mcp"}, Options{Home: "/data/elysian"})
 	if err != nil {
 		t.Fatal(err)
@@ -121,8 +121,13 @@ func TestGeminiOpenCodeAndVSCodeAreRegisteredThroughTheirCLIs(t *testing.T) {
 	if calls := logged(t, bin, "gemini"); !strings.Contains(calls, "mcp add --scope user --trust --env ELYSIAN_HOME=/data/elysian elysian /opt/elysian-mcp server") {
 		t.Fatalf("gemini must be registered user-wide, got %q", calls)
 	}
-	if calls := logged(t, bin, "opencode"); !strings.Contains(calls, "mcp add elysian --env ELYSIAN_HOME=/data/elysian -- /opt/elysian-mcp server") {
-		t.Fatalf("opencode must be registered, got %q", calls)
+	openCode, _ := os.ReadFile(filepath.Join(home, ".config", "opencode", "opencode.json"))
+	plugin, _ := os.ReadFile(filepath.Join(home, ".config", "opencode", "plugins", "elysian.js"))
+	if !strings.Contains(string(openCode), `"command": [
+        "/opt/elysian-mcp",
+        "server"
+      ]`) || !strings.Contains(string(plugin), `const BINARY = "/opt/elysian-mcp";`) || !strings.Contains(string(plugin), `const HOME = "/data/elysian";`) {
+		t.Fatalf("opencode must get its global entry and plugin, got %s\n%.300s", openCode, plugin)
 	}
 	code := logged(t, bin, "code")
 	if wsl() {

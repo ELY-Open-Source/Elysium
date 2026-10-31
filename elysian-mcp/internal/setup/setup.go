@@ -114,18 +114,14 @@ func Run(ctx context.Context, cfg config.Config, options Options) (Result, error
 	return result, nil
 }
 
-// registerCodex writes the server itself, since `codex mcp add` cannot set its approval mode; the old
-// entry is removed through Codex first (it exits 0 whether or not one exists).
+// registerCodex writes the server, its approval mode and its trusted hooks in one edit of Codex's
+// files; `codex mcp add` cannot set the approval mode.
 func registerCodex(ctx context.Context, codex string, server entry) (Action, error) {
-	args := []string{"mcp", "remove", server.Name}
-	if output, err := exec.CommandContext(ctx, codex, args...).CombinedOutput(); err != nil {
-		return Action{}, errors.New("codex mcp remove failed: " + strings.TrimSpace(string(output)))
-	}
 	target, err := wireCodex(ctx, codex, server)
 	if err != nil {
 		return Action{}, err
 	}
-	return Action{Client: "codex", Target: target, Detail: "registered user-wide, Elysian's tools approved; session and prompt hooks, trusted", Command: commandLine(codex, args)}, nil
+	return Action{Client: "codex", Target: target, Detail: "registered user-wide, Elysian's tools approved; session and prompt hooks, trusted"}, nil
 }
 
 func registerClaude(ctx context.Context, claude string, server entry) (Action, error) {

@@ -34,7 +34,7 @@ func registerKiro(_ context.Context, _ string, server entry) (Action, error) {
 	shell := windowsShell("plain")
 	var hooks []any
 	for _, hook := range []struct{ name, trigger, event string }{{"elysian-session", "SessionStart", "session-start"}, {"elysian-recall", "UserPromptSubmit", "prompt"}} {
-		command, err := plainCommand(server.Binary, shell, hookArgs(server, "kiro", hook.event)...)
+		command, err := shellCommand(server.Binary, shell, hookArgs(server, "kiro", hook.event)...)
 		if err != nil {
 			return Action{}, err
 		}
@@ -138,7 +138,7 @@ func registerAntigravity(_ context.Context, _ string, server entry) (Action, err
 	}
 	shell := windowsShell("plain")
 	handler := func(event string, timeout int) ([]any, error) {
-		command, err := plainCommand(server.Binary, shell, hookArgs(server, "agy", event)...)
+		command, err := shellCommand(server.Binary, shell, hookArgs(server, "agy", event)...)
 		return []any{map[string]any{"type": "command", "command": command, "timeout": timeout}}, err
 	}
 	start, err := handler("session-start", 30)
@@ -196,7 +196,10 @@ func registerKimi(ctx context.Context, kimi string, server entry) (Action, error
 	if err != nil {
 		return Action{}, err
 	}
-	command := shellCommand(server.Binary, windowsShell("cmd"), hookArgs(server, "kimi", "prompt")...)
+	command, err := shellCommand(server.Binary, windowsShell("cmd"), hookArgs(server, "kimi", "prompt")...)
+	if err != nil {
+		return Action{}, err
+	}
 	hook := "[[hooks]]\nevent = \"UserPromptSubmit\"\ncommand = \"" + tomlEscape(command) + "\"\ntimeout = 10"
 	rule := "[[permission.rules]]\ndecision = \"allow\"\npattern = \"mcp__" + server.Name + "__*\""
 	detail := "registered user-wide; prompt hook (it opens each session too); Elysian's tools allowed"
@@ -229,9 +232,17 @@ func registerCopilot(_ context.Context, _ string, server entry) (Action, error) 
 	}); err != nil {
 		return Action{}, err
 	}
+	events := []string{"session-start", "prompt", "approve"}
+	bash, err := hookCommands(server, "copilot", "sh", events...)
+	if err != nil {
+		return Action{}, err
+	}
+	powershell, err := hookCommands(server, "copilot", "pwsh", events...)
+	if err != nil {
+		return Action{}, err
+	}
 	handler := func(event string, timeout int) []any {
-		args := hookArgs(server, "copilot", event)
-		return []any{map[string]any{"type": "command", "bash": shellCommand(server.Binary, "sh", args...), "powershell": shellCommand(server.Binary, "pwsh", args...), "timeoutSec": timeout}}
+		return []any{map[string]any{"type": "command", "bash": bash[event], "powershell": powershell[event], "timeoutSec": timeout}}
 	}
 	hookPath := filepath.Join(dir, "hooks", "elysian.json")
 	if err := editJSON(hookPath, func(document map[string]any) error {
@@ -247,9 +258,12 @@ func registerCopilot(_ context.Context, _ string, server entry) (Action, error) 
 // wireCursor adds Cursor's sessionStart and beforeSubmitPrompt hooks and, for its CLI, the allow rule.
 func wireCursor(path string, server entry) (string, error) {
 	dir := filepath.Dir(path)
-	shell := windowsShell("pwsh")
+	commands, err := hookCommands(server, "cursor", windowsShell("pwsh"), "session-start", "prompt")
+	if err != nil {
+		return "", err
+	}
 	hookPath := filepath.Join(dir, "hooks.json")
-	err := editJSON(hookPath, func(document map[string]any) error {
+	err = editJSON(hookPath, func(document map[string]any) error {
 		if _, ok := document["version"]; !ok {
 			document["version"] = 1
 		}
@@ -271,7 +285,7 @@ func wireCursor(path string, server entry) (string, error) {
 					kept = append(kept, handler)
 				}
 			}
-			hooks[event] = append(kept, map[string]any{"command": shellCommand(server.Binary, shell, hookArgs(server, "cursor", spec.name)...), "timeout": spec.timeout})
+			hooks[event] = append(kept, map[string]any{"command": commands[spec.name], "timeout": spec.timeout})
 		}
 		return nil
 	})

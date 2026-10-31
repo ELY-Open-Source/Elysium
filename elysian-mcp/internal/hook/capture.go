@@ -46,7 +46,9 @@ func capturable(prompt string) (string, bool) {
 	if strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!") || runes < minRunes {
 		return "", false
 	}
-	if runes < questionRunes && (strings.HasSuffix(text, "?") || strings.HasSuffix(text, "？")) {
+	// A client may hand over the prompt in quotes, so the mark is looked for inside them.
+	bare := strings.TrimRight(text, `"'“”’ `)
+	if runes < questionRunes && (strings.HasSuffix(bare, "?") || strings.HasSuffix(bare, "？")) {
 		return "", false
 	}
 	for _, pattern := range secrets {

@@ -63,14 +63,14 @@ func wireCodex(_ context.Context, _ string, server entry) (string, error) {
 	shell := windowsShell("plain")
 	commands := map[string]string{}
 	for _, hook := range codexHooks {
-		command, err := plainCommand(server.Binary, shell, hookArgs(server, "codex", hook.name)...)
+		command, err := shellCommand(server.Binary, shell, hookArgs(server, "codex", hook.name)...)
 		if err != nil {
 			return "", err
 		}
 		commands[hook.event] = command
 	}
 	positions := map[string]int{}
-	err = editJSON(path, func(document map[string]any) error {
+	hooksFile, err := planJSON(path, func(document map[string]any) error {
 		hooks, err := object(document, "hooks", path)
 		if err != nil {
 			return err
@@ -106,10 +106,12 @@ func wireCodex(_ context.Context, _ string, server entry) (string, error) {
 	if home := server.Env["ELYSIAN_HOME"]; home != "" {
 		block.WriteString("\n[mcp_servers." + server.Name + ".env]\nELYSIAN_HOME = \"" + tomlEscape(home) + "\"\n")
 	}
+	// The server is written here whole, so an earlier definition goes, however its header is quoted.
+	text = withoutTables(text, "mcp_servers", server.Name)
 	for _, hook := range codexHooks {
 		key := absolute + ":" + hook.snake + ":" + strconv.Itoa(positions[hook.event]) + ":0"
 		// That position now holds our hook, so any trust recorded there is stale, whoever wrote it.
-		text = withoutTable(text, `[hooks.state."`+tomlEscape(key)+`"]`)
+		text = withoutTables(text, "hooks", "state", key)
 		hash, err := codexHookHash(hook.snake, hook.matcher, commands[hook.event], 30)
 		if err != nil {
 			return "", err
@@ -121,30 +123,22 @@ func wireCodex(_ context.Context, _ string, server entry) (string, error) {
 		return "", errors.New(configPath + " is not valid TOML, so it was left untouched: " + err.Error())
 	}
 	if tomlHas(theirs, "mcp_servers", server.Name) {
-		return "", errors.New(configPath + " still defines mcp_servers." + server.Name + " after `codex mcp remove`; remove it by hand")
+		return "", errors.New(configPath + " defines mcp_servers." + server.Name + " inline, so it was left untouched; move it to its own [mcp_servers." + server.Name + "] table or remove it")
 	}
-	return path + " and " + configPath, writeTOMLBlock(configPath, text, block.String())
-}
-
-// withoutTable removes one table, from its header to the next header, from TOML text.
-func withoutTable(text, header string) string {
-	lines := strings.Split(text, "\n")
-	kept := lines[:0]
-	skipping := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == header {
-			skipping = true
-			continue
-		}
-		if skipping && strings.HasPrefix(trimmed, "[") {
-			skipping = false
-		}
-		if !skipping {
-			kept = append(kept, line)
+	for _, hook := range codexHooks {
+		if tomlHas(theirs, "hooks", "state", absolute+":"+hook.snake+":"+strconv.Itoa(positions[hook.event])+":0") {
+			return "", errors.New(configPath + " records hook trust inline, so it was left untouched; remove hooks.state for " + path + " by hand")
 		}
 	}
-	return strings.Join(kept, "\n")
+	configFile, err := planTOMLBlock(configPath, text, block.String())
+	if err != nil {
+		return "", err
+	}
+	// Both files are checked before either is written, so a refusal leaves Codex as it was.
+	if err := writeAtomic(path, hooksFile); err != nil {
+		return "", err
+	}
+	return path + " and " + configPath, writeAtomic(configPath, configFile)
 }
 
 func tomlEscape(text string) string {
@@ -167,19 +161,6 @@ func outsideBlock(text string) string {
 	return text[:begin] + rest
 }
 
-// plainCommand is a command line for a shell nobody documented: no word may need quoting.
-func plainCommand(binary, shell string, args ...string) (string, error) {
-	if shell != "plain" {
-		return shellCommand(binary, shell, args...), nil
-	}
-	for _, word := range append([]string{binary}, args...) {
-		if !plainPath.MatchString(word) {
-			return "", errors.New(word + " needs quoting, and this client's Windows hook shell is undocumented; use paths without spaces")
-		}
-	}
-	return binary + " " + strings.Join(args, " "), nil
-}
-
 // registerDroid writes Factory Droid's MCP entry and hooks; the PreToolUse hook approves Elysian's
 // tools, which Droid's default autonomy level would otherwise ask about.
 func registerDroid(_ context.Context, _ string, server entry) (Action, error) {
@@ -200,12 +181,12 @@ func registerDroid(_ context.Context, _ string, server entry) (Action, error) {
 	}); err != nil {
 		return Action{}, err
 	}
-	shell := windowsShell("cmd")
-	command := func(event string) string {
-		return shellCommand(server.Binary, shell, hookArgs(server, "droid", event)...)
+	commands, err := hookCommands(server, "droid", windowsShell("cmd"), "session-start", "prompt", "approve")
+	if err != nil {
+		return Action{}, err
 	}
 	group := func(event string, timeout int) map[string]any {
-		return map[string]any{"hooks": []any{map[string]any{"type": "command", "command": command(event), "timeout": timeout}}}
+		return map[string]any{"hooks": []any{map[string]any{"type": "command", "command": commands[event], "timeout": timeout}}}
 	}
 	approve := group("approve", 5)
 	approve["matcher"] = "mcp__" + server.Name + "__.*"
@@ -250,8 +231,12 @@ func registerQwen(_ context.Context, _ string, server entry) (Action, error) {
 	}
 	path := filepath.Join(dir, "settings.json")
 	shell := windowsShell("pwsh")
+	commands, err := hookCommands(server, "qwen", shell, "session-start", "prompt")
+	if err != nil {
+		return Action{}, err
+	}
 	group := func(event, name string) map[string]any {
-		handler := map[string]any{"type": "command", "name": name, "command": shellCommand(server.Binary, shell, hookArgs(server, "qwen", event)...), "timeout": 10}
+		handler := map[string]any{"type": "command", "name": name, "command": commands[event], "timeout": 10}
 		if shell == "pwsh" {
 			handler["shell"] = "powershell"
 		}
@@ -289,9 +274,12 @@ func wireGemini(_ context.Context, _ string, server entry) (string, error) {
 		return "", err
 	}
 	path := filepath.Join(root, ".gemini", "settings.json")
-	shell := windowsShell("pwsh")
+	commands, err := hookCommands(server, "gemini", windowsShell("pwsh"), "session-start", "prompt")
+	if err != nil {
+		return "", err
+	}
 	group := func(event, name string, timeout int) map[string]any {
-		return map[string]any{"matcher": "*", "hooks": []any{map[string]any{"type": "command", "name": name, "command": shellCommand(server.Binary, shell, hookArgs(server, "gemini", event)...), "timeout": timeout}}}
+		return map[string]any{"matcher": "*", "hooks": []any{map[string]any{"type": "command", "name": name, "command": commands[event], "timeout": timeout}}}
 	}
 	return path, editJSON(path, func(document map[string]any) error {
 		hooks, err := object(document, "hooks", path)

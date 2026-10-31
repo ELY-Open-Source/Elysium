@@ -72,7 +72,7 @@ func (f grokFamily) register(_ context.Context, _ string, server entry) (Action,
 	if err := writeTOMLBlock(configPath, text, strings.Join(block, "\n\n")); err != nil {
 		return Action{}, err
 	}
-	command, err := plainCommand(server.Binary, windowsShell("plain"), hookArgs(server, f.client, "prompt")...)
+	command, err := shellCommand(server.Binary, windowsShell("plain"), hookArgs(server, f.client, "prompt")...)
 	if err != nil {
 		return Action{}, err
 	}

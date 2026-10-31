@@ -26,18 +26,6 @@ func registerGemini(ctx context.Context, gemini string, server entry) (Action, e
 	return Action{Client: "gemini", Target: settings, Detail: "registered user-wide, trusted; session and prompt hooks", Command: commandLine(gemini, args)}, nil
 }
 
-func registerOpenCode(ctx context.Context, opencode string, server entry) (Action, error) {
-	args := []string{"mcp", "add", server.Name}
-	for key, value := range server.Env {
-		args = append(args, "--env", key+"="+value)
-	}
-	args = append(args, "--", server.Binary, "server")
-	if output, err := exec.CommandContext(ctx, opencode, args...).CombinedOutput(); err != nil {
-		return Action{}, errors.New("opencode mcp add failed (it needs OpenCode 1.17 or newer): " + strings.TrimSpace(string(output)))
-	}
-	return Action{Client: "opencode", Target: "~/.config/opencode/opencode.json", Detail: "registered user-wide", Command: commandLine(opencode, args)}, nil
-}
-
 func registerVSCode(ctx context.Context, code string, server entry) (Action, error) {
 	if wsl() {
 		return Action{Client: "vscode", Detail: "skipped under WSL: `code` here is the Windows editor, which cannot run a Linux path; run the Windows installer"}, nil
