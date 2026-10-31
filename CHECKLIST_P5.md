@@ -21,7 +21,8 @@
   - Cursor（编辑 `~/.cursor/mcp.json`，保留其它键，非 JSON 就停）、Gemini CLI、OpenCode、VS Code（WSL 下跳过）；结果附 `any_other_client` 的 `mcpServers` 条目。真实 gemini-cli 与 opencode-ai 各跑两遍：写入并替换。评审第 1 轮 FAIL 只报 p5-4 的真实路径问题；第 2 轮 PASS。
 - [x] **p5-6** 干净机器验收：没有 Python 的 Linux 容器里跑那一条命令，再用 stdio JSON-RPC 驱动 MCP 写一条记忆、读回来；CI 在 Linux、macOS、Windows 上跑同样的步骤。
   - `scripts/install_acceptance.sh --source`：debian:bookworm-slim（无 Python 无 Git）一条命令装好，客户端经 `scripts/mcp_roundtrip.py` 写入并读回。CI `install.yml`：ubuntu、macos、windows 与裸容器四个 job 全绿（run 41154989666）。验收逼出三个真问题并在根上修掉：精简 Debian 没有 `pgrep`（改读 `/proc`）；rapidocr 拉进的 GUI 版 OpenCV 缺 libxcb（安装时排除，用 headless）；uv 的 macOS Python 不能加载扩展（只有 VectorIndex 加载 sqlite-vec，`test_without_extensions.py`）。评审第 1 轮 PASS。
-- [ ] **p5-7** 发布：打 `mcp-v0.2.0`，安装脚本取它；README、`elysian-mcp/README.md`、AGENTS.md 同步。
+- [x] **p5-7** 发布：打 `mcp-v0.2.0`，安装脚本取它；README、`elysian-mcp/README.md`、AGENTS.md 同步。
+  - 发布 `mcp-v0.2.0`，后修为 `mcp-v0.2.1`：发布流程末尾的 accept job 在裸 Debian 上跑公开的一行命令，两次都 success。评审第 1 轮 FAIL（Windows 覆盖不了运行中的 elysian-mcp.exe，改为先改名）；第 2 轮 FAIL，D1 带方括号的路径被当通配符，D2 下载前就移走旧二进制，D3 MCP 的 HTTP 客户端把成功响应截到 4096 字节（发布包既有问题，修后发 v0.2.1）；第 3 轮 FAIL（含方括号的 TEMP 下 `New-TemporaryFile` 失效，改 `GetTempFileName`，`907d362`）。3 轮用完，该修复经评审在原生 PowerShell 5.1 复核 PASS。Windows 的发布模式未在本机真跑（会改用户真实的客户端配置），只跑了 CI 的源码模式与上述局部实测。
 
 ## B. 宣传站（`site/` → `elysian.elydora.com`）
 
