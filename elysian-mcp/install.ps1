@@ -34,9 +34,18 @@ if (-not $ProjectRoot) {
   }
 }
 $ProjectRoot = (Resolve-Path $ProjectRoot).Path
+# Only a home the user named is passed on; otherwise the server's own rule, and its guards, decide.
 if (-not $ElysianHome) { $ElysianHome = $env:ELYSIAN_HOME }
-if (-not $ElysianHome) { $ElysianHome = Join-Path $HOME ".elysian" }
-$BinDir = Join-Path $ElysianHome "bin"
+$HomeArgs = @()
+if ($ElysianHome) {
+  New-Item -ItemType Directory -Force -Path $ElysianHome | Out-Null
+  $ElysianHome = (Resolve-Path $ElysianHome).Path
+  $HomeArgs = @("--elysian-home", $ElysianHome)
+  $BinDir = Join-Path $ElysianHome "bin"
+}
+else {
+  $BinDir = Join-Path (Join-Path $HOME ".elysian") "bin"
+}
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 $Binary = Join-Path $BinDir "elysian-mcp.exe"
 
@@ -123,5 +132,5 @@ switch ($Method) {
   --scope $Scope `
   --server-name $ServerName `
   --project-root $ProjectRoot `
-  --elysian-home $ElysianHome `
+  @HomeArgs `
   --binary $Binary

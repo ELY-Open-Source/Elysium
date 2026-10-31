@@ -83,3 +83,24 @@ func TestAnExplicitHomeWithAnOldDatabaseIsRefused(t *testing.T) {
 		t.Fatalf("a moved store must open, got %v", err)
 	}
 }
+
+func TestAProjectLinkToTheGlobalStoreIsTheSameStore(t *testing.T) {
+	root := user(t)
+	global := filepath.Join(root, "user", ".elysian")
+	store(t, filepath.Join(global, "data", "elysian.sqlite"))
+	if err := os.Symlink(global, filepath.Join(root, "project", ".elysian")); err != nil {
+		t.Fatal(err)
+	}
+	if home, err := resolveHome(""); err != nil || home != global {
+		t.Fatalf("a link to the global store must open it, got %q, %v", home, err)
+	}
+}
+
+func TestTheProjectRootIsTheWorkingDirectoryNotTheHomesParent(t *testing.T) {
+	root := user(t)
+	store(t, filepath.Join(root, "user", ".elysian", "data", "elysian.sqlite"))
+	cfg, err := Resolve("", "", "")
+	if err != nil || cfg.ProjectRoot != filepath.Join(root, "project") {
+		t.Fatalf("the project root must be the working directory, got %q, %v", cfg.ProjectRoot, err)
+	}
+}

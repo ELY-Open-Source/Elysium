@@ -49,9 +49,16 @@ if [[ -z "$PROJECT_ROOT" ]]; then
   fi
 fi
 PROJECT_ROOT="$(cd -- "$PROJECT_ROOT" && pwd)"
-[[ -z "$ELYSIAN_HOME" ]] && ELYSIAN_HOME="$HOME/.elysian"
-mkdir -p "$ELYSIAN_HOME/bin"
-BINARY="$ELYSIAN_HOME/bin/elysian-mcp"
+# Only a home the user named is passed on; otherwise the server's own rule, and its guards, decide.
+HOME_ARGS=()
+if [[ -n "$ELYSIAN_HOME" ]]; then
+  mkdir -p "$ELYSIAN_HOME"
+  ELYSIAN_HOME="$(cd -- "$ELYSIAN_HOME" && pwd)"
+  HOME_ARGS=(--elysian-home "$ELYSIAN_HOME")
+fi
+BIN_DIR="${ELYSIAN_HOME:-$HOME/.elysian}/bin"
+mkdir -p "$BIN_DIR"
+BINARY="$BIN_DIR/elysian-mcp"
 
 detect_platform() {
   local os arch
@@ -139,5 +146,5 @@ acquire
   --scope "$SCOPE" \
   --server-name "$SERVER_NAME" \
   --project-root "$PROJECT_ROOT" \
-  --elysian-home "$ELYSIAN_HOME" \
+  ${HOME_ARGS[@]+"${HOME_ARGS[@]}"} \
   --binary "$BINARY"

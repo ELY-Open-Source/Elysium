@@ -41,3 +41,16 @@ def test_naming_the_project_store_opens_it(user: Path, monkeypatch: pytest.Monke
 
     assert Settings().home == store
     assert Settings(home=user / "elsewhere").home == user / "elsewhere"
+
+
+def test_an_empty_elysian_home_means_unset_as_in_the_mcp_server(user: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ELYSIAN_HOME", "")
+
+    assert Settings().home == user / "user" / ".elysian"
+
+
+def test_a_home_in_the_dotenv_file_is_refused(user: Path) -> None:
+    (user / "project" / ".env").write_text("ELYSIAN_HOME=relative\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="sets ELYSIAN_HOME, which the MCP server does not read"):
+        Settings()

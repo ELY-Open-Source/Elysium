@@ -39,7 +39,7 @@ def test_an_exported_old_variable_in_the_dotenv_file_is_refused(tmp_path: Path, 
 
 
 def test_a_relative_home_beside_the_old_one_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """.env.example ships ELYSIAN_HOME=.elysian; a relative home must not slip past the absolute comparison."""
+    """A relative ELYSIAN_HOME must not slip past the absolute comparison."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".ely_eye" / "data").mkdir(parents=True)

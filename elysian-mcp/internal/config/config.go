@@ -39,7 +39,7 @@ func Resolve(projectRoot string, elysianHome string, binary string) (Config, err
 	}
 	root := projectRoot
 	if root == "" {
-		root = filepath.Dir(home)
+		root = "."
 	}
 	root, err = filepath.Abs(root)
 	if err != nil {
@@ -101,7 +101,7 @@ func refuseProjectStore(home string) error {
 	}
 	for _, name := range append([]string{".elysian"}, oldHomeNames...) {
 		store := filepath.Join(cwd, name)
-		if exists(filepath.Join(store, "data")) && store != home {
+		if exists(filepath.Join(store, "data")) && real(store) != real(home) {
 			return errors.New(store + " holds a project store, and Elysian now keeps memory in " + home +
 				"; set ELYSIAN_HOME=" + store + " to keep using it, or move it to " + home)
 		}
@@ -129,6 +129,14 @@ func refuseOldStores(home string) error {
 		}
 	}
 	return nil
+}
+
+// real follows symlinks, as the backend's Path.resolve does; a path not yet made stays as given.
+func real(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 func exists(path string) bool {

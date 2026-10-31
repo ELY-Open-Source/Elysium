@@ -16,7 +16,7 @@ OLD_DATABASE_NAMES = ("ely_eye.sqlite", "elysium.sqlite")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ELYSIAN_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="ELYSIAN_", env_file=".env", env_ignore_empty=True, extra="ignore")
 
     home: Path = Field(default_factory=lambda: Path.home() / ".elysian")
     default_holder: str = "local"
@@ -122,6 +122,11 @@ def refuse_old_names(settings: Settings, environment: dict[str, str], cwd: Path)
     dotenv = cwd / ".env"
     names = list(environment) + (list(dotenv_values(dotenv)) if dotenv.is_file() else [])
     old = sorted((name, prefix) for name in names for prefix in OLD_ENV_PREFIXES if name.startswith(prefix))
+    if dotenv.is_file() and "ELYSIAN_HOME" in dotenv_values(dotenv):
+        raise SystemExit(
+            f"{dotenv} sets ELYSIAN_HOME, which the MCP server does not read, so the two would open "
+            "different stores; export ELYSIAN_HOME instead"
+        )
     if "ELYSIAN_VLM_MODEL_DIR" in names:
         raise SystemExit(
             "ELYSIAN_VLM_MODEL_DIR is set, but pictures are now described by a served model: "
