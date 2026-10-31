@@ -19,7 +19,8 @@
   - 根目录 `install.sh` / `install.ps1` 是唯一安装器（删 `elysian-mcp/install.*`）：uv（官方脚本装到 `~/.local/bin`）、按 release tag 的 GitHub 归档装后端（不需要 Git，`--excludes opencv-python` 避开要 X 库的 GUI 版 OpenCV）、`elysian init`、校验后的 MCP 二进制、旁边放 `elysian`（Windows 复制 exe）、`elysian-mcp setup`。重装先停本 home 的 API（真实路径匹配；Linux 读 `/proc`，macOS 用 `pgrep`）。评审第 1 轮 FAIL D1–D4（注册未用解析后的 home、要 Git、sed 解析 JSON、ASCII 写 .cmd）；第 2 轮 FAIL D5（Windows 覆盖不了在跑的 elysian.exe）；第 3 轮 FAIL（停止排在 uv 重装之后）。3 轮用完，修复 `a6c757a` 与之后的真实路径匹配由 p5-5 的评审复核 PASS。
 - [x] **p5-5** 客户端：除 Codex、Claude Code 外，注册 Cursor、Gemini CLI、OpenCode、VS Code；格式按各家文档，不靠猜。其余客户端，安装结束时打印一段通用 stdio 配置。
   - Cursor（编辑 `~/.cursor/mcp.json`，保留其它键，非 JSON 就停）、Gemini CLI、OpenCode、VS Code（WSL 下跳过）；结果附 `any_other_client` 的 `mcpServers` 条目。真实 gemini-cli 与 opencode-ai 各跑两遍：写入并替换。评审第 1 轮 FAIL 只报 p5-4 的真实路径问题；第 2 轮 PASS。
-- [ ] **p5-6** 干净机器验收：没有 Python 的 Linux 容器里跑那一条命令，再用 stdio JSON-RPC 驱动 MCP 写一条记忆、读回来；CI 在 Linux、macOS、Windows 上跑同样的步骤。
+- [x] **p5-6** 干净机器验收：没有 Python 的 Linux 容器里跑那一条命令，再用 stdio JSON-RPC 驱动 MCP 写一条记忆、读回来；CI 在 Linux、macOS、Windows 上跑同样的步骤。
+  - `scripts/install_acceptance.sh --source`：debian:bookworm-slim（无 Python 无 Git）一条命令装好，客户端经 `scripts/mcp_roundtrip.py` 写入并读回。CI `install.yml`：ubuntu、macos、windows 与裸容器四个 job 全绿（run 41154989666）。验收逼出三个真问题并在根上修掉：精简 Debian 没有 `pgrep`（改读 `/proc`）；rapidocr 拉进的 GUI 版 OpenCV 缺 libxcb（安装时排除，用 headless）；uv 的 macOS Python 不能加载扩展（只有 VectorIndex 加载 sqlite-vec，`test_without_extensions.py`）。评审第 1 轮 PASS。
 - [ ] **p5-7** 发布：打 `mcp-v0.2.0`，安装脚本取它；README、`elysian-mcp/README.md`、AGENTS.md 同步。
 
 ## B. 宣传站（`site/` → `elysian.elydora.com`）
