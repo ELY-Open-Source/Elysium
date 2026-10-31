@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>往世乐土 Elysian · a local memory store for AI</title>
+    <meta name="description" content="Elysian (往世乐土) is a local memory store for AI agents. Every memory carries who it belongs to, where it came from, when it was true, and who may read it." />
+    <meta name="theme-color" content="#EAE2D3" />
+    <meta property="og:title" content="往世乐土 Elysian" />
+    <meta property="og:description" content="A local memory store for AI. Every memory knows whose it is." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://elysian.elydora.com/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/NotoSerifSC-700.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/NotoSerifSC-500.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Newsreader.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <canvas id="world" aria-hidden="true"></canvas>
+    <p class="flat-note" id="flat-note" hidden>This browser cannot draw the isometric scene, so the page shows its text.</p>
+    <main id="story">
+      <section class="beat" data-beat="opening" aria-labelledby="h-opening">
+        <div class="cue">
+          <h1 id="h-opening"><span lang="zh-CN">往世乐土</span> Elysian</h1>
+          <p class="zh" lang="zh-CN">给 AI 的本地记忆库。每条记忆都记得：属于谁，从哪来，何时为真，谁能读。</p>
+          <p class="en">A local memory store for AI. Every memory carries who it belongs to, where it came from, when it was true, and who may read it.</p>
+          <p class="hint" aria-hidden="true">向下滚动 · Scroll</p>
+        </div>
+      </section>
+
+      <section class="beat" data-beat="holders" aria-labelledby="h-holders">
+        <div class="cue">
+          <h2 id="h-holders" class="zh" lang="zh-CN">每个人的记忆，归每个人自己。</h2>
+          <p class="en">Each person's memories are their own. A search walks only the asker's row.</p>
+          <p class="fact"><strong>+0.455</strong> recall@10 from scoping alone, with the same ranker and the same items. A Mem0-style counterpart scores 0.866 inside one holder's memory and 0.412 across everyone's.
+            <a href="https://github.com/ELY-Open-Source/Elysian/blob/main/bench/reports/BASELINE_EXTERNAL.md">Report</a></p>
+        </div>
+      </section>
+
+      <section class="beat" data-beat="referral" aria-labelledby="h-referral">
+        <div class="cue">
+          <h2 id="h-referral" class="zh" lang="zh-CN">我不知道钥匙在哪。我知道她知道。</h2>
+          <p class="en">"I don't know where the keys are. I know my wife knows, and I can find my wife."</p>
+          <p class="fact">His chest is empty. The store says nobody here knows, and names who does. It does not invent an answer.</p>
+          <p class="hint"><span class="fine-pointer">Point at a person to read their card.</span><span class="coarse-pointer">Tap a person to read their card.</span></p>
+        </div>
+      </section>
+
+      <section class="beat" data-beat="cost" aria-labelledby="h-cost">
+        <div class="cue">
+          <h2 id="h-cost" class="zh" lang="zh-CN">同一个 9B 模型，七分之一的代价。</h2>
+          <p class="en">Same 9B model. A seventh of the tokens.</p>
+          <table>
+            <caption>recall@10 on 110 questions, Qwen3.5-9B as every system's LLM</caption>
+            <thead><tr><th scope="col">system</th><th scope="col">recall@10</th><th scope="col">9B tokens / question</th></tr></thead>
+            <tbody>
+              <tr class="win"><th scope="row">Elysian + 9B judge</th><td>0.909</td><td>32,365</td></tr>
+              <tr><th scope="row">Elysian</th><td>0.864</td><td>23,087</td></tr>
+              <tr><th scope="row">Mem0, raw text</th><td>0.891</td><td>23,087</td></tr>
+              <tr><th scope="row">Mem0, LLM extraction</th><td>0.718</td><td>228,116</td></tr>
+              <tr><th scope="row">Mem0, LLM rerank (p50 15.6 s)</th><td>0.718</td><td>233,436</td></tr>
+              <tr class="chance"><th scope="row">chance</th><td>0.591</td><td></td></tr>
+            </tbody>
+          </table>
+          <p class="fact">One run. Raw Mem0 against Elysian without the judge is inside the noise.
+            <a href="https://github.com/ELY-Open-Source/Elysian/blob/main/bench/reports/LIVE.md">Report</a></p>
+        </div>
+      </section>
+
+      <section class="beat" data-beat="speed" aria-labelledby="h-speed">
+        <div class="cue">
+          <h2 id="h-speed" class="zh" lang="zh-CN">十六万条记忆，一个文件。</h2>
+          <p class="en">165,973 atoms in one SQLite file. A search returns in 0.072 s at the median, 0.218 s at p95.</p>
+          <p class="fact">No index to rebuild: a memory is findable the moment it is stored.
+            <a href="https://github.com/ELY-Open-Source/Elysian/blob/main/bench/reports/SCALE.md">Report</a></p>
+        </div>
+      </section>
+
+      <section class="beat" data-beat="counter" aria-labelledby="h-counter">
+        <div class="cue" id="install">
+          <h2 id="h-counter" class="zh" lang="zh-CN">一条命令，任何智能体。</h2>
+          <p class="en">One command. Claude Code, Codex, Cursor, Gemini CLI, OpenCode and VS Code reach one store through one MCP server. Memory lives in <code>~/.elysian</code>. Any model.</p>
+          <div class="cmd">
+            <span class="os">macOS · Linux</span>
+            <pre><code id="install-unix">curl -fsSL https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.sh | bash</code></pre>
+            <button type="button" data-copy="install-unix">Copy</button>
+          </div>
+          <div class="cmd">
+            <span class="os">Windows</span>
+            <pre><code id="install-win">irm https://raw.githubusercontent.com/ELY-Open-Source/Elysian/main/install.ps1 | iex</code></pre>
+            <button type="button" data-copy="install-win">Copy</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="beat" data-beat="ending" aria-labelledby="h-ending">
+        <div class="cue">
+          <h2 id="h-ending" class="zh" lang="zh-CN">记住是谁的。</h2>
+          <p class="en">Remember whose it is.</p>
+          <nav class="links" aria-label="Project">
+            <a href="https://github.com/ELY-Open-Source/Elysian">GitHub</a>
+            <a href="https://github.com/ELY-Open-Source/Elysian#what-is-measured">What is measured</a>
+            <a href="https://github.com/ELY-Open-Source/Elysian/blob/main/LICENSE">MIT licence</a>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <div class="memory-card" id="memory-card" role="tooltip" hidden></div>
+    <template id="card-wife">
+      <p class="memory">the archive key is in the second drawer</p>
+      <dl><dt>holder</dt><dd>wife</dd><dt>origin</dt><dd>self</dd><dt>scenario</dt><dd>home</dd><dt>visibility</dt><dd>holder</dd></dl>
+    </template>
+    <template id="card-husband">
+      <p class="memory">no memory of the key</p>
+      <dl><dt>holder</dt><dd>husband</dd><dt>who-knows</dt><dd>wife</dd></dl>
+    </template>
+    <template id="card-agent">
+      <p class="memory" data-slot="label"></p>
+      <dl><dt>reaches</dt><dd>one MCP server</dd><dt>store</dt><dd>~/.elysian</dd></dl>
+    </template>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
