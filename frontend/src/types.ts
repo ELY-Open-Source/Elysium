@@ -130,24 +130,74 @@ export interface TrustScores {
   model: number;
 }
 
+export const MODALITIES = [
+  'text',
+  'code',
+  'image',
+  'pdf_page',
+  'pdf_region',
+  'video_frame',
+  'audio',
+  'ui_screenshot',
+  'mixed',
+] as const;
+
+export type Modality = (typeof MODALITIES)[number];
+
+export type MemoryOrigin = 'self' | 'observed' | 'artifact' | 'third_party';
+
+export type TimePrecision = 'instant' | 'minute' | 'hour' | 'day' | 'month' | 'year' | 'unknown';
+
+export interface Visibility {
+  scope: 'holder' | 'visible_to' | 'everyone';
+  holders: string[];
+  purpose: string | null;
+}
+
 export interface EvidenceAtom {
   atom_id: string;
-  modality: string;
+  modality: Modality;
   source_id: string;
   source: string;
+  ingested_at: string;
   text: string;
   image_ref: string | null;
+  embedding_refs: string[];
   layout: LayoutBox | null;
+  relations: string[];
+  trust: TrustScores;
   token_equivalent: number;
-  ingested_at: string;
+  metadata: Record<string, unknown>;
   holder_id: string;
-  origin: string;
+  origin: MemoryOrigin;
   scenario: string;
   event_time: string | null;
-  event_time_precision: string;
+  event_time_end: string | null;
+  event_time_precision: TimePrecision;
+  event_time_source: string;
   valid_from: string | null;
   valid_to: string | null;
-  trust: TrustScores;
+  supersedes: string[];
+  visibility: Visibility;
+  retention_until: string | null;
+  quarantined: boolean;
+  session_id: string;
+  importance: number | null;
+  recall_count: number;
+  last_recalled_at: string | null;
+  archived_at: string | null;
+}
+
+/** Mirrors transactive_schemas.Holder: a registered person, agent or service. */
+export interface Holder {
+  holder_id: string;
+  name: string;
+  kind: 'person' | 'agent' | 'service';
+  knows_about: string[];
+  contact: Record<string, string>;
+  token_issued_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AtomPage {
@@ -161,7 +211,7 @@ export interface SearchFilters {
   as_holder?: string | null;
   scenario?: string | null;
   source_id?: string | null;
-  modality?: string | null;
+  modality?: Modality | null;
   since?: string | null;
   until?: string | null;
   min_trust?: number | null;

@@ -212,7 +212,7 @@ Mounting one scopes every subsequent search to it; switching is one command.
 ```text
 backend/     Python: ingestion, retrieval, memory, runtime, training, FastAPI
 bench/       the benchmark suite: frozen third-party corpora, harnesses, reports
-frontend/    the local dashboard (Vite + React)
+frontend/    the local console (pnpm, Vite, React, three.js, Lenis)
 scripts/     install, serving, runtimes, smoke (.sh on Linux/macOS, .ps1 on Windows)
 elysian-mcp/ Go: the MCP server
 ```
