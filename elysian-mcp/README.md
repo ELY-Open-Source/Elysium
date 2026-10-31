@@ -12,15 +12,34 @@ The repository's `install.sh` (Linux, macOS) and `install.ps1` (Windows) install
 the top-level README. They download the checksum-verified binary of the newest `mcp-*` release into
 `<elysian-home>/bin`, place the `elysian` CLI beside it (a link; a copy on Windows), and run `elysian-mcp setup`.
 
-`setup` registers the server user-wide with every installed coding agent and skips the rest:
-Codex (`codex mcp add`), Claude Code (`claude mcp remove` then `claude mcp add-json --scope user`),
-Gemini CLI (`gemini mcp add --scope user`), OpenCode (`opencode mcp add`, 1.17 or newer), VS Code
-(`code --add-mcp`; skipped under WSL, where `code` is the Windows editor) and Cursor (it edits
-`~/.cursor/mcp.json` and keeps every other entry; a file that is not JSON stops setup untouched).
-A re-run replaces the entry. `--client <name>` registers one and fails if it is missing.
-`ELYSIAN_HOME` is written into the entry only when it was set or `--elysian-home` was given, and then
-as the resolved absolute path. The JSON it prints ends with `any_other_client`, an `mcpServers` entry
-for any other MCP client.
+`setup` wires every installed coding agent so memory works by itself, and skips the rest. For each it
+registers the server user-wide, turns off the prompt before Elysian's tools run, and adds hooks that run
+`elysian-mcp hook --client <name> <event>`: at session start it adds the project's memories to the
+agent's context, and on each prompt it recalls what matches, then saves the prompt (secrets masked;
+commands, one-word replies and short questions skipped). A hook that fails never blocks the turn; it
+writes the reason to stderr and `<elysian-home>/logs/hook.log`.
+
+| Client | Server and approval | Hooks |
+|---|---|---|
+| Claude Code (≥2.1.139) | `claude mcp add-json --scope user`; `mcp__elysian__*` allowed in `~/.claude/settings.json` | SessionStart, UserPromptSubmit (exec form) |
+| Codex | `[mcp_servers.elysian]` with `default_tools_approval_mode = "approve"` in `~/.codex/config.toml` | SessionStart, UserPromptSubmit in `hooks.json`, trusted by pinning their own hashes |
+| Factory Droid | `~/.factory/mcp.json` | SessionStart, UserPromptSubmit, and a PreToolUse hook that approves `mcp__elysian__*` |
+| Qwen Code | `~/.qwen/settings.json`, `trust: true` | SessionStart, UserPromptSubmit |
+| Gemini CLI | `gemini mcp add --scope user --trust` | SessionStart, BeforeAgent |
+| Kiro CLI | `~/.kiro/settings/mcp.json`, `autoApprove: ["*"]`; an allow rule in `permissions.yaml` | global V3 hooks in `~/.kiro/hooks/elysian.json` |
+| Antigravity (`agy`) | `~/.gemini/config/mcp_config.json`; `mcp(elysian/*)` allowed | SessionStart, PreInvocation (once per prompt) |
+| Kimi Code (2.x) | `~/.kimi-code/mcp.json`; an allow rule in `config.toml` | UserPromptSubmit, which also opens each session |
+| Copilot CLI and VS Code | `~/.copilot/mcp-config.json` (VS Code's Copilot harness reads it; `code --add-mcp` too) | sessionStart, userPromptSubmitted, a permissionRequest hook that approves only Elysian's tools |
+| Cursor | `~/.cursor/mcp.json`; `Mcp(elysian:*)` in `cli-config.json` when the CLI is there | sessionStart, beforeSubmitPrompt |
+| OpenCode (1.x and 2.x) | `~/.config/opencode/opencode.json` | a plugin, `plugins/elysian.js` |
+| Grok Build, Kigi | `[mcp_servers.elysian]` and `MCPTool(elysian__*)` in `config.toml` | a prompt hook that saves; their hooks cannot add context, so a rules file tells the model to recall |
+
+What a client still asks for, setup does not decide for the user: Claude Code, Droid, Gemini CLI,
+Grok and Kiro hold hooks (and some, the server) until a folder is trusted once. A file setup cannot
+read as its format, or a TOML table it would have to define twice, stops that client untouched and is
+named. A re-run replaces only Elysian's own entries. `--client <name>` wires one and fails if it is
+missing. `ELYSIAN_HOME` is written into entries and hooks only when it was set or `--elysian-home`
+was given. The JSON it prints ends with `any_other_client`, an `mcpServers` entry for any other client.
 
 ## Manual run
 

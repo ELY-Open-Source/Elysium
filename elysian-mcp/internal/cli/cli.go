@@ -17,7 +17,7 @@ import (
 
 // version is stamped at release build time via -ldflags -X. The default is the
 // development version used by source builds.
-var version = "0.2.2"
+var version = "0.3.0"
 
 func Run(ctx context.Context, args []string) error {
 	if len(args) == 0 {

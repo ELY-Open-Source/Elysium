@@ -113,6 +113,8 @@ is down (`internal/backend`), using the `elysian` the installer links beside the
 `scripts/mcp_autostart_smoke.sh` proves it end to end. `install.sh` / `install.ps1` at the root are the only
 installers: uv, `uv tool install` of the backend at the release tag, `elysian init`, the release binary, the sign-in
 service (systemd user unit, LaunchAgent, or the Windows Run entry for `cmd/elysian-start`, built `-H=windowsgui`), `elysian-mcp setup`.
+`elysian-mcp setup` also writes each client's hooks, which run `elysian-mcp hook --client <name>
+<event>` (`internal/hook`: one dialect per client payload) and the settings that stop its tool prompts.
 On Windows the API starts with `CREATE_NO_WINDOW`: `DETACHED_PROCESS` leaves uv's python to open a console of its own.
 
 ## Public site
