@@ -8,14 +8,19 @@ export interface Hover {
   label?: string;
 }
 
-/** One rule of the story: the DOM section it captions, its camera keys and a pure function of time. */
+/**
+ * One rule of the story: the DOM section it captions, its camera keys for a wide screen and for a
+ * portrait one (framed tighter on the subject, labels that would be too small left off), and a pure
+ * function of time.
+ */
 export interface Beat {
   id: string;
   start: number;
   settle: number;
   keys: Key[];
+  portrait: Key[];
   hover: Hover[];
-  update(t: number): void;
+  update(t: number, portrait: boolean): void;
 }
 
 /** Film time, in seconds, at which each beat's caption takes over. */

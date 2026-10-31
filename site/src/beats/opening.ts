@@ -4,7 +4,7 @@ import { actor } from '../cast';
 import { FloorPhrase } from '../floortype';
 import { C, LEGS, TOPS } from '../palette';
 import { box, column, solid } from '../solid';
-import { fit } from '../stage';
+import { cover, fit } from '../stage';
 
 export const INTRO = 3.4;
 
@@ -48,6 +48,10 @@ export function opening(root: Group): Beat {
     keys: [
       [0, fit(x0 - 6, x0 + 11, -10.4, 3.4, 1.8, 1.1)],
       [7.5, fit(x0 - 6, x0 + 9, -10.2, 3.2, 1.8, 1.02)],
+    ],
+    portrait: [
+      [0, fit(...cover(title.box, [x0 + 3, x0 + 9.6, -0.5, 0.7]), 1.8, 1.1)],
+      [7.5, fit(...cover(title.box, [x0 + 2, x0 + 7, -0.5, 0.7]), 1.8, 1.06)],
     ],
     update(t) {
       title.update(t);

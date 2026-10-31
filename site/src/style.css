@@ -218,6 +218,28 @@ tr.chance th,
 tr.chance td {
   color: var(--soft);
 }
+tbody th::before {
+  content: '';
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 0.45em;
+  vertical-align: 0.02em;
+  border-radius: 1px;
+}
+tr.win th::before {
+  background: #d0573a;
+}
+tr.own th::before {
+  background: #3d6b59;
+}
+tr.mem0 th::before {
+  background: #7a7468;
+}
+tr.chance th::before {
+  height: 0;
+  border-top: 2px dashed var(--ink);
+}
 
 code {
   font-family: var(--mono);

@@ -11,6 +11,7 @@ import {
 } from 'three';
 import { C } from './palette';
 import { eo, lerp, seg, ss } from './ease';
+import type { Box } from './stage';
 
 export const SERIF_SC = 'Noto Serif SC Sub';
 export const SERIF = 'Newsreader Sub';
@@ -104,7 +105,8 @@ interface Glyph {
 export class FloorPhrase {
   readonly node = new Group();
   private readonly glyphs: Glyph[] = [];
-  readonly end: number;
+  /** The floor rectangle the phrase covers, descenders included: [x0, x1, y0, y1]. */
+  readonly box: Box = [Infinity, -Infinity, Infinity, -Infinity];
 
   constructor(p: Phrase) {
     const sc = p.scale ?? 1;
@@ -129,7 +131,6 @@ export class FloorPhrase {
       });
       tc += 0.2;
     });
-    this.end = tc + 0.5;
   }
 
   private addGlyph(ch: string, f: Face, x: number, y: number, tc: number): void {
@@ -148,6 +149,10 @@ export class FloorPhrase {
     anchor.rotation.z = Math.PI;
     anchor.add(pivot);
     this.node.add(anchor);
+    this.box[0] = Math.min(this.box[0], x - cw);
+    this.box[1] = Math.max(this.box[1], x);
+    this.box[2] = Math.min(this.box[2], y - f.size);
+    this.box[3] = Math.max(this.box[3], y + f.size * 0.25);
     const ghost = f.colour === C.accent ? C.accentLt : C.ghost;
     this.glyphs.push({ pivot, mat, from: new Color(ghost), to: new Color(f.colour), tc });
   }

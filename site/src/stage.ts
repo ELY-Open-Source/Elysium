@@ -10,6 +10,18 @@ export interface Frame {
   hh: number;
 }
 export type Key = [t: number, frame: Frame];
+/** A floor rectangle: [x0, x1, y0, y1] in metres. */
+export type Box = [number, number, number, number];
+
+/** The smallest floor rectangle holding every given one. */
+export function cover(...boxes: Box[]): Box {
+  return [
+    Math.min(...boxes.map((b) => b[0])),
+    Math.max(...boxes.map((b) => b[1])),
+    Math.min(...boxes.map((b) => b[2])),
+    Math.max(...boxes.map((b) => b[3])),
+  ];
+}
 
 const VIEW = new Vector3(1, 1, 1).normalize();
 const MAX_PIXELS = 5_000_000;
@@ -41,11 +53,12 @@ export function fit(x0: number, x1: number, y0: number, y1: number, top = 1.8, m
 }
 
 /** Each beat's camera holds its last frame until the next beat's travel begins. */
-export function holdKeys(beats: { start: number; keys: Key[] }[]): Key[] {
+export function holdKeys(beats: { start: number; keys: Key[]; portrait: Key[] }[], portrait: boolean): Key[] {
   return beats.flatMap((b, i) => {
+    const keys = portrait ? b.portrait : b.keys;
     const next = beats[i + 1];
-    const last = b.keys[b.keys.length - 1];
-    return next ? [...b.keys, [next.start - 1.4, last[1]] as Key] : b.keys;
+    const last = keys[keys.length - 1];
+    return next ? [...keys, [next.start - 1.4, last[1]] as Key] : keys;
   });
 }
 
@@ -95,11 +108,15 @@ export class Stage {
     this.renderer.setSize(width, height, false);
   }
 
-  /** Frames the floor point in the band above the caption; the angle never changes, only translation and zoom. */
-  look(f: Frame, reserveBottom: number): void {
+  /**
+   * Frames the floor box in the band above the caption; the angle never changes, only translation and
+   * zoom. On a tall band the width sets the zoom, and `settleLow` rests the box on the caption so the
+   * spare height above shows more of the place instead of empty ground below.
+   */
+  look(f: Frame, reserveBottom: number, settleLow: boolean): void {
     const band = Math.max(this.height - reserveBottom, this.height * 0.4);
     const k = Math.min(this.width / (2 * f.hw), band / (2 * f.hh));
-    const cy = band / 2;
+    const cy = settleLow ? band - f.hh * k : band / 2;
     const target = new Vector3(f.x, f.y, 0);
     this.camera.position.copy(target).addScaledVector(VIEW, 600);
     this.camera.lookAt(target);

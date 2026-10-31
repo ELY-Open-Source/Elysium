@@ -6,7 +6,7 @@ import { FloorPhrase } from '../floortype';
 import { C, LEGS, TOPS } from '../palette';
 import { fade, strip } from '../solid';
 import { lerp, seg, ss } from '../ease';
-import { fit } from '../stage';
+import { cover, fit } from '../stage';
 
 const ROWS = [-6.6, -3.4, -0.2, 3.0];
 const FILED = [16, 12, 18, 14];
@@ -50,6 +50,10 @@ export function holders(root: Group): Beat {
     keys: [
       [t0 + 1.6, fit(x0 - 6.5, x0 + 6.5, -7.6, 9.8, 1.8, 1.08)],
       [t0 + 11.5, fit(x0 - 6.5, x0 + 6.5, -7.6, 9.8, 1.8, 1.02)],
+    ],
+    portrait: [
+      [t0 + 1.6, fit(...cover(phrase.box, [x0 - 2, x0 + 6.2, -0.8, 5.0]), 1.8, 1.08)],
+      [t0 + 11.5, fit(...cover(phrase.box, [x0 - 1, x0 + 6.2, 2.2, 5.0]), 1.8, 1.06)],
     ],
     update(t) {
       const dim = ss(seg(t, t0 + 9.2, t0 + 10.2));

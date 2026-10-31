@@ -5,7 +5,7 @@ import { FloorPhrase } from '../floortype';
 import { C, LEGS, TOPS, tri } from '../palette';
 import { box, fade, paint, rect, solid, strip, tone, toneMaterial } from '../solid';
 import { lerp, seg, ss } from '../ease';
-import { fit } from '../stage';
+import { cover, fit } from '../stage';
 
 const W0 = -7;
 const W1 = 5;
@@ -95,6 +95,10 @@ export function speed(root: Group): Beat {
     keys: [
       [t0 + 2.0, fit(x0 - 7.5, x0 + 11, -6.5, 8.6, 2.6, 1.0)],
       [t0 + 4.8, fit(x0 - 7.5, x0 + 7, -6.5, 8.6, 2.6, 1.04)],
+    ],
+    portrait: [
+      [t0 + 2.0, fit(...cover(phrase.box, [x0 - 5, x0 + 7, -5, 3]), 2.6, 1.04)],
+      [t0 + 4.8, fit(...cover(phrase.box, [x0 - 5, x0 + 6.5, -5, 3]), 2.6, 1.04)],
     ],
     update(t) {
       const turn = ss(seg(t, t0 + 2.2, t0 + 3.6));

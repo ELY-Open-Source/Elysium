@@ -5,7 +5,7 @@ import { FloorPhrase, SERIF } from '../floortype';
 import { C, LEGS, TOPS } from '../palette';
 import { box, solid, strip, type Strip } from '../solid';
 import { seg, ss } from '../ease';
-import { fit } from '../stage';
+import { cover, fit } from '../stage';
 
 const AGENTS = ['Claude Code', 'Codex', 'Cursor', 'Gemini CLI', 'OpenCode', 'VS Code'] as const;
 const LANE = 1.4;
@@ -78,10 +78,17 @@ export function counter(root: Group): Beat {
       [t0 + 2.0, fit(x0 - 7.2, x0 + 9.8, -5.4, 7.4, 2.9, 1.06)],
       [t0 + 10, fit(x0 - 7.2, x0 + 9.8, -5.4, 7.4, 2.9, 1.02)],
     ],
-    update(t) {
+    portrait: [
+      [t0 + 2.0, fit(...cover(phrase.box, [x0 - 7.2, x0 + 5.6, -5.4, 4.4]), 2.9, 1.06)],
+      [t0 + 10, fit(...cover(phrase.box, [x0 - 7.2, x0 + 5.6, -5.4, 4.4]), 2.9, 1.02)],
+    ],
+    update(t, portrait) {
       const paint = ss(seg(t, t0 + 0.4, t0 + 1.6));
       lanes.forEach((l) => l.grow(paint));
-      names.forEach((n) => n.update(t));
+      for (const n of names) {
+        n.node.visible = !portrait;
+        n.update(t);
+      }
       agents.forEach(({ a }) => a.update(t));
       panelMat.color.lerpColors(lit.off, lit.on, ss(seg(t, t0 + 8.3, t0 + 8.9)));
       phrase.update(t);

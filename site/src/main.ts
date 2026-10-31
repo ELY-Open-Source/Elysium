@@ -51,12 +51,15 @@ function wireCopyButtons(): void {
   }
 }
 
-/** Caption height eases with the camera between beats, so the frame never jumps when a caption switches. */
+/**
+ * The screen below each caption's measured top is not the scene's; that reserve eases with the camera
+ * between beats, so the frame never jumps when a caption switches.
+ */
 function reserveKeys(beats: Beat[]): [number, number][] {
   const heights = beats.map((b) => {
     const cue = document.querySelector<HTMLElement>(`[data-beat="${b.id}"] .cue`);
     if (!cue) throw new Error(`section "${b.id}" has no .cue`);
-    return cue.getBoundingClientRect().height + 28;
+    return window.innerHeight - cue.getBoundingClientRect().top + 20;
   });
   const keys: [number, number][] = [[beats[0].start, heights[0]]];
   for (let i = 1; i < beats.length; i++) keys.push([beats[i].start - 1.2, heights[i - 1]], [beats[i].start + 1.2, heights[i]]);
@@ -93,12 +96,13 @@ async function boot(): Promise<void> {
   stage.scene.add(world);
   world.add(slabGrid(-320, 40, -48, 48));
   const beats = [opening, holders, referral, cost, speed, counter, ending].map((build) => build(world));
-  const keys = holdKeys(beats);
   prepareWash(world);
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let intro = reduced ? INTRO : 0;
   let reserve: [number, number][] = [];
+  let portrait = false;
+  let keys = holdKeys(beats, portrait);
   let lastT = Number.NaN;
   let dirty = true;
   const draw = (): void => {
@@ -108,8 +112,8 @@ async function boot(): Promise<void> {
     showCaption(t);
     lastT = t;
     dirty = false;
-    for (const b of beats) b.update(t);
-    stage.look(frameAt(keys, t), reserveAt(reserve, t));
+    for (const b of beats) b.update(t, portrait);
+    stage.look(frameAt(keys, t), reserveAt(reserve, t), portrait);
     stage.render();
     canvas.dataset.t = t.toFixed(3);
   };
@@ -119,6 +123,8 @@ async function boot(): Promise<void> {
   const resize = (): void => {
     stage.resize(window.innerWidth, window.innerHeight);
     reserve = reserveKeys(beats);
+    portrait = window.innerWidth < window.innerHeight;
+    keys = holdKeys(beats, portrait);
     dirty = true;
     draw();
   };

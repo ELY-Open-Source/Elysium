@@ -6,7 +6,7 @@ import { FloorPhrase } from '../floortype';
 import { C, LEGS, TOPS } from '../palette';
 import { paint, strip } from '../solid';
 import { seg, ss } from '../ease';
-import { fit } from '../stage';
+import { cover, fit } from '../stage';
 
 const HUSBAND = 1;
 const WIFE = 2;
@@ -49,6 +49,10 @@ export function referral(root: Group): Beat {
     keys: [
       [t0 + 1.8, fit(x0 - 7.5, x0 + 7.5, -1.2, 5.6, 1.8, 1.12)],
       [t0 + 9.5, fit(x0 - 7.5, x0 + 7.5, -1.2, 5.6, 1.8, 1.04)],
+    ],
+    portrait: [
+      [t0 + 1.8, fit(...cover(phrase.box, [x0 - 6, x0 + 6, -0.7, 2.7]), 1.8, 1.1)],
+      [t0 + 9.5, fit(...cover(phrase.box, [x0 - 5.6, x0 + 5.4, -0.7, 2.7]), 1.8, 1.05)],
     ],
     update(t) {
       his.open(t, t0 + 4.6);
