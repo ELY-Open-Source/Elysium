@@ -70,7 +70,7 @@ Get-CimInstance Win32_Process -Filter "Name = 'elysian.exe'" | Where-Object { $_
 }
 Step "Elysian and its Python"
 # rapidocr pulls the GUI build of OpenCV; the headless build Elysian lists serves the same cv2.
-$Excludes = New-TemporaryFile
+$Excludes = [IO.Path]::GetTempFileName()
 Set-Content -LiteralPath $Excludes -Value "opencv-python"
 if ($Source) {
   Invoke-Checked $Uv @("tool", "install", "--python", "3.12", "--reinstall", "--excludes", $Excludes, (Join-Path $Checkout "backend"))
